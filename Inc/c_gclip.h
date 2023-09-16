@@ -54,8 +54,8 @@ public:
 	size_t GetHitNameStackSize(void);
 	void GetHitNameStackValues(unsigned int *pDst, size_t dstSize);
 
-	void SelectDrawLine(const vec3_t *pLnPts);
-	void SelectDrawTri(const vec3_t *pTriPts);
+	void SelectDrawLine(const void* Frame, const vec3_t *pLnPts);
+	void SelectDrawTri(const void* Frame, const vec3_t *pTriPts);
 
 private:
 	unsigned int m_cpEnableBits;
@@ -64,6 +64,9 @@ private:
 	std::deque<unsigned int> m_hitNameStack;
 	float m_selClosestDepth;
 	bool m_selHit;
+	const void* LastFrame = NULL;
+
+	void CheckFrame(const void* Frame);
 };
 
 #endif //_C_GCLIP_

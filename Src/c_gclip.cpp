@@ -272,10 +272,22 @@ void CGClip::GetHitNameStackValues(unsigned int *pDst, size_t dstSize) {
 	return;
 }
 
+void CGClip::CheckFrame(const void* Frame)
+{
+	// such happen on start next (sub)frame, like top one after mirror/portal/skybox
+	if (LastFrame != Frame)
+	{
+		LastFrame = Frame;
+		//Reset best depth value to farthest
+		m_selClosestDepth = std::numeric_limits<float>::infinity();
+	}
+}
 
-void CGClip::SelectDrawLine(const vec3_t *pLnPts) {
+void CGClip::SelectDrawLine(const void* Frame, const vec3_t *pLnPts) {
 	cl_line_t clLn;
 	unsigned int u;
+
+	CheckFrame(Frame);
 
 	//Discard if hit name stack empty
 	if (m_hitNameStack.empty()) {
@@ -300,9 +312,11 @@ void CGClip::SelectDrawLine(const vec3_t *pLnPts) {
 	return;
 }
 
-void CGClip::SelectDrawTri(const vec3_t *pTriPts) {
+void CGClip::SelectDrawTri(const void* Frame, const vec3_t *pTriPts) {
 	cl_tri_t clTri;
 	unsigned int u;
+
+	CheckFrame(Frame);
 
 	//Discard if hit name stack empty
 	if (m_hitNameStack.empty()) {

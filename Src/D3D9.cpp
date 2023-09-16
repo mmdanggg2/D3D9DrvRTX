@@ -1252,7 +1252,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(0,  TEXT("OneXBlending"), CPP_PROPERTY_LOCAL(OneXBlending), UTGLR_DEFAULT_OneXBlending);
 	SC_AddIntConfigParam(TEXT("MinLogTextureSize"), CPP_PROPERTY_LOCAL(MinLogTextureSize), 0);
 	SC_AddIntConfigParam(TEXT("MaxLogTextureSize"), CPP_PROPERTY_LOCAL(MaxLogTextureSize), 8);
-	SC_AddBoolConfigParam(5,  TEXT("UseMultiTexture"), CPP_PROPERTY_LOCAL(UseMultiTexture), 1);
 	SC_AddBoolConfigParam(4,  TEXT("UsePrecache"), CPP_PROPERTY_LOCAL(UsePrecache), 0);
 	SC_AddBoolConfigParam(3,  TEXT("UseTrilinear"), CPP_PROPERTY_LOCAL(UseTrilinear), 0);
 	SC_AddBoolConfigParam(2,  TEXT("UseS3TC"), CPP_PROPERTY_LOCAL(UseS3TC), UTGLR_DEFAULT_UseS3TC);
@@ -1271,13 +1270,14 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(3,  TEXT("UseSSE2"), CPP_PROPERTY_LOCAL(UseSSE2), 1);
 	SC_AddBoolConfigParam(2,  TEXT("UseTexIdPool"), CPP_PROPERTY_LOCAL(UseTexIdPool), 1);
 	SC_AddBoolConfigParam(1,  TEXT("UseTexPool"), CPP_PROPERTY_LOCAL(UseTexPool), 1);
-	SC_AddBoolConfigParam(0,  TEXT("CacheStaticMaps"), CPP_PROPERTY_LOCAL(CacheStaticMaps), 0);
 	SC_AddIntConfigParam(TEXT("DynamicTexIdRecycleLevel"), CPP_PROPERTY_LOCAL(DynamicTexIdRecycleLevel), 100);
 	SC_AddBoolConfigParam(1,  TEXT("TexDXT1ToDXT3"), CPP_PROPERTY_LOCAL(TexDXT1ToDXT3), 0);
 	SC_AddBoolConfigParam(0,  TEXT("UseFragmentProgram"), CPP_PROPERTY_LOCAL_DCV(UseFragmentProgram), 0);
 	SC_AddIntConfigParam(TEXT("SwapInterval"), CPP_PROPERTY_LOCAL(SwapInterval), -1);
 	SC_AddIntConfigParam(TEXT("FrameRateLimit"), CPP_PROPERTY_LOCAL(FrameRateLimit), 0);
+#if UTGLR_USES_SCENENODEHACK
 	SC_AddBoolConfigParam(6,  TEXT("SceneNodeHack"), CPP_PROPERTY_LOCAL(SceneNodeHack), 1);
+#endif
 	SC_AddBoolConfigParam(5,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
 	SC_AddBoolConfigParam(4,  TEXT("MaskedTextureHack"), CPP_PROPERTY_LOCAL(MaskedTextureHack), 1);
 	SC_AddBoolConfigParam(3,  TEXT("UseTripleBuffering"), CPP_PROPERTY_LOCAL(UseTripleBuffering), 0);
@@ -1287,6 +1287,9 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddIntConfigParam(TEXT("NumAASamples"), CPP_PROPERTY_LOCAL(NumAASamples), 4);
 	SC_AddBoolConfigParam(1,  TEXT("NoAATiles"), CPP_PROPERTY_LOCAL(NoAATiles), 1);
 	SC_AddBoolConfigParam(0,  TEXT("ZRangeHack"), CPP_PROPERTY_LOCAL(ZRangeHack), UTGLR_DEFAULT_ZRangeHack);
+
+	SurfaceSelectionColor = FColor(0, 0, 31, 31);
+	new(GetClass(), TEXT("SurfaceSelectionColor"), RF_Public)UStructProperty(CPP_PROPERTY(SurfaceSelectionColor), TEXT("Options"), CPF_Config, FindObjectChecked<UStruct>(NULL, TEXT("Core.Object.Color"), 1));
 
 #undef CPP_PROPERTY_LOCAL
 #undef CPP_PROPERTY_LOCAL_DCV
@@ -2116,7 +2119,6 @@ void UD3D9RenderDevice::BuildGammaRamp(float redGamma, float greenGamma, float b
 	float rcpBlueGamma = 1.0f / (2.5f * blueGamma);
 	for (u = 0; u < 256; u++) {
 		int iVal;
-		int iValRed, iValGreen, iValBlue;
 
 		//Initial value
 		iVal = u;
@@ -2127,15 +2129,10 @@ void UD3D9RenderDevice::BuildGammaRamp(float redGamma, float greenGamma, float b
 		if (iVal < 0) iVal = 0;
 		if (iVal > 255) iVal = 255;
 
-		//Gamma
-		iValRed = (int)appRound((float)appPow(iVal / 255.0f, rcpRedGamma) * 65535.0f);
-		iValGreen = (int)appRound((float)appPow(iVal / 255.0f, rcpGreenGamma) * 65535.0f);
-		iValBlue = (int)appRound((float)appPow(iVal / 255.0f, rcpBlueGamma) * 65535.0f);
-
-		//Save results
-		ramp.red[u] = (_WORD)iValRed;
-		ramp.green[u] = (_WORD)iValGreen;
-		ramp.blue[u] = (_WORD)iValBlue;
+		//Gamma + Save results
+		ramp.red[u] = (_WORD)(int)appRound((float)appPow(iVal / 255.0f, rcpRedGamma) * 65535.0f);
+		ramp.green[u] = (_WORD)(int)appRound((float)appPow(iVal / 255.0f, rcpGreenGamma) * 65535.0f);
+		ramp.blue[u] = (_WORD)(int)appRound((float)appPow(iVal / 255.0f, rcpBlueGamma) * 65535.0f);
 	}
 
 	return;
@@ -2153,7 +2150,6 @@ void UD3D9RenderDevice::BuildGammaRamp(float redGamma, float greenGamma, float b
 	float rcpBlueGamma = 1.0f / (2.5f * blueGamma);
 	for (u = 0; u < 256; u++) {
 		int iVal;
-		int iValRed, iValGreen, iValBlue;
 
 		//Initial value
 		iVal = u;
@@ -2164,15 +2160,10 @@ void UD3D9RenderDevice::BuildGammaRamp(float redGamma, float greenGamma, float b
 		if (iVal < 0) iVal = 0;
 		if (iVal > 255) iVal = 255;
 
-		//Gamma
-		iValRed = (int)appRound((float)appPow(iVal / 255.0f, rcpRedGamma) * 255.0f);
-		iValGreen = (int)appRound((float)appPow(iVal / 255.0f, rcpGreenGamma) * 255.0f);
-		iValBlue = (int)appRound((float)appPow(iVal / 255.0f, rcpBlueGamma) * 255.0f);
-
-		//Save results
-		ramp.red[u] = (BYTE)iValRed;
-		ramp.green[u] = (BYTE)iValGreen;
-		ramp.blue[u] = (BYTE)iValBlue;
+		//Gamma + Save results
+		ramp.red[u] = (BYTE)(int)appRound((float)appPow(iVal / 255.0f, rcpRedGamma) * 255.0f);
+		ramp.green[u] = (BYTE)(int)appRound((float)appPow(iVal / 255.0f, rcpGreenGamma) * 255.0f);
+		ramp.blue[u] = (BYTE)(int)appRound((float)appPow(iVal / 255.0f, rcpBlueGamma) * 255.0f);
 	}
 
 	return;
@@ -2659,7 +2650,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(TMUnits);
 		UTGLR_DEBUG_SHOW_PARAM_REG(MaxTMUnits);
 		UTGLR_DEBUG_SHOW_PARAM_REG(RefreshRate);
-		UTGLR_DEBUG_SHOW_PARAM_REG(UseMultiTexture);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UsePrecache);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTrilinear);
 //		UTGLR_DEBUG_SHOW_PARAM_REG(UseVertexSpecular);
@@ -2679,13 +2669,14 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseSSE2);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTexIdPool);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTexPool);
-		UTGLR_DEBUG_SHOW_PARAM_REG(CacheStaticMaps);
 		UTGLR_DEBUG_SHOW_PARAM_REG(DynamicTexIdRecycleLevel);
 		UTGLR_DEBUG_SHOW_PARAM_REG(TexDXT1ToDXT3);
 		UTGLR_DEBUG_SHOW_PARAM_DCV(UseFragmentProgram);
 		UTGLR_DEBUG_SHOW_PARAM_REG(SwapInterval);
 		UTGLR_DEBUG_SHOW_PARAM_REG(FrameRateLimit);
+#if UTGLR_USES_SCENENODEHACK
 		UTGLR_DEBUG_SHOW_PARAM_REG(SceneNodeHack);
+#endif
 		UTGLR_DEBUG_SHOW_PARAM_REG(SmoothMaskedTextures);
 		UTGLR_DEBUG_SHOW_PARAM_REG(MaskedTextureHack);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTripleBuffering);
@@ -2825,15 +2816,10 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		MaxTMUnits = MAX_TMUNITS;
 	}
 
-	if (UseMultiTexture) {
-		TMUnits = m_d3dCaps.MaxSimultaneousTextures;
-		debugf(TEXT("%i Texture Mapping Units found"), TMUnits);
-		if (TMUnits > MaxTMUnits) {
-			TMUnits = MaxTMUnits;
-		}
-	}
-	else {
-		TMUnits = 1;
+	TMUnits = m_d3dCaps.MaxSimultaneousTextures;
+	debugf(TEXT("%i Texture Mapping Units found"), TMUnits);
+	if (TMUnits > MaxTMUnits) {
+		TMUnits = MaxTMUnits;
 	}
 
 
@@ -3466,17 +3452,20 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 	//Reset stats
 	BindCycles = ImageCycles = ComplexCycles = GouraudCycles = TileCycles = 0;
 
+#ifdef D3D9_DEBUG
 	m_vpEnableCount = 0;
 	m_vpSwitchCount = 0;
 	m_fpEnableCount = 0;
 	m_fpSwitchCount = 0;
 	m_AASwitchCount = 0;
 	m_sceneNodeCount = 0;
+# if UTGLR_USES_SCENENODEHACK
 	m_sceneNodeHackCount = 0;
+# endif
 	m_vbFlushCount = 0;
 	m_stat0Count = 0;
 	m_stat1Count = 0;
-
+#endif
 
 	HRESULT hResult;
 
@@ -3815,7 +3804,9 @@ void UD3D9RenderDevice::SetSceneNode(FSceneNode* Frame) {
 
 	EndBuffering();		// Flush vertex array before changing the projection matrix!
 
+#ifdef D3D9_DEBUG
 	m_sceneNodeCount++;
+#endif
 
 	//No need to set default AA state here
 	//No need to set default projection state as this function always sets/initializes it
@@ -3874,24 +3865,24 @@ void UD3D9RenderDevice::SetSceneNode(FSceneNode* Frame) {
 			nY *= m_RFY2;
 			pY *= m_RFY2;
 
-			cp[0] = +1.0; cp[1] = 0.0; cp[2] = 0.0; cp[3] = -nX;
+			cp[0] = +1.0f; cp[1] = 0.0f; cp[2] = 0.0f; cp[3] = -nX;
 			m_gclip.SetCp(0, cp);
 			m_gclip.SetCpEnable(0, true);
 
-			cp[0] = 0.0; cp[1] = +1.0; cp[2] = 0.0; cp[3] = -nY;
+			cp[0] = 0.0f; cp[1] = +1.0f; /*cp[2] = 0.0f;*/ cp[3] = -nY;
 			m_gclip.SetCp(1, cp);
 			m_gclip.SetCpEnable(1, true);
 
-			cp[0] = -1.0; cp[1] = 0.0; cp[2] = 0.0; cp[3] = +pX;
+			cp[0] = -1.0f; cp[1] = 0.0f; /*cp[2] = 0.0f;*/ cp[3] = +pX;
 			m_gclip.SetCp(2, cp);
 			m_gclip.SetCpEnable(2, true);
 
-			cp[0] = 0.0; cp[1] = -1.0; cp[2] = 0.0; cp[3] = +pY;
+			cp[0] = 0.0f; cp[1] = -1.0f; /*cp[2] = 0.0f;*/ cp[3] = +pY;
 			m_gclip.SetCp(3, cp);
 			m_gclip.SetCpEnable(3, true);
 
 			//Near clip plane
-			cp[0] = 0.0f; cp[1] = 0.0f; cp[2] = 1.0f; cp[3] = -0.5f;
+			/*cp[0] = 0.0f;*/ cp[1] = 0.0f; cp[2] = 1.0f; cp[3] = -0.5f;
 			m_gclip.SetCp(4, cp);
 			m_gclip.SetCpEnable(4, true);
 		}
@@ -3909,12 +3900,12 @@ void UD3D9RenderDevice::SetSceneNode(FSceneNode* Frame) {
 			N[1] = (FVector(pX * Frame->RProj.Z, 0, 1) ^ FVector(0, +1, 0)).SafeNormal();
 			N[2] = (FVector(0, nY * Frame->RProj.Z, 1) ^ FVector(+1, 0, 0)).SafeNormal();
 			N[3] = (FVector(0, pY * Frame->RProj.Z, 1) ^ FVector(-1, 0, 0)).SafeNormal();
-
+			
+			cp[3] = 0.0f;
 			for (i = 0; i < 4; i++) {
 				cp[0] = N[i].X;
 				cp[1] = N[i].Y;
 				cp[2] = N[i].Z;
-				cp[3] = 0.0f;
 				m_gclip.SetCp(i, cp);
 				m_gclip.SetCpEnable(i, true);
 			}
@@ -4026,14 +4017,16 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 	}
 #endif
 
-#if 0
+#ifdef D3D9_DEBUG
 	dout << TEXT("VP enable count = ") << m_vpEnableCount << std::endl;
 	dout << TEXT("VP switch count = ") << m_vpSwitchCount << std::endl;
 	dout << TEXT("FP enable count = ") << m_fpEnableCount << std::endl;
 	dout << TEXT("FP switch count = ") << m_fpSwitchCount << std::endl;
 	dout << TEXT("AA switch count = ") << m_AASwitchCount << std::endl;
-	dout << TEXT("Scene node count = ") << m_sceneNodeCount << std::endl;
+	dout << TEXT("Scene node count = ") << m_sceneNodeCount << std::endl; 
+# if UTGLR_USES_SCENENODEHACK
 	dout << TEXT("Scene node hack count = ") << m_sceneNodeHackCount << std::endl;
+# endif
 	dout << TEXT("VB flush count = ") << m_vbFlushCount << std::endl;
 	dout << TEXT("Stat 0 count = ") << m_stat0Count << std::endl;
 	dout << TEXT("Stat 1 count = ") << m_stat1Count << std::endl;
@@ -4114,12 +4107,16 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 
 	EndBuffering();
 
+# if UTGLR_USES_SCENENODEHACK
 	if (SceneNodeHack) {
 		if ((Frame->X != m_sceneNodeX) || (Frame->Y != m_sceneNodeY)) {
+#ifdef D3D9_DEBUG
 			m_sceneNodeHackCount++;
+#endif
 			SetSceneNode(Frame);
 		}
 	}
+# endif
 
 	SetDefaultAAState();
 	SetDefaultProjectionState();
@@ -4152,7 +4149,7 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 				triPts[2].y = Pt->Point.Y;
 				triPts[2].z = Pt->Point.Z;
 
-				m_gclip.SelectDrawTri(triPts);
+				m_gclip.SelectDrawTri(Frame, triPts);
 			}
 		}
 
@@ -4322,7 +4319,7 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 			polyColor = FPlaneTo_BGRAClamped(&Color);
 		}
 		else {
-			polyColor = 0x7F00007F;
+			polyColor = SurfaceSelectionColor.TrueColor() | (SurfaceSelectionColor.A << 24); //0x1F00003F;
 		}
 
 		for (FSavedPoly* Poly = Facet.Polys; Poly; Poly = Poly->Next) {
@@ -4702,12 +4699,16 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 
 	EndBufferingExcept(BV_TYPE_GOURAUD_POLYS);
 
+# if UTGLR_USES_SCENENODEHACK
 	if (SceneNodeHack) {
 		if ((Frame->X != m_sceneNodeX) || (Frame->Y != m_sceneNodeY)) {
+#ifdef D3D9_DEBUG
 			m_sceneNodeHackCount++;
+#endif
 			SetSceneNode(Frame);
 		}
 	}
+# endif
 
 	//Reject invalid polygons early so that other parts of the code do not have to deal with them
 	if (NumPts < 3) {
@@ -4736,7 +4737,7 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 			triPts[2].y = Pt->Point.Y;
 			triPts[2].z = Pt->Point.Z;
 
-			m_gclip.SelectDrawTri(triPts);
+			m_gclip.SelectDrawTri(Frame, triPts);
 		}
 
 		return;
@@ -4918,12 +4919,16 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 
 	EndBufferingExcept(BV_TYPE_TILES);
 
+# if UTGLR_USES_SCENENODEHACK
 	if (SceneNodeHack) {
 		if ((Frame->X != m_sceneNodeX) || (Frame->Y != m_sceneNodeY)) {
+#ifdef D3D9_DEBUG
 			m_sceneNodeHackCount++;
+#endif
 			SetSceneNode(Frame);
 		}
 	}
+# endif
 
 	//Adjust Z coordinate if Z range hack is active
 	if (m_useZRangeHack) {
@@ -4964,21 +4969,21 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 		triPts[2].y = RPY2;
 		triPts[2].z = Z;
 
-		m_gclip.SelectDrawTri(triPts);
-
+		m_gclip.SelectDrawTri(Frame, triPts);
+		/*
 		triPts[0].x = RPX1;
 		triPts[0].y = RPY1;
 		triPts[0].z = Z;
 
-		triPts[1].x = RPX2;
-		triPts[1].y = RPY2;
+		triPts[1].x = RPX2;*/
+		triPts[1].y = RPY2;/*
 		triPts[1].z = Z;
-
-		triPts[2].x = RPX1;
+		*/
+		triPts[2].x = RPX1;/*
 		triPts[2].y = RPY2;
 		triPts[2].z = Z;
-
-		m_gclip.SelectDrawTri(triPts);
+		*/
+		m_gclip.SelectDrawTri(Frame, triPts);
 
 		return;
 	}
@@ -5208,7 +5213,7 @@ void UD3D9RenderDevice::Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 			lnPts[1].y = P2.Y;
 			lnPts[1].z = P2.Z;
 
-			m_gclip.SelectDrawLine(lnPts);
+			m_gclip.SelectDrawLine(Frame, lnPts);
 
 			return;
 		}
@@ -5316,7 +5321,7 @@ void UD3D9RenderDevice::Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 		lnPts[1].y = Y2Pos;
 		lnPts[1].z = P2.Z;
 
-		m_gclip.SelectDrawLine(lnPts);
+		m_gclip.SelectDrawLine(Frame, lnPts);
 
 		return;
 	}
@@ -5433,21 +5438,21 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 		triPts[2].y = Y2Pos;
 		triPts[2].z = Z;
 
-		m_gclip.SelectDrawTri(triPts);
-
+		m_gclip.SelectDrawTri(Frame, triPts);
+		/*
 		triPts[0].x = X1Pos;
 		triPts[0].y = Y1Pos;
 		triPts[0].z = Z;
 
-		triPts[1].x = X2Pos;
-		triPts[1].y = Y2Pos;
+		triPts[1].x = X2Pos;*/
+		triPts[1].y = Y2Pos;/*
 		triPts[1].z = Z;
-
-		triPts[2].x = X1Pos;
+		*/
+		triPts[2].x = X1Pos;/*
 		triPts[2].y = Y2Pos;
 		triPts[2].z = Z;
-
-		m_gclip.SelectDrawTri(triPts);
+		*/
+		m_gclip.SelectDrawTri(Frame, triPts);
 
 		return;
 	}
@@ -5906,6 +5911,8 @@ UBOOL UD3D9RenderDevice::SupportsTextureFormat(ETextureFormat Format)
 	switch ( Format )
 	{
 	case TEXF_P8:     return true;
+	case TEXF_BGRA8:  return true;
+	case TEXF_RGBA8_: return true;
 	case TEXF_BC1:    return SupportsTC && m_dxt1TextureCap;
 	case TEXF_BC2:    return SupportsTC && m_dxt3TextureCap;
 	case TEXF_BC3:    return SupportsTC && m_dxt5TextureCap;
@@ -6235,9 +6242,6 @@ bool UD3D9RenderDevice::BindTexture(DWORD texNum, FTexInfo& Tex, FTextureInfo& I
 
 			//Set bind type
 			pBind->bindType = BIND_TYPE_NON_ZERO_PREFIX_LRU_LIST;
-			if (CacheStaticMaps && ((Tex.CurrentCacheID & 0xFF) == 0x18)) {
-				pBind->bindType = BIND_TYPE_NON_ZERO_PREFIX;
-			}
 
 			//Save tree index
 			pBind->treeIndex = (BYTE)treeIndex;
@@ -6553,9 +6557,24 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 					break;
 
 				default:
-					guard(ConvertBGRA7777);
-					(this->*pBind->pConvertBGRA7777)(Mip, Level);
-					unguard;
+					switch (Info.Format) {
+					case TEXF_BGRA8:
+						guard(ConvertBGRA8);
+						(this->*pBind->pConvertBGRA8)(Mip, Level);
+						unguard;
+						break;
+
+					case TEXF_RGBA8_:
+						guard(ConvertRGBA8);
+						(this->*pBind->pConvertRGBA8)(Mip, Level);
+						unguard;
+						break;
+
+					default:
+						guard(ConvertBGRA7777);
+						(this->*pBind->pConvertBGRA7777)(Mip, Level);
+						unguard;
+					}					
 				}
 
 				DWORD texWidth, texHeight;
@@ -6752,7 +6771,7 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 	if (pBind->texType != TEX_TYPE_NONE) {
 		//Using compressed texture
 	}
-	else if (Info.Palette) {
+	else if (FIsPalettizedFormat(Info.Format)) {
 		pBind->texType = TEX_TYPE_HAS_PALETTE;
 		pBind->texFormat = D3DFMT_A8R8G8B8;
 		//Check if texture should be 16-bit
@@ -6764,9 +6783,13 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 		pBind->texType = TEX_TYPE_NORMAL;
 		if (texFlags & TEX_FLAG_NO_CLAMP) {
 			pBind->pConvertBGRA7777 = &UD3D9RenderDevice::ConvertBGRA7777_BGRA8888_NoClamp;
+			pBind->pConvertBGRA8 = &UD3D9RenderDevice::ConvertBGRA8_BGRA8888_NoClamp;
+			pBind->pConvertRGBA8 = &UD3D9RenderDevice::ConvertRGBA8_BGRA8888_NoClamp;
 		}
 		else {
 			pBind->pConvertBGRA7777 = &UD3D9RenderDevice::ConvertBGRA7777_BGRA8888;
+			pBind->pConvertBGRA8 = &UD3D9RenderDevice::ConvertBGRA8_BGRA8888;
+			pBind->pConvertRGBA8 = &UD3D9RenderDevice::ConvertRGBA8_BGRA8888;
 		}
 		pBind->texFormat = D3DFMT_A8R8G8B8;
 	}
@@ -6781,15 +6804,19 @@ void UD3D9RenderDevice::ConvertDXT1_DXT1(const FMipmapBase *Mip, INT Level) {
 	DWORD UBlocks = 1U << Max(0, (INT)m_texConvertCtx.pBind->UBits - Level - 2);
 	DWORD VBlocks = 1U << Max(0, (INT)m_texConvertCtx.pBind->VBits - Level - 2);
 
+	DWORD USet = Min((INT)UBlocks*4, (Mip->USize + 3) >> 2 << 2) >> 1;
+	DWORD UZero = UBlocks*2 - USet;
 	for (DWORD v = 0; v < VBlocks; v++) {
 		DWORD *pDest = pTex;
-		for (DWORD u = 0; u < UBlocks; u++) {
-			//Copy one block
-			pDest[0] = pSrc[0];
-			pDest[1] = pSrc[1];
-			pSrc += 2;
-			pDest += 2;
+		if (v*4 < Mip->VSize) {
+			appMemcpy(pDest, pSrc, sizeof(DWORD)*USet);
+			pSrc += USet;
+			pDest += USet;
+		} else {
+			UZero = UBlocks*2;
 		}
+		if (UZero)
+			appMemzero(pDest, sizeof(DWORD)*UZero);
 		pTex = (DWORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
 	}
 
@@ -6809,13 +6836,17 @@ void UD3D9RenderDevice::ConvertDXT1_DXT3(const FMipmapBase *Mip, INT Level) {
 
 	for (DWORD v = 0; v < VBlocks; v++) {
 		DWORD *pDest = pTex;
+		BOOL bZero = v*4 >= Mip->VSize;
 		for (DWORD u = 0; u < UBlocks; u++) {
 			//Copy one block
 			pDest[0] = 0xFFFFFFFF;
 			pDest[1] = 0xFFFFFFFF;
-			pDest[2] = pSrc[0];
-			pDest[3] = pSrc[1];
-			pSrc += 2;
+			if (bZero || u*4 >= Mip->USize) {
+				appMemzero(&pDest[2], sizeof(DWORD)*2);
+			} else {
+				appMemcpy(&pDest[2], pSrc, sizeof(DWORD)*2);
+				pSrc += 2;
+			}
 			pDest += 4;
 		}
 		pTex = (DWORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
@@ -6835,17 +6866,19 @@ void UD3D9RenderDevice::ConvertDXT35_DXT35(const FMipmapBase *Mip, INT Level) {
 	DWORD UBlocks = 1U << Max(0, (INT)m_texConvertCtx.pBind->UBits - Level - 2);
 	DWORD VBlocks = 1U << Max(0, (INT)m_texConvertCtx.pBind->VBits - Level - 2);
 
+	DWORD USet = Min((INT)UBlocks*4, (Mip->USize + 3) >> 2 << 2);
+	DWORD UZero = UBlocks*4 - USet;
 	for (DWORD v = 0; v < VBlocks; v++) {
 		DWORD *pDest = pTex;
-		for (DWORD u = 0; u < UBlocks; u++) {
-			//Copy one block
-			pDest[0] = pSrc[0];
-			pDest[1] = pSrc[1];
-			pDest[2] = pSrc[2];
-			pDest[3] = pSrc[3];
-			pSrc += 4;
-			pDest += 4;
+		if (v*4 < Mip->VSize) {
+			appMemcpy(pDest, pSrc, sizeof(DWORD)*USet);
+			pSrc += USet;
+			pDest += USet;
+		} else {
+			UZero = UBlocks*4;
 		}
+		if (UZero)
+			appMemzero(pDest, sizeof(DWORD)*UZero);
 		pTex = (DWORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
 	}
 
@@ -6860,18 +6893,25 @@ void UD3D9RenderDevice::ConvertDXT35_DXT35(const FMipmapBase *Mip, INT Level) {
 void UD3D9RenderDevice::ConvertP8_RGBA8888(const FMipmapBase *Mip, const FColor *Palette, INT Level) {
 	DWORD *pTex = (DWORD *)m_texConvertCtx.lockRect.pBits;
 	INT StepBits = m_texConvertCtx.stepBits;
-	DWORD UMask = Mip->USize - 1;
-	DWORD VMask = Mip->VSize - 1;
+	DWORD UMask = (1U << Mip->UBits) - 1;
+	DWORD VMask = (1U << Mip->VBits) - 1;
 	INT ij_inc = 1 << StepBits;
 	INT i_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->VBits - Level + StepBits);
 	INT j_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->UBits - Level + StepBits);
 	INT i = 0;
 	do { //i_stop always >= 1
-		BYTE* Base = (BYTE*)Mip->DataPtr + (i & VMask) * Mip->USize;
+		INT VOff = i & VMask;
+		BYTE* Base = (BYTE*)Mip->DataPtr + VOff * Mip->USize;
+		BOOL bZero = VOff >= Mip->VSize;
 		INT j = 0;
 		do { //j_stop always >= 1
-			DWORD dwColor = GET_COLOR_DWORD(Palette[Base[j & UMask]]);
-			pTex[j] = (dwColor & 0xFF00FF00) | ((dwColor >> 16) & 0xFF) | ((dwColor << 16) & 0xFF0000);
+			INT UOff = j & UMask;
+			if (bZero || UOff >= Mip->USize)
+				pTex[j] = 0;
+			else {
+				DWORD dwColor = GET_COLOR_DWORD(Palette[Base[UOff]]);
+				pTex[j] = (dwColor & 0xFF00FF00) | ((dwColor >> 16) & 0xFF) | ((dwColor << 16) & 0xFF0000);
+			}
 		} while ((j += ij_inc) < j_stop);
 		pTex = (DWORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
 	} while ((i += ij_inc) < i_stop);
@@ -6886,17 +6926,24 @@ void UD3D9RenderDevice::ConvertP8_RGBA8888(const FMipmapBase *Mip, const FColor 
 
 void UD3D9RenderDevice::ConvertP8_RGBA8888_NoStep(const FMipmapBase *Mip, const FColor *Palette, INT Level) {
 	DWORD *pTex = (DWORD *)m_texConvertCtx.lockRect.pBits;
-	DWORD UMask = Mip->USize - 1;
-	DWORD VMask = Mip->VSize - 1;
+	DWORD UMask = (1U << Mip->UBits) - 1;
+	DWORD VMask = (1U << Mip->VBits) - 1;
 	INT i_stop = m_texConvertCtx.texHeightPow2;
 	INT j_stop = m_texConvertCtx.texWidthPow2;
 	INT i = 0;
 	do { //i_stop always >= 1
-		BYTE* Base = (BYTE*)Mip->DataPtr + (i & VMask) * Mip->USize;
+		INT VOff = i & VMask;
+		BYTE* Base = (BYTE*)Mip->DataPtr + VOff * Mip->USize;
+		BOOL bZero = VOff >= Mip->VSize;
 		INT j = 0;
 		do { //j_stop always >= 1
-			DWORD dwColor = GET_COLOR_DWORD(Palette[Base[j & UMask]]);
-			pTex[j] = (dwColor & 0xFF00FF00) | ((dwColor >> 16) & 0xFF) | ((dwColor << 16) & 0xFF0000);
+			INT UOff = j & UMask;
+			if (bZero || UOff >= Mip->USize)
+				pTex[j] = 0;
+			else {
+				DWORD dwColor = GET_COLOR_DWORD(Palette[Base[UOff]]);
+				pTex[j] = (dwColor & 0xFF00FF00) | ((dwColor >> 16) & 0xFF) | ((dwColor << 16) & 0xFF0000);
+			}	
 		} while ((j += 1) < j_stop);
 		pTex = (DWORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
 	} while ((i += 1) < i_stop);
@@ -6912,18 +6959,25 @@ void UD3D9RenderDevice::ConvertP8_RGBA8888_NoStep(const FMipmapBase *Mip, const 
 void UD3D9RenderDevice::ConvertP8_RGB565(const FMipmapBase *Mip, const FColor *Palette, INT Level) {
 	_WORD *pTex = (_WORD *)m_texConvertCtx.lockRect.pBits;
 	INT StepBits = m_texConvertCtx.stepBits;
-	DWORD UMask = Mip->USize - 1;
-	DWORD VMask = Mip->VSize - 1;
+	DWORD UMask = (1U << Mip->UBits) - 1;
+	DWORD VMask = (1U << Mip->VBits) - 1;
 	INT ij_inc = 1 << StepBits;
 	INT i_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->VBits - Level + StepBits);
 	INT j_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->UBits - Level + StepBits);
 	INT i = 0;
 	do { //i_stop always >= 1
-		BYTE* Base = (BYTE*)Mip->DataPtr + (i & VMask) * Mip->USize;
+		INT VOff = i & VMask;
+		BYTE* Base = (BYTE*)Mip->DataPtr + VOff * Mip->USize;
+		BOOL bZero = VOff >= Mip->VSize;
 		INT j = 0;
 		do { //j_stop always >= 1
-			DWORD dwColor = GET_COLOR_DWORD(Palette[Base[j & UMask]]);
-			pTex[j] = ((dwColor >> 19) & 0x001F) | ((dwColor >> 5) & 0x07E0) | ((dwColor << 8) & 0xF800);
+			INT UOff = j & UMask;
+			if (bZero || UOff >= Mip->USize)
+				pTex[j] = 0;
+			else {
+				DWORD dwColor = GET_COLOR_DWORD(Palette[Base[UOff]]);
+				pTex[j] = ((dwColor >> 19) & 0x001F) | ((dwColor >> 5) & 0x07E0) | ((dwColor << 8) & 0xF800);
+			}
 		} while ((j += ij_inc) < j_stop);
 		pTex = (WORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
 	} while ((i += ij_inc) < i_stop);
@@ -6938,17 +6992,24 @@ void UD3D9RenderDevice::ConvertP8_RGB565(const FMipmapBase *Mip, const FColor *P
 
 void UD3D9RenderDevice::ConvertP8_RGB565_NoStep(const FMipmapBase *Mip, const FColor *Palette, INT Level) {
 	_WORD *pTex = (_WORD *)m_texConvertCtx.lockRect.pBits;
-	DWORD UMask = Mip->USize - 1;
-	DWORD VMask = Mip->VSize - 1;
+	DWORD UMask = (1U << Mip->UBits) - 1;
+	DWORD VMask = (1U << Mip->VBits) - 1;
 	INT i_stop = m_texConvertCtx.texHeightPow2;
 	INT j_stop = m_texConvertCtx.texWidthPow2;
 	INT i = 0;
 	do { //i_stop always >= 1
-		BYTE* Base = (BYTE*)Mip->DataPtr + (i & VMask) * Mip->USize;
+		INT VOff = i & VMask;
+		BYTE* Base = (BYTE*)Mip->DataPtr + VOff * Mip->USize;
+		BOOL bZero = VOff >= Mip->VSize;
 		INT j = 0;
 		do { //j_stop always >= 1
-			DWORD dwColor = GET_COLOR_DWORD(Palette[Base[j & UMask]]);
-			pTex[j] = ((dwColor >> 19) & 0x001F) | ((dwColor >> 5) & 0x07E0) | ((dwColor << 8) & 0xF800);
+			INT UOff = j & UMask;
+			if (bZero || UOff >= Mip->USize)
+				pTex[j] = 0;
+			else {
+				DWORD dwColor = GET_COLOR_DWORD(Palette[Base[UOff]]);
+				pTex[j] = ((dwColor >> 19) & 0x001F) | ((dwColor >> 5) & 0x07E0) | ((dwColor << 8) & 0xF800);
+			}
 		} while ((j += 1) < j_stop);
 		pTex = (_WORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
 	} while ((i += 1) < i_stop);
@@ -6964,18 +7025,25 @@ void UD3D9RenderDevice::ConvertP8_RGB565_NoStep(const FMipmapBase *Mip, const FC
 void UD3D9RenderDevice::ConvertP8_RGBA5551(const FMipmapBase *Mip, const FColor *Palette, INT Level) {
 	_WORD *pTex = (_WORD *)m_texConvertCtx.lockRect.pBits;
 	INT StepBits = m_texConvertCtx.stepBits;
-	DWORD UMask = Mip->USize - 1;
-	DWORD VMask = Mip->VSize - 1;
+	DWORD UMask = (1U << Mip->UBits) - 1;
+	DWORD VMask = (1U << Mip->VBits) - 1;
 	INT ij_inc = 1 << StepBits;
 	INT i_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->VBits - Level + StepBits);
 	INT j_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->UBits - Level + StepBits);
 	INT i = 0;
 	do { //i_stop always >= 1
-		BYTE* Base = (BYTE*)Mip->DataPtr + (i & VMask) * Mip->USize;
+		INT VOff = i & VMask;
+		BYTE* Base = (BYTE*)Mip->DataPtr + VOff * Mip->USize;
+		BOOL bZero = VOff >= Mip->VSize;
 		INT j = 0;
 		do { //j_stop always >= 1
-			DWORD dwColor = GET_COLOR_DWORD(Palette[Base[j & UMask]]);
-			pTex[j] = ((dwColor >> 19) & 0x001F) | ((dwColor >> 6) & 0x03E0) | ((dwColor << 7) & 0x7C00) | ((dwColor >> 16) & 0x8000);
+			INT UOff = j & UMask;
+			if (bZero || UOff >= Mip->USize)
+				pTex[j] = 0;
+			else {
+				DWORD dwColor = GET_COLOR_DWORD(Palette[Base[UOff]]);
+				pTex[j] = ((dwColor >> 19) & 0x001F) | ((dwColor >> 6) & 0x03E0) | ((dwColor << 7) & 0x7C00) | ((dwColor >> 16) & 0x8000);
+			}
 		} while ((j += ij_inc) < j_stop);
 		pTex = (WORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
 	} while ((i += ij_inc) < i_stop);
@@ -6990,17 +7058,24 @@ void UD3D9RenderDevice::ConvertP8_RGBA5551(const FMipmapBase *Mip, const FColor 
 
 void UD3D9RenderDevice::ConvertP8_RGBA5551_NoStep(const FMipmapBase *Mip, const FColor *Palette, INT Level) {
 	_WORD *pTex = (_WORD *)m_texConvertCtx.lockRect.pBits;
-	DWORD UMask = Mip->USize - 1;
-	DWORD VMask = Mip->VSize - 1;
+	DWORD UMask = (1U << Mip->UBits) - 1;
+	DWORD VMask = (1U << Mip->VBits) - 1;
 	INT i_stop = m_texConvertCtx.texHeightPow2;
 	INT j_stop = m_texConvertCtx.texWidthPow2;
 	INT i = 0;
 	do { //i_stop always >= 1
-		BYTE* Base = (BYTE*)Mip->DataPtr + (i & VMask) * Mip->USize;
+		INT VOff = i & VMask;
+		BYTE* Base = (BYTE*)Mip->DataPtr + VOff * Mip->USize;
+		BOOL bZero = VOff >= Mip->VSize;
 		INT j = 0;
 		do { //j_stop always >= 1
-			DWORD dwColor = GET_COLOR_DWORD(Palette[Base[j & UMask]]);
-			pTex[j] = ((dwColor >> 19) & 0x001F) | ((dwColor >> 6) & 0x03E0) | ((dwColor << 7) & 0x7C00) | ((dwColor >> 16) & 0x8000);
+			INT UOff = j & UMask;
+			if (bZero || UOff >= Mip->USize)
+				pTex[j] = 0;
+			else {
+				DWORD dwColor = GET_COLOR_DWORD(Palette[Base[UOff]]);
+				pTex[j] = ((dwColor >> 19) & 0x001F) | ((dwColor >> 6) & 0x03E0) | ((dwColor << 7) & 0x7C00) | ((dwColor >> 16) & 0x8000);
+			}
 		} while ((j += 1) < j_stop);
 		pTex = (_WORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
 	} while ((i += 1) < i_stop);
@@ -7016,20 +7091,27 @@ void UD3D9RenderDevice::ConvertP8_RGBA5551_NoStep(const FMipmapBase *Mip, const 
 void UD3D9RenderDevice::ConvertBGRA7777_BGRA8888(const FMipmapBase *Mip, INT Level) {
 	DWORD *pTex = (DWORD *)m_texConvertCtx.lockRect.pBits;
 	INT StepBits = m_texConvertCtx.stepBits;
-	DWORD VMask = Mip->VSize - 1;
+	DWORD VMask = (1U << Mip->VBits) - 1;
 	DWORD VClampVal = m_texConvertCtx.pBind->VClampVal;
-	DWORD UMask = Mip->USize - 1;
+	DWORD UMask = (1U << Mip->UBits) - 1;
 	DWORD UClampVal = m_texConvertCtx.pBind->UClampVal;
 	INT ij_inc = 1 << StepBits;
 	INT i_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->VBits - Level + StepBits);
 	INT j_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->UBits - Level + StepBits);
 	INT i = 0;
 	do { //i_stop always >= 1
-		FColor* Base = (FColor*)Mip->DataPtr + Min<DWORD>(i & VMask, VClampVal) * Mip->USize;
+		INT VOff = i & VMask;
+		FColor* Base = (FColor*)Mip->DataPtr + Min<DWORD>(VOff, VClampVal) * Mip->USize;
+		BOOL bZero = VOff >= Mip->VSize;
 		INT j = 0;
 		do { //j_stop always >= 1;
-			DWORD dwColor = GET_COLOR_DWORD(Base[Min<DWORD>(j & UMask, UClampVal)]);
-			pTex[j] = dwColor * 2; // because of 7777
+			INT UOff = j & UMask;
+			if (bZero || UOff >= Mip->USize)
+				pTex[j] = 0;
+			else {
+				DWORD dwColor = GET_COLOR_DWORD(Base[Min<DWORD>(UOff, UClampVal)]);
+				pTex[j] = dwColor * 2; // because of 7777
+			}
 		} while ((j += ij_inc) < j_stop);
 		pTex = (DWORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
 	} while ((i += ij_inc) < i_stop);
@@ -7045,18 +7127,165 @@ void UD3D9RenderDevice::ConvertBGRA7777_BGRA8888(const FMipmapBase *Mip, INT Lev
 void UD3D9RenderDevice::ConvertBGRA7777_BGRA8888_NoClamp(const FMipmapBase *Mip, INT Level) {
 	DWORD *pTex = (DWORD *)m_texConvertCtx.lockRect.pBits;
 	INT StepBits = m_texConvertCtx.stepBits;
-	DWORD VMask = Mip->VSize - 1;
-	DWORD UMask = Mip->USize - 1;
+	DWORD VMask = (1U << Mip->VBits) - 1;
+	DWORD UMask = (1U << Mip->UBits) - 1;
 	INT ij_inc = 1 << StepBits;
 	INT i_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->VBits - Level + StepBits);
 	INT j_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->UBits - Level + StepBits);
 	INT i = 0;
 	do { //i_stop always >= 1
-		FColor* Base = (FColor*)Mip->DataPtr + (DWORD)(i & VMask) * Mip->USize;
+		INT VOff = i & VMask;
+		FColor* Base = (FColor*)Mip->DataPtr + VOff * Mip->USize;
+		BOOL bZero = VOff >= Mip->VSize;
 		INT j = 0;
 		do { //j_stop always >= 1;
-			DWORD dwColor = GET_COLOR_DWORD(Base[(DWORD)(j & UMask)]);
-			pTex[j] = dwColor * 2; // because of 7777
+			INT UOff = j & UMask;
+			if (bZero || UOff >= Mip->USize)
+				pTex[j] = 0;
+			else {
+				DWORD dwColor = GET_COLOR_DWORD(Base[UOff]);
+				pTex[j] = dwColor * 2; // because of 7777
+			}
+		} while ((j += ij_inc) < j_stop);
+		pTex = (DWORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
+	} while ((i += ij_inc) < i_stop);
+
+#ifdef UTGLR_DEBUG_SHOW_TEX_CONVERT_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: ConvertBGRA7777_BGRA8888_NoClamp = " << si++ << std::endl;
+	}
+#endif
+}
+
+void UD3D9RenderDevice::ConvertBGRA8_BGRA8888(const FMipmapBase *Mip, INT Level) {
+	DWORD *pTex = (DWORD *)m_texConvertCtx.lockRect.pBits;
+	INT StepBits = m_texConvertCtx.stepBits;
+	DWORD VMask = (1U << Mip->VBits) - 1;
+	DWORD VClampVal = m_texConvertCtx.pBind->VClampVal;
+	DWORD UMask = (1U << Mip->UBits) - 1;
+	DWORD UClampVal = m_texConvertCtx.pBind->UClampVal;
+	INT ij_inc = 1 << StepBits;
+	INT i_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->VBits - Level + StepBits);
+	INT j_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->UBits - Level + StepBits);
+	INT i = 0;
+	do { //i_stop always >= 1
+		INT VOff = i & VMask;
+		FColor* Base = (FColor*)Mip->DataPtr + Min<DWORD>(VOff, VClampVal) * Mip->USize;
+		BOOL bZero = VOff >= Mip->VSize;
+		INT j = 0;
+		do { //j_stop always >= 1;
+			INT UOff = j & UMask;
+			if (bZero || UOff >= Mip->USize)
+				pTex[j] = 0;
+			else {
+				DWORD dwColor = GET_COLOR_DWORD(Base[Min<DWORD>(UOff, UClampVal)]);
+				pTex[j] = dwColor;
+			}
+		} while ((j += ij_inc) < j_stop);
+		pTex = (DWORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
+	} while ((i += ij_inc) < i_stop);
+
+#ifdef UTGLR_DEBUG_SHOW_TEX_CONVERT_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: ConvertBGRA7777_BGRA8888 = " << si++ << std::endl;
+	}
+#endif
+}
+
+void UD3D9RenderDevice::ConvertBGRA8_BGRA8888_NoClamp(const FMipmapBase *Mip, INT Level) {
+	DWORD *pTex = (DWORD *)m_texConvertCtx.lockRect.pBits;
+	INT StepBits = m_texConvertCtx.stepBits;
+	DWORD VMask = (1U << Mip->VBits) - 1;
+	DWORD UMask = (1U << Mip->UBits) - 1;
+	INT ij_inc = 1 << StepBits;
+	INT i_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->VBits - Level + StepBits);
+	INT j_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->UBits - Level + StepBits);
+	INT i = 0;
+	do { //i_stop always >= 1
+		INT VOff = i & VMask;
+		FColor* Base = (FColor*)Mip->DataPtr + VOff * Mip->USize;
+		BOOL bZero = VOff >= Mip->VSize;
+		INT j = 0;
+		do { //j_stop always >= 1;
+			INT UOff = j & UMask;
+			if (bZero || UOff >= Mip->USize)
+				pTex[j] = 0;
+			else {
+				DWORD dwColor = GET_COLOR_DWORD(Base[UOff]);
+				pTex[j] = dwColor;
+			}
+		} while ((j += ij_inc) < j_stop);
+		pTex = (DWORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
+	} while ((i += ij_inc) < i_stop);
+
+#ifdef UTGLR_DEBUG_SHOW_TEX_CONVERT_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: ConvertBGRA7777_BGRA8888_NoClamp = " << si++ << std::endl;
+	}
+#endif
+}
+
+void UD3D9RenderDevice::ConvertRGBA8_BGRA8888(const FMipmapBase *Mip, INT Level) {
+	DWORD *pTex = (DWORD *)m_texConvertCtx.lockRect.pBits;
+	INT StepBits = m_texConvertCtx.stepBits;
+	DWORD VMask = (1U << Mip->VBits) - 1;
+	DWORD VClampVal = m_texConvertCtx.pBind->VClampVal;
+	DWORD UMask = (1U << Mip->UBits) - 1;
+	DWORD UClampVal = m_texConvertCtx.pBind->UClampVal;
+	INT ij_inc = 1 << StepBits;
+	INT i_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->VBits - Level + StepBits);
+	INT j_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->UBits - Level + StepBits);
+	INT i = 0;
+	do { //i_stop always >= 1
+		INT VOff = i & VMask;
+		FColor* Base = (FColor*)Mip->DataPtr + Min<DWORD>(VOff, VClampVal) * Mip->USize;
+		BOOL bZero = VOff >= Mip->VSize;
+		INT j = 0;
+		do { //j_stop always >= 1;
+			INT UOff = j & UMask;
+			if (bZero || UOff >= Mip->USize)
+				pTex[j] = 0;
+			else {
+				DWORD dwColor = GET_COLOR_DWORD(Base[Min<DWORD>(UOff, UClampVal)]);
+				pTex[j] = (dwColor & 0xFF00FF00) | ((dwColor >> 16) & 0xFF) | ((dwColor << 16) & 0xFF0000);
+			}
+		} while ((j += ij_inc) < j_stop);
+		pTex = (DWORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
+	} while ((i += ij_inc) < i_stop);
+
+#ifdef UTGLR_DEBUG_SHOW_TEX_CONVERT_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: ConvertBGRA7777_BGRA8888 = " << si++ << std::endl;
+	}
+#endif
+}
+
+void UD3D9RenderDevice::ConvertRGBA8_BGRA8888_NoClamp(const FMipmapBase *Mip, INT Level) {
+	DWORD *pTex = (DWORD *)m_texConvertCtx.lockRect.pBits;
+	INT StepBits = m_texConvertCtx.stepBits;
+	DWORD VMask = (1U << Mip->VBits) - 1;
+	DWORD UMask = (1U << Mip->UBits) - 1;
+	INT ij_inc = 1 << StepBits;
+	INT i_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->VBits - Level + StepBits);
+	INT j_stop = 1 << Max(0, (INT)m_texConvertCtx.pBind->UBits - Level + StepBits);
+	INT i = 0;
+	do { //i_stop always >= 1
+		INT VOff = i & VMask;
+		FColor* Base = (FColor*)Mip->DataPtr + VOff * Mip->USize;
+		BOOL bZero = VOff >= Mip->VSize;
+		INT j = 0;
+		do { //j_stop always >= 1;
+			INT UOff = j & UMask;
+			if (bZero || UOff >= Mip->USize)
+				pTex[j] = 0;
+			else {
+				DWORD dwColor = GET_COLOR_DWORD(Base[UOff]);
+				pTex[j] = (dwColor & 0xFF00FF00) | ((dwColor >> 16) & 0xFF) | ((dwColor << 16) & 0xFF0000);
+			}
 		} while ((j += ij_inc) < j_stop);
 		pTex = (DWORD *)((BYTE *)pTex + m_texConvertCtx.lockRect.Pitch);
 	} while ((i += ij_inc) < i_stop);
@@ -7363,8 +7592,10 @@ void UD3D9RenderDevice::SetVertexShaderNoCheck(IDirect3DVertexShader9 *vertexSha
 		appErrorf(TEXT("SetVertexShader failed"));
 	}
 
+#ifdef D3D9_DEBUG
 	m_vpSwitchCount++;
 	if ((vertexShader != NULL) && (m_curVertexShader == NULL)) m_vpEnableCount++;
+#endif
 
 	//Save new current vertex shader
 	m_curVertexShader = vertexShader;
@@ -7381,8 +7612,10 @@ void UD3D9RenderDevice::SetPixelShaderNoCheck(IDirect3DPixelShader9 *pixelShader
 		appErrorf(TEXT("SetPixelShader failed"));
 	}
 
+#ifdef D3D9_DEBUG
 	m_fpSwitchCount++;
 	if ((pixelShader != NULL) && (m_curPixelShader == NULL)) m_fpEnableCount++;
+#endif
 
 	//Save new current pixel shader
 	m_curPixelShader = pixelShader;
@@ -7395,7 +7628,9 @@ void UD3D9RenderDevice::SetAAStateNoCheck(bool AAEnable) {
 	//Save new AA state
 	m_curAAEnable = AAEnable;
 
+#ifdef D3D9_DEBUG
 	m_AASwitchCount++;
+#endif
 
 	//Set new AA state
 	m_d3dDevice->SetRenderState(D3DRS_MULTISAMPLEANTIALIAS, (AAEnable) ? TRUE : FALSE);

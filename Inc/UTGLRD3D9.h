@@ -10,6 +10,8 @@
 //Make sure valid build config selected
 #undef UTGLR_VALID_BUILD_CONFIG
 
+//#define D3D9_DEBUG
+
 #if defined(UTGLR_UT_BUILD) || UNREAL_TOURNAMENT_OLDUNREAL
 #define UTGLR_VALID_BUILD_CONFIG 1
 #define UTGLR_USES_ALPHABLEND 1
@@ -59,8 +61,12 @@
 	#if _M_IX86 || _M_X64 || i386 || __x86_64__
 		#define UTGLR_X86_SSE2_MINIMUM 1
 	#endif
+	#define UTGLR_USES_SCENENODEHACK 0
 #elif UTGLR_RUNE_BUILD
 	#define UTGLR_USES_ALPHABLEND 1
+	#define UTGLR_USES_SCENENODEHACK 1
+#else
+	#define UTGLR_USES_SCENENODEHACK 1
 #endif
 
 
@@ -208,9 +214,9 @@ struct FCachedTexture {
 #endif
 	tex_params_t texParams;
 	D3DFORMAT texFormat;
-	union {
-		void (FASTCALL UD3D9RenderDevice::*pConvertBGRA7777)(const FMipmapBase *, INT);
-	};
+	void (FASTCALL UD3D9RenderDevice::*pConvertBGRA7777)(const FMipmapBase *, INT);
+	void (FASTCALL UD3D9RenderDevice::*pConvertBGRA8)(const FMipmapBase *, INT);
+	void (FASTCALL UD3D9RenderDevice::*pConvertRGBA8)(const FMipmapBase *, INT);
 	FCachedTexture *pPrev;
 	FCachedTexture *pNext;
 };
@@ -498,15 +504,16 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	bool m_texCoordBufferNeedsDiscard[MAX_TMUNITS];
 
 	inline void FlushVertexBuffers(void) {
-		unsigned int u;
 		m_curVertexBufferPos = 0;
 		m_vertexColorBufferNeedsDiscard = true;
 		m_secondaryColorBufferNeedsDiscard = true;
-		for (u = 0; u < MAX_TMUNITS; u++) {
+		for (int u = 0; u < MAX_TMUNITS; u++) {
 			m_texCoordBufferNeedsDiscard[u] = true;
 		}
 
+#ifdef D3D9_DEBUG
 		m_vbFlushCount++;
+#endif
 	}
 
 	inline void LockVertexColorBuffer(void) {
@@ -697,8 +704,10 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	DWORD m_fpEnableCount;
 	DWORD m_fpSwitchCount;
 	DWORD m_AASwitchCount;
+#if UTGLR_USES_SCENENODEHACK
 	DWORD m_sceneNodeCount;
 	DWORD m_sceneNodeHackCount;
+#endif
 	DWORD m_vbFlushCount;
 	DWORD m_stat0Count;
 	DWORD m_stat1Count;
@@ -726,7 +735,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	INT TMUnits;
 	INT MaxTMUnits;
 	INT RefreshRate;
-	UBOOL UseMultiTexture;
 	UBOOL UsePrecache;
 	UBOOL UseTrilinear;
 	UBOOL UseVertexSpecular;
@@ -744,7 +752,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	UBOOL UseSSE2;
 	UBOOL UseTexIdPool;
 	UBOOL UseTexPool;
-	UBOOL CacheStaticMaps;
 	INT DynamicTexIdRecycleLevel;
 	UBOOL TexDXT1ToDXT3;
 	UBOOL UseFragmentProgram;
@@ -765,6 +772,8 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	UBOOL UseAA;
 	INT NumAASamples;
 	UBOOL NoAATiles;
+
+	FColor SurfaceSelectionColor;
 
 	UBOOL ZRangeHack;
 	bool m_useZRangeHack;
@@ -1361,6 +1370,10 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void FASTCALL ConvertP8_RGBA5551_NoStep(const FMipmapBase *Mip, const FColor *Palette, INT Level);
 	void FASTCALL ConvertBGRA7777_BGRA8888(const FMipmapBase *Mip, INT Level);
 	void FASTCALL ConvertBGRA7777_BGRA8888_NoClamp(const FMipmapBase *Mip, INT Level);
+	void FASTCALL ConvertBGRA8_BGRA8888(const FMipmapBase *Mip, INT Level);
+	void FASTCALL ConvertBGRA8_BGRA8888_NoClamp(const FMipmapBase *Mip, INT Level);
+	void FASTCALL ConvertRGBA8_BGRA8888(const FMipmapBase *Mip, INT Level);
+	void FASTCALL ConvertRGBA8_BGRA8888_NoClamp(const FMipmapBase *Mip, INT Level);
 
 	inline void FASTCALL SetBlend(DWORD PolyFlags) {
 #if UTGLR_USES_ALPHABLEND
