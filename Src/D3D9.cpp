@@ -49,7 +49,7 @@ TODO:
 =============================================================================*/
 
 #include "D3D9Drv.h"
-#include "D3D9.h"
+#include "..\Inc\UTGLRD3D9.h"
 
 #ifdef WIN32
 #include <mmsystem.h>
@@ -1363,12 +1363,16 @@ void UD3D9RenderDevice::StaticConstructor() {
 	//Frame rate limit timer not yet initialized
 	m_frameRateLimitTimerInitialized = false;
 
+	DescFlags |= RDDESCF_Certified;
+
 	unguard;
 }
 
 
 void UD3D9RenderDevice::SC_AddBoolConfigParam(DWORD BitMaskOffset, const TCHAR *pName, UBOOL &param, ECppProperty EC_CppProperty, INT InOffset, UBOOL defaultValue) {
-	param = (((defaultValue) != 0) ? 1 : 0) << BitMaskOffset; //Doesn't exactly work like a UBOOL "// Boolean 0 (false) or 1 (true)."
+	//param = (((defaultValue) != 0) ? 1 : 0) << BitMaskOffset; //Doesn't exactly work like a UBOOL "// Boolean 0 (false) or 1 (true)."
+	// stijn: we no longer need the manual bitmask shifting in patch 469
+	param = defaultValue;
 	new(GetClass(), pName, RF_Public)UBoolProperty(EC_CppProperty, InOffset, TEXT("Options"), CPF_Config);
 }
 
@@ -1533,7 +1537,7 @@ void UD3D9RenderDevice::ShutdownFrameRateLimitTimer(void) {
 	return;
 }
 
-
+#if UTGLR_USES_ALPHABLEND
 static void FASTCALL Buffer3Verts(UD3D9RenderDevice *pRD, FTransTexture** Pts) {
 	FGLTexCoord *pTexCoordArray = &pRD->m_pTexCoordArray[0][pRD->m_bufferedVerts];
 	FGLVertexColor *pVertexColorArray = &pRD->m_pVertexColorArray[pRD->m_bufferedVerts];
@@ -1558,11 +1562,10 @@ static void FASTCALL Buffer3Verts(UD3D9RenderDevice *pRD, FTransTexture** Pts) {
 			pSecondaryColorArray++;
 		}
 		else if (pRD->m_requestedColorFlags & UD3D9RenderDevice::CF_COLOR_ARRAY) {
-#ifdef UTGLR_RUNE_BUILD
-			pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGR_Aub(&P->Light, pRD->m_gpAlpha);
-#else
-			pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGR_A255(&P->Light);
-#endif
+			if (pRD->m_gpAlpha > 0)
+				pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGR_Aub(&P->Light, pRD->m_gpAlpha);
+			else
+				pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGR_A255(&P->Light);
 		}
 		else {
 			pVertexColorArray->color = 0xFFFFFFFF;
@@ -1570,6 +1573,7 @@ static void FASTCALL Buffer3Verts(UD3D9RenderDevice *pRD, FTransTexture** Pts) {
 		pVertexColorArray++;
 	}
 }
+#endif
 
 static void FASTCALL Buffer3BasicVerts(UD3D9RenderDevice *pRD, FTransTexture** Pts) {
 	FGLTexCoord *pTexCoordArray = &pRD->m_pTexCoordArray[0][pRD->m_bufferedVerts];
@@ -1606,7 +1610,9 @@ static void FASTCALL Buffer3ColoredVerts(UD3D9RenderDevice *pRD, FTransTexture**
 		pVertexColorArray->x = P->Point.X;
 		pVertexColorArray->y = P->Point.Y;
 		pVertexColorArray->z = P->Point.Z;
-		pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGR_A255(&P->Light);
+		// stijn: needed clamping in 64-bit because Actors with AmbientGlow==0 often had RGBA values above 1
+		pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGRClamped_A255(&P->Light);
+		//pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGR_A255(&P->Light);
 		pVertexColorArray++;
 	}
 }
@@ -2033,7 +2039,7 @@ void UD3D9RenderDevice::BufferAdditionalClippedVerts(FTransTexture** Pts, INT Nu
 #ifdef UTGLR_RUNE_BUILD
 			pVertexColorArray->color = FPlaneTo_BGR_Aub(&P->Light, m_gpAlpha);
 #else
-			pVertexColorArray->color = FPlaneTo_BGR_A255(&P->Light);
+			pVertexColorArray->color = FPlaneTo_BGRClamped_A255(&P->Light);
 #endif
 		}
 		else {
@@ -2059,7 +2065,7 @@ void UD3D9RenderDevice::BufferAdditionalClippedVerts(FTransTexture** Pts, INT Nu
 #ifdef UTGLR_RUNE_BUILD
 			pVertexColorArray->color = FPlaneTo_BGR_Aub(&P->Light, m_gpAlpha);
 #else
-			pVertexColorArray->color = FPlaneTo_BGR_A255(&P->Light);
+			pVertexColorArray->color = FPlaneTo_BGRClamped_A255(&P->Light);
 #endif
 		}
 		else {
@@ -2085,7 +2091,7 @@ void UD3D9RenderDevice::BufferAdditionalClippedVerts(FTransTexture** Pts, INT Nu
 #ifdef UTGLR_RUNE_BUILD
 			pVertexColorArray->color = FPlaneTo_BGR_Aub(&P->Light, m_gpAlpha);
 #else
-			pVertexColorArray->color = FPlaneTo_BGR_A255(&P->Light);
+			pVertexColorArray->color = FPlaneTo_BGRClamped_A255(&P->Light);
 #endif
 		}
 		else {
@@ -2254,6 +2260,44 @@ void UD3D9RenderDevice::ShutdownAfterError() {
 	unguard;
 }
 
+UBOOL UD3D9RenderDevice::ResetDevice()
+{
+	//Free old resources if they exist
+	FreePermanentResources();
+
+	//Get real viewport size
+	INT NewX = Viewport->SizeX;
+	INT NewY = Viewport->SizeY;
+
+	//Don't break editor and tiny windowed mode
+	if (NewX < 16) NewX = 16;
+	if (NewY < 16) NewY = 16;
+
+	//Set new size
+	m_d3dpp.BackBufferWidth = NewX;
+	m_d3dpp.BackBufferHeight = NewY;
+
+	//Reset device
+	HRESULT hResult = m_d3dDevice->Reset(&m_d3dpp);
+	if (FAILED(hResult)) {
+		appErrorf(TEXT("Failed to create D3D device for new window size"));
+	}
+
+	//Initialize permanent rendering state, including allocation of some resources
+	InitPermanentResourcesAndRenderingState();
+
+	//Set viewport
+	D3DVIEWPORT9 d3dViewport;
+	d3dViewport.X = 0;
+	d3dViewport.Y = 0;
+	d3dViewport.Width = NewX;
+	d3dViewport.Height = NewY;
+	d3dViewport.MinZ = 0.0f;
+	d3dViewport.MaxZ = 1.0f;
+	m_d3dDevice->SetViewport(&d3dViewport);
+	
+	return TRUE;
+}
 
 UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Fullscreen) {
 	guard(UD3D9RenderDevice::SetRes);
@@ -2286,46 +2330,13 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 
 	// If not fullscreen, and color bytes hasn't changed, do nothing.
 	//If SetRes called due to device reset, do full destroy/recreate
-	if (m_d3dDevice && !saved_SetRes_isDeviceReset && !Fullscreen && !WasFullscreen && (NewColorBytes == Viewport->ColorBytes)) {
+	if (m_d3dDevice && !saved_SetRes_isDeviceReset && !Fullscreen && !WasFullscreen && (NewColorBytes == static_cast<INT>(Viewport->ColorBytes))) {
 		//Resize viewport
 		if (!Viewport->ResizeViewport(BLIT_HardwarePaint | BLIT_Direct3D, NewX, NewY, NewColorBytes)) {
 			return 0;
 		}
 
-		//Free old resources if they exist
-		FreePermanentResources();
-
-		//Get real viewport size
-		NewX = Viewport->SizeX;
-		NewY = Viewport->SizeY;
-
-		//Don't break editor and tiny windowed mode
-		if (NewX < 16) NewX = 16;
-		if (NewY < 16) NewY = 16;
-
-		//Set new size
-		m_d3dpp.BackBufferWidth = NewX;
-		m_d3dpp.BackBufferHeight = NewY;
-
-		//Reset device
-		hResult = m_d3dDevice->Reset(&m_d3dpp);
-		if (FAILED(hResult)) {
-			appErrorf(TEXT("Failed to create D3D device for new window size"));
-		}
-
-		//Initialize permanent rendering state, including allocation of some resources
-		InitPermanentResourcesAndRenderingState();
-
-		//Set viewport
-		D3DVIEWPORT9 d3dViewport;
-		d3dViewport.X = 0;
-		d3dViewport.Y = 0;
-		d3dViewport.Width = NewX;
-		d3dViewport.Height = NewY;
-		d3dViewport.MinZ = 0.0f;
-		d3dViewport.MaxZ = 1.0f;
-		m_d3dDevice->SetViewport(&d3dViewport);
-
+		ResetDevice();
 		return 1;
 	}
 
@@ -2591,6 +2602,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 				hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
 			}
 			if (FAILED(hResult)) {
+				debugf(NAME_Init, TEXT("Failed to create D3D device with software vertex processing (0x%08X)"), hResult);
 			}
 			else {
 				tryDefaultRefreshRate = false;
@@ -2606,7 +2618,14 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 				hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
 			}
 			if (FAILED(hResult)) {
-				appErrorf(TEXT("Failed to create D3D device (0x%08X)"), hResult);
+				// stijn: on win10, we also see devices getting lost here...
+				if (hResult == D3DERR_DEVICELOST) {
+					debugf(NAME_Init, TEXT("Failed to create D3D device with default refresh rate (0x%08X)"), hResult);
+					return 0;
+				}
+				else {
+					appErrorf(TEXT("Failed to create D3D device (0x%08X)"), hResult);
+				}
 			}
 		}
 	}
@@ -2932,6 +2951,9 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 
 void UD3D9RenderDevice::UnsetRes() {
 	guard(UD3D9RenderDevice::UnsetRes);
+
+	if (!m_d3d9 || !m_d3dDevice)
+		return;
 
 	check(m_d3d9);
 	check(m_d3dDevice);
@@ -3326,38 +3348,13 @@ UBOOL UD3D9RenderDevice::Init(UViewport* InViewport, INT NewX, INT NewY, INT New
 
 	// Get list of device modes.
 	for (INT i = 0; ; i++) {
-		UBOOL UnicodeOS;
-
-#if defined(NO_UNICODE_OS_SUPPORT) || !defined(UNICODE)
-		UnicodeOS = 0;
-#elif defined(NO_ANSI_OS_SUPPORT)
-		UnicodeOS = 1;
-#else
-		UnicodeOS = GUnicodeOS;
-#endif
-
-		if (!UnicodeOS) {
-#if defined(NO_UNICODE_OS_SUPPORT) || !defined(UNICODE) || !defined(NO_ANSI_OS_SUPPORT)
-			DEVMODEA Tmp;
-			appMemzero(&Tmp, sizeof(Tmp));
-			Tmp.dmSize = sizeof(Tmp);
-			if (!EnumDisplaySettingsA(NULL, i, &Tmp)) {
-				break;
-			}
-			Modes.AddUniqueItem(FPlane(Tmp.dmPelsWidth, Tmp.dmPelsHeight, Tmp.dmBitsPerPel, Tmp.dmDisplayFrequency));
-#endif
+		DEVMODEW Tmp;
+		appMemzero(&Tmp, sizeof(Tmp));
+		Tmp.dmSize = sizeof(Tmp);
+		if (!EnumDisplaySettingsW(NULL, i, &Tmp)) {
+			break;
 		}
-		else {
-#if !defined(NO_UNICODE_OS_SUPPORT) && defined(UNICODE)
-			DEVMODEW Tmp;
-			appMemzero(&Tmp, sizeof(Tmp));
-			Tmp.dmSize = sizeof(Tmp);
-			if (!EnumDisplaySettingsW(NULL, i, &Tmp)) {
-				break;
-			}
-			Modes.AddUniqueItem(FPlane(Tmp.dmPelsWidth, Tmp.dmPelsHeight, Tmp.dmBitsPerPel, Tmp.dmDisplayFrequency));
-#endif
-		}
+		Modes.AddUniqueItem(FPlane(Tmp.dmPelsWidth, Tmp.dmPelsHeight, Tmp.dmBitsPerPel, Tmp.dmDisplayFrequency));
 	}
 
 	//Load D3D9 library
@@ -3442,6 +3439,11 @@ UBOOL UD3D9RenderDevice::Exec(const TCHAR* Cmd, FOutputDevice& Ar) {
 			Str += FString::Printf(TEXT("%ix%i "), (INT)Relevant(i).X, (INT)Relevant(i).Y);
 		}
 		Ar.Log(*Str.LeftChop(1));
+		return 1;
+	}
+	else if (ParseCommand(&Cmd, TEXT("GetColorDepths")))
+	{
+		Ar.Logf(TEXT("32"));
 		return 1;
 	}
 
@@ -3867,10 +3869,10 @@ void UD3D9RenderDevice::SetSceneNode(FSceneNode* Frame) {
 			FLOAT nY = Viewport->HitY - Frame->FY2;
 			FLOAT pY = nY + Viewport->HitYL;
 
-			nX *= m_RFX2 * 0.5f;
-			pX *= m_RFX2 * 0.5f;
-			nY *= m_RFY2 * 0.5f;
-			pY *= m_RFY2 * 0.5f;
+			nX *= m_RFX2;
+			pX *= m_RFX2;
+			nY *= m_RFY2;
+			pY *= m_RFY2;
 
 			cp[0] = +1.0; cp[1] = 0.0; cp[2] = 0.0; cp[3] = -nX;
 			m_gclip.SetCp(0, cp);
@@ -3995,6 +3997,7 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 	m_currentFrameCount++;
 
 	//Check for optional frame rate limit
+#if !UNREAL_TOURNAMENT_OLDUNREAL
 	if (FrameRateLimit >= 20) {
 #if defined UTGLR_DX_BUILD || defined UTGLR_RUNE_BUILD
 		FLOAT curFrameTimestamp;
@@ -4021,7 +4024,7 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 			m_prevFrameTimestamp = appSeconds();
 		}
 	}
-
+#endif
 
 #if 0
 	dout << TEXT("VP enable count = ") << m_vpEnableCount << std::endl;
@@ -4156,7 +4159,7 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 		return;
 	}
 
-	clock(ComplexCycles);
+	clockFast(ComplexCycles);
 
 	//Calculate UDot and VDot intermediates for complex surface
 	m_csUDot = Facet.MapCoords.XAxis | Facet.MapCoords.Origin;
@@ -4363,7 +4366,7 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 		m_d3dDevice->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
 	}
 
-	unclock(ComplexCycles);
+	unclockFast(ComplexCycles);
 	unguard;
 }
 
@@ -4562,7 +4565,7 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 }
 #endif
 	guard(UD3D9RenderDevice::DrawGouraudPolygonOld);
-	clock(GouraudCycles);
+	clockFast(GouraudCycles);
 
 	//Decide if should request near Z range hack projection
 	bool requestNearZRangeHackProjection = false;
@@ -4573,11 +4576,7 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 	SetProjectionState(requestNearZRangeHackProjection);
 
 	//Check if should render fog and if vertex specular is supported
-#ifdef UTGLR_RUNE_BUILD
 	bool drawFog = (((PolyFlags & (PF_RenderFog | PF_Translucent | PF_Modulated | PF_AlphaBlend)) == PF_RenderFog) && UseVertexSpecular) ? true : false;
-#else
-	bool drawFog = (((PolyFlags & (PF_RenderFog | PF_Translucent | PF_Modulated)) == PF_RenderFog) && UseVertexSpecular) ? true : false;
-#endif
 
 	//If not drawing fog, disable the PF_RenderFog flag
 	if (!drawFog) {
@@ -4587,7 +4586,7 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 	SetBlend(PolyFlags);
 	SetTextureNoPanBias(0, Info, PolyFlags);
 
-#ifdef UTGLR_RUNE_BUILD
+#if UTGLR_USES_ALPHABLEND
 	BYTE alpha = 255;
 	if (PolyFlags & PF_AlphaBlend) {
 		alpha = appRound(Info.Texture->Alpha * 255.0f);
@@ -4656,7 +4655,7 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 #ifdef UTGLR_RUNE_BUILD
 			destVertexColor.color = FPlaneTo_BGR_Aub(&P->Light, alpha);
 #else
-			destVertexColor.color = FPlaneTo_BGR_A255(&P->Light);
+			destVertexColor.color = FPlaneTo_BGRClamped_A255(&P->Light);
 #endif
 		}
 
@@ -4685,7 +4684,7 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 	m_d3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
 #endif
 
-	unclock(GouraudCycles);
+	unclockFast(GouraudCycles);
 	unguard;
 }
 
@@ -4805,11 +4804,7 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 		else {
 			m_requestedColorFlags = CF_COLOR_ARRAY;
 
-#ifdef UTGLR_RUNE_BUILD
 			if (((PolyFlags & (PF_RenderFog | PF_Translucent | PF_Modulated | PF_AlphaBlend)) == PF_RenderFog) && UseVertexSpecular) {
-#else
-			if (((PolyFlags & (PF_RenderFog | PF_Translucent | PF_Modulated)) == PF_RenderFog) && UseVertexSpecular) {
-#endif
 				m_requestedColorFlags = CF_COLOR_ARRAY | CF_FOG_MODE;
 			}
 		}
@@ -4830,6 +4825,13 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 		SetDefaultTextureState();
 
 		SetBlend(PolyFlags);
+
+		// stijn: Support alphablended decal drawing. This is a backport from 227
+#if UTGLR_USES_ALPHABLEND
+		if ((PolyFlags & (PF_AlphaBlend)) && (Info.Texture->PolyFlags & PF_Modulated))
+			SetBlend(Info.Texture->PolyFlags);
+#endif
+		
 		SetTextureNoPanBias(0, Info, PolyFlags);
 
 		//Lock vertexColor and texCoord0 buffers
@@ -4874,7 +4876,7 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 		else {
 			m_pBuffer3VertsProc = m_pBuffer3BasicVertsProc;
 		}
-#ifdef UTGLR_RUNE_BUILD
+#if UTGLR_USES_ALPHABLEND
 		m_gpAlpha = 255;
 		if (PolyFlags & PF_AlphaBlend) {
 			m_gpAlpha = appRound(Info.Texture->Alpha * 255.0f);
@@ -4905,6 +4907,14 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 
 	//DrawTile does not use PolyFlags2
 	const DWORD PolyFlags2 = 0;
+
+	// stijn: fix for invisible actor icons in ortho viewports
+	if (GIsEditor &&
+		Frame->Viewport->Actor &&
+		(Frame->Viewport->IsOrtho() || Abs(Z) <= SMALL_NUMBER))
+	{
+		Z = 1.f;
+	}
 
 	EndBufferingExcept(BV_TYPE_TILES);
 
@@ -5012,14 +5022,6 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 			m_curPolyFlags = PolyFlags;
 			m_curPolyFlags2 = PolyFlags2;
 
-#ifdef UTGLR_RUNE_BUILD
-			if (Info.Palette && Info.Palette[128].A != 255 && !(PolyFlags & (PF_Translucent | PF_AlphaBlend))) {
-#else
-			if (Info.Palette && Info.Palette[128].A != 255 && !(PolyFlags & PF_Translucent)) {
-#endif
-				PolyFlags |= PF_Highlighted | PF_Occlude;
-			}
-
 			//Set default texture state
 			SetDefaultTextureState();
 
@@ -5062,9 +5064,12 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 
 				fAlpha = _mm_setzero_ps();
 				fAlpha = _mm_move_ss(fAlpha, fColorMulReg);
-#ifdef UTGLR_RUNE_BUILD
+#if UTGLR_USES_ALPHABLEND
 				if (PolyFlags & PF_AlphaBlend) {
-					fAlpha = _mm_mul_ss(fAlpha, _mm_load_ss(&Info.Texture->Alpha));
+					if (Info.Texture->Alpha > 0.f)
+						fAlpha = _mm_mul_ss(fAlpha, _mm_load_ss(&Info.Texture->Alpha));
+					else
+						fAlpha = _mm_mul_ss(fAlpha, _mm_load_ss(&Color.W));
 				}
 #endif
 				fAlpha = _mm_shuffle_ps(fAlpha, fAlpha,  _MM_SHUFFLE(0, 1, 1, 1));
@@ -5079,9 +5084,10 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 #endif
 			}
 			else {
-#ifdef UTGLR_RUNE_BUILD
+#ifdef UTGLR_USES_ALPHABLEND
 				if (PolyFlags & PF_AlphaBlend) {
-					Color.W = Info.Texture->Alpha;
+					if (Info.Texture->Alpha > 0.f)
+						Color.W = Info.Texture->Alpha;
 					tileColor = FPlaneTo_BGRAClamped(&Color);
 				}
 				else {
@@ -5183,7 +5189,7 @@ void UD3D9RenderDevice::Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 		if (Abs(P2.X - P1.X) + Abs(P2.Y - P1.Y) >= 0.2f) {
 			Draw2DLine(Frame, Color, LineFlags, P1, P2);
 		}
-		else if (Frame->Viewport->Actor->OrthoZoom < ORTHO_LOW_DETAIL) {
+		else {
 			Draw2DPoint(Frame, Color, LINE_None, P1.X - 1.0f, P1.Y - 1.0f, P1.X + 1.0f, P1.Y + 1.0f, P1.Z);
 		}
 	}
@@ -5400,10 +5406,10 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 	}
  
 	//Get point coordinates back in 3D
-	FLOAT X1Pos = m_RFX2 * (X1 - Frame->FX2);
-	FLOAT Y1Pos = m_RFY2 * (Y1 - Frame->FY2);
-	FLOAT X2Pos = m_RFX2 * (X2 - Frame->FX2);
-	FLOAT Y2Pos = m_RFY2 * (Y2 - Frame->FY2);
+	FLOAT X1Pos = m_RFX2 * (X1 - Frame->FX2 - 0.5f);
+	FLOAT Y1Pos = m_RFY2 * (Y1 - Frame->FY2 - 0.5f);
+	FLOAT X2Pos = m_RFX2 * (X2 - Frame->FX2 + 0.5f);
+	FLOAT Y2Pos = m_RFY2 * (Y2 - Frame->FY2 + 0.5f);
 	if (!Frame->Viewport->IsOrtho()) {
 		X1Pos *= Z;
 		Y1Pos *= Z;
@@ -5625,7 +5631,7 @@ void UD3D9RenderDevice::GetStats(TCHAR* Result) {
 	guard(UD3D9RenderDevice::GetStats);
 
 	double msPerCycle = GSecondsPerCycle * 1000.0f;
-	appSprintf(
+	appSprintf( // stijn: mem safety NOT OK
 		Result,
 		TEXT("D3D9 stats: Bind=%04.1f Image=%04.1f Complex=%04.1f Gouraud=%04.1f Tile=%04.1f"),
 		msPerCycle * BindCycles,
@@ -5895,6 +5901,19 @@ void UD3D9RenderDevice::PrecacheTexture(FTextureInfo& Info, DWORD PolyFlags) {
 	unguard;
 }
 
+UBOOL UD3D9RenderDevice::SupportsTextureFormat(ETextureFormat Format)
+{
+	switch ( Format )
+	{
+	case TEXF_P8:     return true;
+	case TEXF_BC1:    return SupportsTC && m_dxt1TextureCap;
+	case TEXF_BC2:    return SupportsTC && m_dxt3TextureCap;
+	case TEXF_BC3:    return SupportsTC && m_dxt5TextureCap;
+	//TODO: m_16BitTextureCap
+	case TEXF_R5G6B5: return m_565TextureCap && false; // Renderer is missing code to upload these textures directly.
+	default:          return false;
+	}
+}
 
 //This function is safe to call multiple times to initialize once
 void UD3D9RenderDevice::InitNoTextureSafe(void) {
@@ -6008,7 +6027,7 @@ void UD3D9RenderDevice::ScanForOldTextures(void) {
 				m_nonZeroPrefixBindChain->unlink(pCT);
 
 				//Get pointer to node in bind map
-				QWORD_CTTree_t::node_t *pNode = (QWORD_CTTree_t::node_t *)((BYTE *)pCT - (DWORD)&(((QWORD_CTTree_t::node_t *)0)->data));
+				QWORD_CTTree_t::node_t *pNode = (QWORD_CTTree_t::node_t *)((BYTE *)pCT - (PTRINT)&(((QWORD_CTTree_t::node_t *)0)->data));
 				//Extract tree index
 				BYTE treeIndex = pCT->treeIndex;
 				//Advanced cached texture pointer to next entry in linked list
@@ -6046,7 +6065,7 @@ void UD3D9RenderDevice::ScanForOldTextures(void) {
 				TexPoolMapKey_t texPoolKey = MakeTexPoolMapKey(pCT->UBits, pCT->VBits);
 
 				//Get pointer to node in bind map
-				QWORD_CTTree_t::node_t *pNode = (QWORD_CTTree_t::node_t *)((BYTE *)pCT - (DWORD)&(((QWORD_CTTree_t::node_t *)0)->data));
+				QWORD_CTTree_t::node_t *pNode = (QWORD_CTTree_t::node_t *)((BYTE *)pCT - (PTRINT)&(((QWORD_CTTree_t::node_t *)0)->data));
 				//Extract tree index
 				BYTE treeIndex = pCT->treeIndex;
 				//Advanced cached texture pointer to next entry in linked list
@@ -6076,7 +6095,7 @@ void UD3D9RenderDevice::ScanForOldTextures(void) {
 		//Stop searching on first one not to be recycled
 		break;
 
-		pCT = pCT->pNext;
+		//pCT = pCT->pNext;
 	}
 
 	unguard;
@@ -6086,7 +6105,7 @@ void UD3D9RenderDevice::SetNoTextureNoCheck(INT Multi) {
 	guard(UD3D9RenderDevice::SetNoTexture);
 
 	// Set small white texture.
-	clock(BindCycles);
+	clockFast(BindCycles);
 
 	//Set texture
 	m_d3dDevice->SetTexture(Multi, m_pNoTexObj);
@@ -6097,7 +6116,7 @@ void UD3D9RenderDevice::SetNoTextureNoCheck(INT Multi) {
 	TexInfo[Multi].CurrentCacheID = TEX_CACHE_ID_NO_TEX;
 	TexInfo[Multi].pBind = NULL;
 
-	unclock(BindCycles);
+	unclockFast(BindCycles);
 
 	unguard;
 }
@@ -6106,7 +6125,7 @@ void UD3D9RenderDevice::SetAlphaTextureNoCheck(INT Multi) {
 	guard(UD3D9RenderDevice::SetAlphaTexture);
 
 	// Set alpha gradient texture.
-	clock(BindCycles);
+	clockFast(BindCycles);
 
 	//Set texture
 	m_d3dDevice->SetTexture(Multi, m_pAlphaTexObj);
@@ -6117,36 +6136,33 @@ void UD3D9RenderDevice::SetAlphaTextureNoCheck(INT Multi) {
 	TexInfo[Multi].CurrentCacheID = TEX_CACHE_ID_ALPHA_TEX;
 	TexInfo[Multi].pBind = NULL;
 
-	unclock(BindCycles);
+	unclockFast(BindCycles);
 
 	unguard;
 }
 
 //This function must use Tex.CurrentCacheID and NEVER use Info.CacheID to reference the texture cache id
 //This makes it work with the masked texture hack code
-void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureInfo& Info, DWORD PolyFlags) {
-	guard(UD3D9RenderDevice::SetTexture);
 
-	// Make current.
-	clock(BindCycles);
+bool UD3D9RenderDevice::BindTexture(DWORD texNum, FTexInfo& Tex, FTextureInfo& Info, DWORD PolyFlags, FCachedTexture*& Bind)
+{
+	const bool isZeroPrefixCacheID = ((Tex.CurrentCacheID & 0xFFFFFFFF00000000ULL) == 0) ? true : false;
 
-	bool isZeroPrefixCacheID = ((Tex.CurrentCacheID & 0xFFFFFFFF00000000ULL) == 0) ? true : false;
-
-	FCachedTexture *pBind = NULL;
+	FCachedTexture* pBind = NULL;
 	bool existingBind = false;
 	HRESULT hResult;
 
 	if (isZeroPrefixCacheID) {
 		DWORD CacheIDSuffix = (Tex.CurrentCacheID & 0x00000000FFFFFFFFULL);
 
-		DWORD_CTTree_t *zeroPrefixBindTree = &m_zeroPrefixBindTrees[CTZeroPrefixCacheIDSuffixToTreeIndex(CacheIDSuffix)];
-		DWORD_CTTree_t::node_t *bindTreePtr = zeroPrefixBindTree->find(CacheIDSuffix);
+		DWORD_CTTree_t* zeroPrefixBindTree = &m_zeroPrefixBindTrees[CTZeroPrefixCacheIDSuffixToTreeIndex(CacheIDSuffix)];
+		DWORD_CTTree_t::node_t* bindTreePtr = zeroPrefixBindTree->find(CacheIDSuffix);
 		if (bindTreePtr != 0) {
 			pBind = &bindTreePtr->data;
 			existingBind = true;
 		}
 		else {
-			DWORD_CTTree_t::node_t *pNewNode;
+			DWORD_CTTree_t::node_t* pNewNode;
 
 			//Insert new texture info
 			pNewNode = m_DWORD_CTTree_Allocator.alloc_node();
@@ -6165,10 +6181,10 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 			CacheTextureInfo(pBind, Info, PolyFlags);
 
 #if 0
-{
-	static int si;
-	dout << L"utd3d9r: Create texture zp = " << si++ << std::endl;
-}
+			{
+				static int si;
+				dout << L"utd3d9r: Create texture zp = " << si++ << std::endl;
+			}
 #endif
 			//Create the texture
 			hResult = m_d3dDevice->CreateTexture(
@@ -6183,11 +6199,11 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 		}
 	}
 	else {
-		DWORD CacheIDSuffix = (Tex.CurrentCacheID & 0x00000000FFFFFFFF);
+		DWORD CacheIDSuffix = (Tex.CurrentCacheID & 0x00000000FFFFFFFFULL);
 		DWORD treeIndex = CTNonZeroPrefixCacheIDSuffixToTreeIndex(CacheIDSuffix);
 
-		QWORD_CTTree_t *nonZeroPrefixBindTree = &m_nonZeroPrefixBindTrees[treeIndex];
-		QWORD_CTTree_t::node_t *bindTreePtr = nonZeroPrefixBindTree->find(Tex.CurrentCacheID);
+		QWORD_CTTree_t* nonZeroPrefixBindTree = &m_nonZeroPrefixBindTrees[treeIndex];
+		QWORD_CTTree_t::node_t* bindTreePtr = nonZeroPrefixBindTree->find(Tex.CurrentCacheID);
 		if (bindTreePtr != 0) {
 			pBind = &bindTreePtr->data;
 			pBind->LastUsedFrameCount = m_currentFrameCount;
@@ -6202,7 +6218,7 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 			existingBind = true;
 		}
 		else {
-			QWORD_CTTree_t::node_t *pNewNode;
+			QWORD_CTTree_t::node_t* pNewNode;
 
 			//Allocate a new node
 			//Use the node pool if it is not empty
@@ -6236,6 +6252,10 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 				m_nonZeroPrefixBindChain->link_to_tail(pBind);
 			}
 
+#if UNREAL_TOURNAMENT_OLDUNREAL
+			pBind->RealtimeChangeCount = Info.Texture ? Info.Texture->RealtimeChangeCount : 0;
+#endif
+
 			//Cache texture info for the new texture
 			CacheTextureInfo(pBind, Info, PolyFlags);
 
@@ -6245,7 +6265,7 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 				//See if the format will be RGBA8
 				//Only textures without mipmaps are stored in the tex pool
 				if ((pBind->texType == TEX_TYPE_NORMAL) && (Info.NumMips == 1)) {
-					TexPoolMap_t::node_t *texPoolPtr;
+					TexPoolMap_t::node_t* texPoolPtr;
 
 					//Create a key from the lg2 width and height of the texture object
 					TexPoolMapKey_t texPoolKey = MakeTexPoolMapKey(pBind->UBits, pBind->VBits);
@@ -6253,10 +6273,10 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 					//Search for the key in the map
 					texPoolPtr = m_RGBA8TexPool->find(texPoolKey);
 					if (texPoolPtr != 0) {
-						QWORD_CTTree_NodePool_t::node_t *texPoolNodePtr;
+						QWORD_CTTree_NodePool_t::node_t* texPoolNodePtr;
 
 						//Get a reference to the pool of nodes with tex ids of the right dimension
-						QWORD_CTTree_NodePool_t &texPool = texPoolPtr->data;
+						QWORD_CTTree_NodePool_t& texPool = texPoolPtr->data;
 
 						//Attempt to get a texture id for the tex pool
 						if ((texPoolNodePtr = texPool.try_remove()) != 0) {
@@ -6271,11 +6291,11 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 							m_nonZeroPrefixNodePool.add(texPoolNodePtr);
 
 #if 0
-{
-	static int si;
-	dout << L"utd3d9r: TexPool retrieve = " << si++ << L", Id = 0x" << HexString((DWORD)pBind->pTexObj, 32)
-		<< L", u = " << pBind->UBits << L", v = " << pBind->VBits << std::endl;
-}
+							{
+								static int si;
+								dout << L"utd3d9r: TexPool retrieve = " << si++ << L", Id = 0x" << HexString((DWORD)pBind->pTexObj, 32)
+									<< L", u = " << pBind->UBits << L", v = " << pBind->VBits << std::endl;
+							}
 #endif
 
 							//Clear the need tex id allocate flag
@@ -6286,10 +6306,10 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 			}
 			if (needTexIdAllocate) {
 #if 0
-{
-	static int si;
-	dout << L"utd3d9r: Create texture nzp = " << si++ << std::endl;
-}
+				{
+					static int si;
+					dout << L"utd3d9r: Create texture nzp = " << si++ << std::endl;
+				}
 #endif
 				//Create the texture
 				hResult = m_d3dDevice->CreateTexture(
@@ -6305,13 +6325,26 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 		}
 	}
 
+	Bind = pBind;
+	return existingBind;
+}
+
+void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureInfo& Info, DWORD PolyFlags) {
+	guard(UD3D9RenderDevice::SetTexture);
+
+	// Make current.
+	clockFast(BindCycles);
+
+	FCachedTexture* pBind = nullptr;
+	bool existingBind = BindTexture(texNum, Tex, Info, PolyFlags, pBind);
+
 	//Save pointer to current texture bind for current texture unit
 	Tex.pBind = pBind;
 
 	//Set texture
 	m_d3dDevice->SetTexture(texNum, pBind->pTexObj);
 
-	unclock(BindCycles);
+	unclockFast(BindCycles);
 
 	// Account for all the impact on scale normalization.
 	Tex.UMult = pBind->UMult;
@@ -6355,6 +6388,16 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 		}
 	}
 
+#if UNREAL_TOURNAMENT_OLDUNREAL
+	if (Info.Texture)
+	{
+		if (pBind->RealtimeChangeCount != Info.Texture->RealtimeChangeCount)
+			pBind->RealtimeChangeCount = Info.Texture->RealtimeChangeCount;
+		else
+			Info.bRealtimeChanged = 0;
+	}
+#endif
+
 	// Upload if needed.
 	if (!existingBind || Info.bRealtimeChanged) {
 		FColor paletteIndex0;
@@ -6372,7 +6415,7 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 		}
 
 		// Download the texture.
-		clock(ImageCycles);
+		clockFast(ImageCycles);
 
 		m_texConvertCtx.pBind = pBind;
 
@@ -6425,7 +6468,7 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 			// Convert the mipmap.
 			INT MipIndex = pBind->BaseMip + Level;
 			INT stepBits = 0;
-			if (MipIndex >= Info.NumMips) {
+			if (MipIndex >= Info.NumMips && Info.NumMips > 0) {
 				stepBits = MipIndex - (Info.NumMips - 1);
 				MipIndex = Info.NumMips - 1;
 			}
@@ -6535,7 +6578,7 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 		}
 		unguard;
 
-		unclock(ImageCycles);
+		unclockFast(ImageCycles);
 
 		//Restore palette index 0 for masked paletted textures
 		if (Info.Palette && (PolyFlags & PF_Masked)) {
@@ -6562,9 +6605,8 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 		<< HexString((DWORD)((QWORD)Info.CacheID & 0xFFFFFFFF), 32) << std::endl;
 }
 {
-	const UTexture *pTexture = Info.Texture;
-	const TCHAR *pName = pTexture->GetFullName();
-	if (pName) dout << L"utd3d9r: TexName = " << pName << std::endl;
+	const UTexture *pTexture = Info.Texture;	
+	dout << L"utd3d9r: TexName = " << *FObjectFullName(pTexture) << std::endl;
 }
 {
 	dout << L"utd3d9r: NumMips = " << Info.NumMips << std::endl;
@@ -6631,6 +6673,31 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 		}
 	}
 
+	// stijn: make an exception and draw the larger texture if the necessary mips don't exist
+	if (BaseMip >= Info.NumMips && Info.NumMips > 0)
+	{
+		BaseMip = Info.NumMips - 1;
+
+		INT TryUBits = Info.Mips[0]->UBits >> BaseMip;
+		INT TryVBits = Info.Mips[0]->VBits >> BaseMip;
+
+		// check if the hardware supports the lower mip
+		if (m_d3dCaps.MaxTextureWidth  >= (1 << TryUBits) &&
+			m_d3dCaps.MaxTextureHeight >= (1 << TryVBits))
+		{
+			// fine
+			UBits = TryUBits;
+			VBits = TryVBits;
+			UCopyBits = 0;
+			VCopyBits = 0;
+		}
+		else
+		{
+			// not fine. Just draw the a partial texture then. This will clearly signal
+			// to the player that something is wrong, and it prevents us from crashing.
+		}
+	}
+
 	pBind->BaseMip = BaseMip;
 	MaxLevel = Min(UBits, VBits) - MinLogTextureSize;
 	if (MaxLevel < 0) {
@@ -6668,8 +6735,6 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 				pBind->texFormat = D3DFMT_DXT1;
 			}
 			break;
-
-#ifdef UTGLR_UNREAL_227_BUILD
 		case TEXF_DXT3: 
 			pBind->texType = TEX_TYPE_COMPRESSED_DXT3; 
 			pBind->texFormat = D3DFMT_DXT3;
@@ -6679,7 +6744,6 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 			pBind->texType = TEX_TYPE_COMPRESSED_DXT5; 
 			pBind->texFormat = D3DFMT_DXT5;
 			break;
-#endif
 
 		default:
 			;
@@ -7035,15 +7099,15 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags) {
 	// Detect changes in the blending modes.
 	DWORD Xor = m_curBlendFlags ^ blendFlags;
 
+	//Save copy of current blend flags
+	DWORD curBlendFlags = m_curBlendFlags;
+
 	//Update main copy of current blend flags early
 	m_curBlendFlags = blendFlags;
 
-#ifdef UTGLR_RUNE_BUILD
 	const DWORD GL_BLEND_FLAG_BITS = PF_Translucent | PF_Modulated | PF_Highlighted | PF_AlphaBlend;
-#else
-	const DWORD GL_BLEND_FLAG_BITS = PF_Translucent | PF_Modulated | PF_Highlighted;
-#endif
 	DWORD relevantBlendFlagBits = GL_BLEND_FLAG_BITS | m_smoothMaskedTexturesBit;
+
 	if (Xor & (relevantBlendFlagBits)) {
 		if (!(blendFlags & (relevantBlendFlagBits))) {
 			m_d3dDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
@@ -7051,37 +7115,41 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags) {
 			m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ZERO);
 		}
 		else {
-			if (blendFlags & PF_Translucent) {
+			if ( !(curBlendFlags & relevantBlendFlagBits) ) {
 				m_d3dDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+			}
+			if (blendFlags & PF_Translucent) {
 				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
 				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCCOLOR);
 			}
 			else if (blendFlags & PF_Modulated) {
-				m_d3dDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
 				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
 				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_SRCCOLOR);
 			}
 			else if (blendFlags & PF_Highlighted) {
-				m_d3dDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
 				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
 				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
 			}
-#ifdef UTGLR_RUNE_BUILD
-			else if (blendFlags & PF_AlphaBlend) {
-				m_d3dDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
-				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
-				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
-			}
-#endif
-			else if (blendFlags & PF_Masked) {
-				m_d3dDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+			else if (blendFlags & (PF_Masked|PF_AlphaBlend)) {
 				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
 				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
 			}
 		}
 	}
-	if (Xor & PF_Masked) {
-		if (blendFlags & PF_Masked) {
+	if (Xor & (PF_Masked|PF_AlphaBlend)) {
+		if (blendFlags & PF_AlphaBlend) {
+			m_fsBlendInfo[0] = 0.01f;
+
+			if (UseFragmentProgram) {
+				m_d3dDevice->SetPixelShaderConstantF(0, m_fsBlendInfo, 1);
+			}
+			else {
+				m_alphaTestEnabled = true;
+				m_d3dDevice->SetRenderState(D3DRS_ALPHAREF, 1);
+				m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
+			}
+		}
+		else if (blendFlags & PF_Masked) {
 			//Enable alpha test with alpha ref of D3D9 version of 0.5
 			m_fsBlendInfo[0] = (127.0f / 255.0f) + 1e-6f;
 
@@ -7090,6 +7158,7 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags) {
 			}
 			else {
 				m_alphaTestEnabled = true;
+				m_d3dDevice->SetRenderState(D3DRS_ALPHAREF, 127);
 				m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
 			}
 
@@ -7287,7 +7356,7 @@ void UD3D9RenderDevice::SetVertexDeclNoCheck(IDirect3DVertexDeclaration9 *vertex
 
 void UD3D9RenderDevice::SetVertexShaderNoCheck(IDirect3DVertexShader9 *vertexShader) {
 	HRESULT hResult;
-
+	
 	//Set vertex shader
 	hResult = m_d3dDevice->SetVertexShader(vertexShader);
 	if (FAILED(hResult)) {
@@ -7691,11 +7760,7 @@ void UD3D9RenderDevice::SetProjectionStateNoCheck(bool requestNearZRangeHackProj
 	zNear = 1.0f * zNearVal;
 
 	//Set zFar
-#ifdef UTGLR_UNREAL_227_BUILD
-	zFar = 49152.0f;
-#else
-	zFar = 32768.0f;
-#endif
+	zFar = 65536.0f; // stijn: increased from 32k to 64k for UT v469b
 	if (requestNearZRangeHackProjection) {
 		zFar *= zScaleVal;
 	}
@@ -7761,12 +7826,12 @@ void UD3D9RenderDevice::SetOrthoProjection(void) {
 	//Save new Z range hack projection state
 	m_nearZRangeHackProjectionActive = false;
 
-	left = -m_RProjZ * 0.5f;
-	right = +m_RProjZ * 0.5f;
-	bottom = -m_Aspect*m_RProjZ * 0.5f;
-	top = +m_Aspect*m_RProjZ * 0.5f;
+	left = -m_RProjZ;
+	right = +m_RProjZ;
+	bottom = -m_Aspect*m_RProjZ;
+	top = +m_Aspect*m_RProjZ;
 	zNear = 1.0f * 0.5f;
-	zFar = 32768.0f;
+	zFar = 65536.0f; // stijn: increased from 32k to 64k for UT v469b
 
 	invRightMinusLeft = 1.0f / (right - left);
 	invTopMinusBottom = 1.0f / (top - bottom);
@@ -8835,7 +8900,7 @@ void UD3D9RenderDevice::EndGouraudPolygonBufferingNoCheck(void) {
 	//Stream state set when start buffering
 	//Default texture state set when start buffering
 
-	clock(GouraudCycles);
+	clockFast(GouraudCycles);
 
 	//Set projection state
 	SetProjectionState(m_requestNearZRangeHackProjection);
@@ -8862,7 +8927,7 @@ void UD3D9RenderDevice::EndGouraudPolygonBufferingNoCheck(void) {
 	m_d3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
 #endif
 
-	unclock(GouraudCycles);
+	unclockFast(GouraudCycles);
 }
 
 void UD3D9RenderDevice::EndTileBufferingNoCheck(void) {
@@ -8876,7 +8941,7 @@ void UD3D9RenderDevice::EndTileBufferingNoCheck(void) {
 	//Stream state set when start buffering
 	//Default texture state set when start buffering
 
-	clock(TileCycles);
+	clockFast(TileCycles);
 
 	//Unlock vertexColor and texCoord0 buffers
 	UnlockVertexColorBuffer();
@@ -8888,7 +8953,7 @@ void UD3D9RenderDevice::EndTileBufferingNoCheck(void) {
 	//Advance vertex buffer position
 	m_curVertexBufferPos += m_bufferedVerts;
 
-	unclock(TileCycles);
+	unclockFast(TileCycles);
 }
 
 void UD3D9RenderDevice::EndLineBufferingNoCheck(void) {

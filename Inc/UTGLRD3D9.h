@@ -10,17 +10,21 @@
 //Make sure valid build config selected
 #undef UTGLR_VALID_BUILD_CONFIG
 
-#ifdef UTGLR_UT_BUILD
+#if defined(UTGLR_UT_BUILD) || UNREAL_TOURNAMENT_OLDUNREAL
 #define UTGLR_VALID_BUILD_CONFIG 1
+#define UTGLR_USES_ALPHABLEND 1
+#define UTGLR_UT_469_BUILD 1
 #endif
 #ifdef UTGLR_DX_BUILD
 #define UTGLR_VALID_BUILD_CONFIG 1
 #endif
 #ifdef UTGLR_RUNE_BUILD
 #define UTGLR_VALID_BUILD_CONFIG 1
+#define UTGLR_USES_ALPHABLEND 1
 #endif
 #ifdef UTGLR_UNREAL_227_BUILD
 #define UTGLR_VALID_BUILD_CONFIG 1
+#define UTGLR_USES_ALPHABLEND 1
 #endif
 
 #if !UTGLR_VALID_BUILD_CONFIG
@@ -49,6 +53,23 @@
 #include "c_gclip.h"
 
 
+//Per-game feature switches
+#if defined UNREAL_TOURNAMENT_UTPG
+	//The base game was built on Visual Studio 2019 and GCC 4.8
+	#if _M_IX86 || _M_X64 || i386 || __x86_64__
+		#define UTGLR_X86_SSE2_MINIMUM 1
+	#endif
+#elif UTGLR_RUNE_BUILD
+	#define UTGLR_USES_ALPHABLEND 1
+#endif
+
+
+#if !UTGLR_USES_ALPHABLEND
+	#define UTGLR_USES_ALPHABLEND 0
+	#define PF_AlphaBlend 0x020000
+#endif
+
+
 typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
 
 
@@ -67,10 +88,12 @@ typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
 #ifdef WIN32
 
 //Optional ASM code
+#if !BUILD_64
 #define UTGLR_USE_ASM_CODE
 
 //Optional SSE code
 #define UTGLR_INCLUDE_SSE_CODE
+#endif
 
 #endif
 
@@ -180,6 +203,9 @@ struct FCachedTexture {
 	BYTE bindType;
 	BYTE treeIndex;
 	BYTE dynamicTexBits;
+#if UNREAL_TOURNAMENT_OLDUNREAL
+	INT RealtimeChangeCount;
+#endif
 	tex_params_t texParams;
 	D3DFORMAT texFormat;
 	union {
@@ -328,11 +354,11 @@ struct FGLMapDot {
 //
 // A D3D9 rendering device attached to a viewport.
 //
-class UD3D9RenderDevice : public URenderDevice {
+class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 #if defined UTGLR_DX_BUILD
 	DECLARE_CLASS(UD3D9RenderDevice, URenderDevice, CLASS_Config)
 #else
-	DECLARE_CLASS(UD3D9RenderDevice, URenderDevice, CLASS_Config, D3D9Drv)
+	DECLARE_CLASS(UD3D9RenderDevice, URenderDeviceOldUnreal469, CLASS_Config, D3D9Drv)
 #endif
 
 #ifdef UTD3D9R_INCLUDE_SHADER_ASM
@@ -349,7 +375,7 @@ class UD3D9RenderDevice : public URenderDevice {
 		int sync() {
 #ifdef WIN32
 			//Output the string
-			TCHAR_CALL_OS(OutputDebugStringW(str().c_str()), OutputDebugStringA(appToAnsi(str().c_str())));
+			OutputDebugStringW(str().c_str());
 #else
 			//Add non-win32 debug output code here
 #endif
@@ -431,8 +457,8 @@ class UD3D9RenderDevice : public URenderDevice {
 	} m_texConvertCtx;
 
 
-	inline void * FASTCALL AlignMemPtr(void *ptr, DWORD align) {
-		return (void *)(((DWORD)ptr + (align - 1)) & -align);
+	inline void * FASTCALL AlignMemPtr(void *ptr, PTRINT align) {
+		return (void *)(((PTRINT)ptr + (align - 1)) & -align);
 	}
 	enum { VERTEX_ARRAY_ALIGN = 64 };	//Must be even multiple of 16B for SSE
 	enum { VERTEX_ARRAY_TAIL_PADDING = 72 };	//Must include 8B for half SSE tail
@@ -866,7 +892,7 @@ class UD3D9RenderDevice : public URenderDevice {
 		CF_NORMAL_ARRAY		= 0x04
 	};
 	BYTE m_requestedColorFlags;
-#ifdef UTGLR_RUNE_BUILD
+#if UTGLR_USES_ALPHABLEND
 	BYTE m_gpAlpha;
 	bool m_gpFogEnabled;
 #endif
@@ -1161,6 +1187,7 @@ class UD3D9RenderDevice : public URenderDevice {
 
 	UBOOL SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Fullscreen);
 	void UnsetRes();
+	UBOOL ResetDevice();
 
 	bool FASTCALL CheckDepthFormat(D3DFORMAT adapterFormat, D3DFORMAT backBufferFormat, D3DFORMAT depthBufferFormat);
 
@@ -1206,7 +1233,7 @@ class UD3D9RenderDevice : public URenderDevice {
 	void ReadPixels(FColor* Pixels);
 	void EndFlash();
 	void PrecacheTexture(FTextureInfo& Info, DWORD PolyFlags);
-
+	UBOOL SupportsTextureFormat(ETextureFormat Format);
 
 	void InitNoTextureSafe(void);
 	void InitAlphaTextureSafe(void);
@@ -1319,6 +1346,7 @@ class UD3D9RenderDevice : public URenderDevice {
 		return;
 	}
 
+	bool FASTCALL BindTexture(DWORD texNum, FTexInfo& Tex, FTextureInfo& Info, DWORD PolyFlags, FCachedTexture*& Bind);
 	void FASTCALL SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureInfo& Info, DWORD PolyFlags);
 	void FASTCALL CacheTextureInfo(FCachedTexture *pBind, const FTextureInfo &Info, DWORD PolyFlags);
 
@@ -1335,7 +1363,7 @@ class UD3D9RenderDevice : public URenderDevice {
 	void FASTCALL ConvertBGRA7777_BGRA8888_NoClamp(const FMipmapBase *Mip, INT Level);
 
 	inline void FASTCALL SetBlend(DWORD PolyFlags) {
-#ifdef UTGLR_RUNE_BUILD
+#if UTGLR_USES_ALPHABLEND
 		if (PolyFlags & PF_AlphaBlend) {
 			if (!(PolyFlags & PF_Masked)) {
 				PolyFlags |= PF_Occlude;
@@ -1354,11 +1382,7 @@ class UD3D9RenderDevice : public URenderDevice {
 		}
 
 		//Only check relevant blend flags
-#ifdef UTGLR_RUNE_BUILD
 		DWORD blendFlags = PolyFlags & (PF_Translucent | PF_Modulated | PF_Invisible | PF_Occlude | PF_Masked | PF_Highlighted | PF_RenderFog | PF_AlphaBlend);
-#else
-		DWORD blendFlags = PolyFlags & (PF_Translucent | PF_Modulated | PF_Invisible | PF_Occlude | PF_Masked | PF_Highlighted | PF_RenderFog);
-#endif
 		if (m_curBlendFlags != blendFlags) {
 			SetBlendNoCheck(blendFlags);
 		}
@@ -1553,6 +1577,15 @@ class UD3D9RenderDevice : public URenderDevice {
 
 	void FASTCALL BufferAdditionalClippedVerts(FTransTexture** Pts, INT NumPts);
 };
+
+#if __STATIC_LINK
+
+/* No native execs. */
+
+#define AUTO_INITIALIZE_REGISTRANTS_D3D9DRV \
+	UD3D9RenderDevice::StaticClass();
+
+#endif
 
 /*-----------------------------------------------------------------------------
 	The End.

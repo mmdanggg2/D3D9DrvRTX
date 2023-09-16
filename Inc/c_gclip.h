@@ -51,8 +51,8 @@ public:
 	void ClearHitNameStack(void);
 	void PushHitName(unsigned int hitName);
 	void PopHitName(void);
-	unsigned int GetHitNameStackSize(void);
-	void GetHitNameStackValues(unsigned int *pDst, unsigned int dstSize);
+	size_t GetHitNameStackSize(void);
+	void GetHitNameStackValues(unsigned int *pDst, size_t dstSize);
 
 	void SelectDrawLine(const vec3_t *pLnPts);
 	void SelectDrawTri(const vec3_t *pTriPts);

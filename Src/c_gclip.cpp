@@ -250,12 +250,12 @@ void CGClip::PopHitName(void) {
 	return;
 }
 
-unsigned int CGClip::GetHitNameStackSize(void) {
+size_t CGClip::GetHitNameStackSize(void) {
 	return m_hitNameStack.size();
 }
 
-void CGClip::GetHitNameStackValues(unsigned int *pDst, unsigned int dstSize) {
-	unsigned int numNames;
+void CGClip::GetHitNameStackValues(unsigned int *pDst, size_t dstSize) {
+	size_t numNames;
 	unsigned int u;
 	std::deque<unsigned int>::const_iterator hnIter;
 
