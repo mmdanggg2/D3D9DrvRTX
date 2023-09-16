@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Src">
+      <UniqueIdentifier>{801702cb-4e38-4c71-aa6b-eedffc1f1515}</UniqueIdentifier>
+      <Extensions>*.cpp;*.h</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Src\c_gclip.cpp" />
+    <ClCompile Include="Src\D3D9.cpp" />
+    <ClCompile Include="Src\D3D9Drv.cpp" />
+    <ClCompile Include="Src\D3D9Render.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Inc\c_gclip.h" />
+    <ClInclude Include="Inc\c_rbtree.h" />
+    <ClInclude Include="Inc\D3D9Drv.h" />
+    <ClInclude Include="Inc\UTGLRD3D9.h" />
+    <ClInclude Include="Inc\D3D9Render.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
+  </ItemGroup>
+</Project>
