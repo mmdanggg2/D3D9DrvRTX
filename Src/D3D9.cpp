@@ -50,6 +50,8 @@ TODO:
 
 #include "D3D9Drv.h"
 #include "..\Inc\UTGLRD3D9.h"
+#include <DirectXMath.h>
+#include "Render.h"
 
 #ifdef WIN32
 #include <mmsystem.h>
@@ -1368,6 +1370,9 @@ void UD3D9RenderDevice::StaticConstructor() {
 
 	DescFlags |= RDDESCF_Certified;
 
+	SupportsStaticBsp = true;
+	UseAmbientlessLightmaps = false;
+
 	unguard;
 }
 
@@ -2013,7 +2018,7 @@ v_loop:
 }
 #endif
 
-
+//#define UTGLR_DEBUG_SHOW_CALL_COUNTS
 //Must be called with (NumPts > 3)
 void UD3D9RenderDevice::BufferAdditionalClippedVerts(FTransTexture** Pts, INT NumPts) {
 	INT i;
@@ -3509,6 +3514,8 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 		appErrorf(TEXT("BeginScene failed"));
 	}
 
+	m_d3dDevice->Clear(0, NULL, D3DCLEAR_TARGET, D3DCOLOR_ARGB(1, 0, 0, 0), 0, 0);
+
 	//Clear the Z-buffer
 	if (1 || GIsEditor || (RenderLockFlags & LOCKR_ClearScreen)) {
 		SetBlend(PF_Occlude);
@@ -3801,6 +3808,8 @@ void UD3D9RenderDevice::SetSceneNode(FSceneNode* Frame) {
 }
 #endif
 	guard(UD3D9RenderDevice::SetSceneNode);
+
+	this->currentFrame = Frame;
 
 	EndBuffering();		// Flush vertex array before changing the projection matrix!
 
@@ -4097,6 +4106,7 @@ void UD3D9RenderDevice::Flush(UBOOL AllowPrecache) {
 
 
 void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet) {
+	return;/*
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 {
 	static int si;
@@ -4201,7 +4211,51 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 			drawDetailTexture = false;
 		}
 	}
+	
+	//FCoords coord = FCoords(Frame->Uncoords);
+	//FCoords coordRot = FCoords(FVector(0,0,0), coord.XAxis, coord.YAxis, coord.ZAxis);
+	//FMatrix fMat = FMatrixFromFCoords(Frame->Uncoords);
+	FCoords FC = Frame->Uncoords;
+	FMatrix fMat;
+	fMat.XPlane = FPlane(FC.XAxis.X, FC.XAxis.Y, FC.XAxis.Z, FC.Origin.X);
+	fMat.YPlane = FPlane(FC.ZAxis.X, FC.ZAxis.Y, FC.ZAxis.Z, FC.Origin.Z);
+	fMat.ZPlane = FPlane(FC.YAxis.X, FC.YAxis.Y, FC.YAxis.Z, FC.Origin.Y);
+	fMat.WPlane = FPlane(0.f, 0.f, 0.f, 1.f);
+	//dout << "coord: " << *coord.String() << std::endl;
+	D3DMATRIX view = {
+		fMat.M(0,0), fMat.M(0,1), fMat.M(0,2), fMat.M(0,3),
+		fMat.M(1,0), fMat.M(1,1), fMat.M(1,2), fMat.M(1,3),
+		fMat.M(2,0), fMat.M(2,1), fMat.M(2,2), fMat.M(2,3),
+		fMat.M(3,0), fMat.M(3,1), fMat.M(3,2), fMat.M(3,3),
+	};
+	/*D3DMATRIX view = {
+		fMat.XPlane.X, fMat.YPlane.X, fMat.ZPlane.X, fMat.WPlane.X,
+		fMat.XPlane.Y, fMat.YPlane.Y, fMat.ZPlane.Y, fMat.WPlane.Y,
+		fMat.XPlane.Z, fMat.YPlane.Z, fMat.ZPlane.Z, fMat.WPlane.Z,
+		fMat.XPlane.W, fMat.YPlane.W, fMat.ZPlane.W, fMat.WPlane.W,
+	};*/
+	/*D3DMATRIX view = {
+		fMat.XPlane.X, fMat.XPlane.Y, fMat.XPlane.Z, fMat.XPlane.W,
+		fMat.YPlane.X, fMat.YPlane.Y, fMat.YPlane.Z, fMat.YPlane.W,
+		fMat.ZPlane.X, fMat.ZPlane.Y, fMat.ZPlane.Z, fMat.ZPlane.W,
+		fMat.WPlane.X, fMat.WPlane.Y, fMat.WPlane.Z, fMat.WPlane.W,
+	};/
 
+
+	char buf[1024];
+	std::sprintf(buf, "{\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n}", view._11, view._12, view._13, view._14, view._21, view._22, view._23, view._24, view._31, view._32, view._33, view._34, view._41, view._42, view._43, view._44);
+	//dout << buf << std::endl;
+
+	DirectX::XMStoreFloat4x4(
+		(DirectX::XMFLOAT4X4*)&view,
+		DirectX::XMMatrixLookAtRH(
+			DirectX::XMVectorSet(200.f, 200.f, 200.f, 0.f),
+			DirectX::g_XMZero,
+			DirectX::XMVectorSet(0, 0, 1, 0)
+		)
+	);
+
+	m_d3dDevice->SetTransform(D3DTS_VIEW, &view);
 
 	DWORD PolyFlags = Surface.PolyFlags;
 
@@ -4364,7 +4418,7 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	}
 
 	unclockFast(ComplexCycles);
-	unguard;
+	unguard;//*/
 }
 
 #ifdef UTGLR_RUNE_BUILD
@@ -5562,6 +5616,242 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 	unguard;
 }
 
+
+D3DCOLORVALUE hsvToRgb(unsigned char h, unsigned char s, unsigned char v) {
+	float H = h / 255.0f;
+	float S = s / 255.0f;
+	float V = v / 255.0f;
+
+	float C = V * S;
+	float X = C * (1 - std::abs(fmod(H * 6, 2) - 1));
+	float m = V - C;
+
+	D3DCOLORVALUE rgbColor;
+
+	if (0 <= H && H < 1 / 6.0) {
+		rgbColor.r = C; rgbColor.g = X; rgbColor.b = 0;
+	}
+	else if (1 / 6.0 <= H && H < 2 / 6.0) {
+		rgbColor.r = X; rgbColor.g = C; rgbColor.b = 0;
+	}
+	else if (2 / 6.0 <= H && H < 3 / 6.0) {
+		rgbColor.r = 0; rgbColor.g = C; rgbColor.b = X;
+	}
+	else if (3 / 6.0 <= H && H < 4 / 6.0) {
+		rgbColor.r = 0; rgbColor.g = X; rgbColor.b = C;
+	}
+	else if (4 / 6.0 <= H && H < 5 / 6.0) {
+		rgbColor.r = X; rgbColor.g = 0; rgbColor.b = C;
+	}
+	else {
+		rgbColor.r = C; rgbColor.g = 0; rgbColor.b = X;
+	}
+
+	rgbColor.r += m;
+	rgbColor.g += m;
+	rgbColor.b += m;
+
+	// Set alpha value to maximum
+	rgbColor.a = 1.0f;
+
+	return rgbColor;
+}
+
+std::wostream& operator<<(std::wostream& os, const D3DMATRIX& mat) {
+	os << std::fixed << std::setprecision(2);
+	for (int i = 0; i < 4; ++i) {
+		for (int j = 0; j < 4; ++j) {
+			os << mat.m[i][j] << L' ';
+		}
+		os << L'\n';
+	}
+	return os;
+}
+
+void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
+#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: SetStaticBsp = " << si++ << std::endl;
+	}
+#endif
+	guard(UD3D9RenderDevice::SetStaticBsp);
+
+	staticBspInfo.Update();
+//	StaticBspData.TimeSeconds = StaticBspInfo.Level->TimeSeconds.GetFloat();
+
+	if ( GIsEditor )
+		return;
+
+	static int lightCount;
+	if (staticBspInfo.SourceGeometryChanged) {
+		dout << "StaticBspInfo changed!" << std::endl;
+		staticBspInfo.SourceGeometryChanged = 0;
+		for (int i = 0; i < lightCount; i++) {
+			D3DLIGHT9 light = D3DLIGHT9();
+			light.Type = D3DLIGHT_POINT;
+			light.Position = D3DVECTOR{ 0, 0, 0 };
+			light.Diffuse = D3DCOLORVALUE{ 0, 255, 255, 0 };
+			light.Specular = light.Diffuse;
+			light.Range = 0;
+			HRESULT res = m_d3dDevice->SetLight(i, &light);
+			assert(res == D3D_OK);
+			res = m_d3dDevice->LightEnable(i, false);
+			assert(res == D3D_OK);
+		}
+	}
+
+	staticBspInfo.ComputeStaticGeometry( EStaticBspMode::STATIC_BSP_PerSurf );
+
+	// This render device prefers precalculated light/atlas UV's
+	staticBspInfo.ComputeLightUV();
+
+
+	EndBuffering();
+	SetDefaultAAState();
+	SetDefaultProjectionState();
+
+	D3DMATRIX oldView;
+	m_d3dDevice->GetTransform(D3DTS_VIEW, &oldView);
+	D3DMATRIX oldProj;
+	m_d3dDevice->GetTransform(D3DTS_PROJECTION, &oldProj);
+
+	D3DMATRIX proj;
+	DirectX::XMStoreFloat4x4(
+		(DirectX::XMFLOAT4X4*)&proj,
+		DirectX::XMMatrixPerspectiveFovLH(Viewport->Actor->FovAngle * PI / 180.0f, (float)m_sceneNodeX / (float)m_sceneNodeY, 0.5f, 65536.0f)
+	);
+
+	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &proj);
+
+	FCoords coord = FCoords(currentFrame->Coords);
+	FVector origin = coord.Origin;
+	FVector forward =  FVector(0.0f, 0.0f, 1.0f).TransformVectorBy(currentFrame->Uncoords);
+	FVector up = FVector(0.0f, -1.0f, 0.0f).TransformVectorBy(currentFrame->Uncoords);
+
+	D3DMATRIX view = D3DMATRIX();
+	DirectX::XMStoreFloat4x4(
+		(DirectX::XMFLOAT4X4*)&view,
+		DirectX::XMMatrixLookToLH(
+			DirectX::XMVectorSet(origin.X, origin.Y, origin.Z, 0.f),
+			DirectX::XMVectorSet(forward.X, forward.Y, forward.Z, 0.0f),
+			DirectX::XMVectorSet(up.X, up.Y, up.Z, 0.0f)
+		)
+	);
+
+	m_d3dDevice->SetTransform(D3DTS_VIEW, &view);
+
+	m_d3dDevice->SetRenderState(D3DRS_LIGHTING, TRUE);
+
+	lightCount = 0;
+
+	for (int i = 0; i < staticBspInfo.Level->Actors.Num(); i++) {
+		AActor* actor = staticBspInfo.Level->Actors(i);
+		if (actor && actor->IsA(ALight::StaticClass())) {
+			ALight* light = (ALight*)actor;
+			D3DLIGHT9 lightInfo = D3DLIGHT9();
+			lightInfo.Type = D3DLIGHT_POINT;
+			lightInfo.Position = D3DVECTOR{ light->Location.X, light->Location.Y, light->Location.Z };
+			lightInfo.Diffuse = hsvToRgb(light->LightHue, 0xFF - light->LightSaturation, light->LightBrightness);
+			lightInfo.Specular = lightInfo.Diffuse;
+			lightInfo.Range = 1000;
+			HRESULT res = m_d3dDevice->SetLight(i, &lightInfo);
+			assert(res == D3D_OK);
+			res = m_d3dDevice->LightEnable(i, true);
+			assert(res == D3D_OK);
+			lightCount++;
+		}
+	}
+	assert(lightCount <= m_d3dCaps.MaxActiveLights);
+	typedef std::tuple<UTexture*, DWORD> SurfKey;
+	std::map<SurfKey, std::vector<FStaticBspSurf>> surfaceMap{};
+	for (int i = 0; i < staticBspInfo.SurfList.Num(); i++) {
+		FStaticBspSurf surface = staticBspInfo.SurfList(i);
+		if (surface.Texture == nullptr || (surface.PolyFlags & (PF_Invisible | PF_FakeBackdrop)))
+			continue;
+		surfaceMap[std::make_tuple(surface.Texture, surface.PolyFlags)].push_back(surface);
+	}
+
+	for (std::pair<SurfKey, std::vector<FStaticBspSurf>> entry : surfaceMap) {
+		UTexture* texture = std::get<0>(entry.first);
+		DWORD polyFlags = std::get<1>(entry.first);
+
+		m_csPtCount = BufferStaticSurfaceGeometry(staticBspInfo, entry.second);
+
+		//Initialize render passes state information
+		m_rpPassCount = 0;
+		m_rpTMUnits = TMUnits;
+		m_rpForceSingle = false;
+		m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
+		m_rpColor = 0xFFFFFFFF;
+
+		FTextureInfo texInfo = FTextureInfo();
+		texture->Lock(texInfo, currentFrame->Viewport->CurrentTime, -1, this);
+
+		AddRenderPass(&texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
+
+		RenderPasses();
+
+		texture->Unlock(texInfo);
+	}
+
+	m_d3dDevice->SetTransform(D3DTS_VIEW, &oldView);
+	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &oldProj);
+	m_d3dDevice->SetRenderState(D3DRS_LIGHTING, FALSE);
+
+	unguard;
+}
+
+INT UD3D9RenderDevice::BufferStaticSurfaceGeometry(const FStaticBspInfoBase& staticBspInfo, const std::vector<FStaticBspSurf>& surfaces) {
+	INT Index = 0;
+
+	// Buffer "static" geometry.
+	m_csPolyCount = 0;
+	FGLMapDot* pMapDot = &MapDotArray[0];
+	FGLVertex* pVertex = &m_csVertexArray[0];
+
+	for (FStaticBspSurf surface : surfaces) {
+		// I was promised to be given triangles
+		assert(surface.VertexCount % 3 == 0);
+		int tris = surface.VertexCount / 3;
+
+		for (int i = 0; i < tris; i++) {
+			INT numPts = 3;
+
+			DWORD csPolyCount = m_csPolyCount;
+			MultiDrawFirstArray[csPolyCount] = Index;
+			MultiDrawCountArray[csPolyCount] = numPts;
+			m_csPolyCount = csPolyCount + 1;
+
+			Index += numPts;
+			if (Index > VERTEX_ARRAY_SIZE) {
+				return 0;
+			}
+			for (int j = 0; j < numPts; j++) {
+				FStaticBspVertex vert = staticBspInfo.VertList(surface.VertexStart + ((i * 3) + j));
+
+				pMapDot->u = vert.TextureU + surface.PanU;
+				pMapDot->v = vert.TextureV + surface.PanV;
+				pMapDot++;
+
+				pVertex->x = vert.Point.X;
+				pVertex->y = vert.Point.Y;
+				pVertex->z = vert.Point.Z;
+				pVertex++;
+			};
+		}
+	}
+
+	return Index;
+}
+
+void UD3D9RenderDevice::DrawStaticBspNode(INT iNode, FSurfaceInfo& Surface) {
+	OutputDebugStringW(L"DrawStaticBspNode()!\n");
+};
+
+void UD3D9RenderDevice::DrawStaticBspSurf(INT iSurf, FSurfaceInfo& Surface) {
+	OutputDebugStringW(L"DrawStaticBspSurf()!\n");
+};
 
 void UD3D9RenderDevice::ClearZ(FSceneNode* Frame) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
@@ -7961,7 +8251,6 @@ void UD3D9RenderDevice::ShutdownFragmentProgramMode(void) {
 void UD3D9RenderDevice::SetProjectionStateNoCheck(bool requestNearZRangeHackProjection) {
 	float left, right, bottom, top, zNear, zFar;
 	float invRightMinusLeft, invTopMinusBottom, invNearMinusFar;
-	D3DMATRIX d3dProj;
 
 	//Save new Z range hack projection state
 	m_nearZRangeHackProjectionActive = requestNearZRangeHackProjection;
@@ -8004,6 +8293,7 @@ void UD3D9RenderDevice::SetProjectionStateNoCheck(bool requestNearZRangeHackProj
 	invTopMinusBottom = 1.0f / (top - bottom);
 	invNearMinusFar = 1.0f / (zNear - zFar);
 
+	D3DMATRIX d3dProj;
 	d3dProj.m[0][0] = 2.0f * zNear * invRightMinusLeft;
 	d3dProj.m[0][1] = 0.0f;
 	d3dProj.m[0][2] = 0.0f;
@@ -8140,8 +8430,10 @@ void UD3D9RenderDevice::RenderPassesExec(void) {
 
 
 	for (INT PolyNum = 0; PolyNum < m_csPolyCount; PolyNum++) {
-		m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos + MultiDrawFirstArray[PolyNum], MultiDrawCountArray[PolyNum] - 2);
+		assert(MultiDrawCountArray[PolyNum] == 3);
+		//m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos + MultiDrawFirstArray[PolyNum], MultiDrawCountArray[PolyNum] - 2);
 	}
+	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, m_curVertexBufferPos, m_csPolyCount);
 
 #ifdef UTGLR_DEBUG_WORLD_WIREFRAME
 	m_d3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
@@ -8945,13 +9237,14 @@ void UD3D9RenderDevice::DrawDetailTexture_FP(FTextureInfo &DetailTextureInfo) {
 	return;
 }
 
+
 INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet) {
 	INT Index = 0;
 
 	// Buffer "static" geometry.
 	m_csPolyCount = 0;
-	FGLMapDot *pMapDot = &MapDotArray[0];
-	FGLVertex *pVertex = &m_csVertexArray[0];
+	FGLMapDot* pMapDot = &MapDotArray[0];
+	FGLVertex* pVertex = &m_csVertexArray[0];
 	for (FSavedPoly* Poly = Facet.Polys; Poly; Poly = Poly->Next) {
 		//Skip if no points
 		INT NumPts = Poly->NumPts;
@@ -8968,9 +9261,9 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 		if (Index > VERTEX_ARRAY_SIZE) {
 			return 0;
 		}
-		FTransform **pPts = &Poly->Pts[0];
+		FTransform** pPts = &Poly->Pts[0];
 		do {
-			const FVector &Point = (*pPts++)->Point;
+			const FVector& Point = (*pPts++)->Point;//.TransformPointBy(currentFrame->Uncoords);
 
 			pMapDot->u = (Facet.MapCoords.XAxis | Point) - m_csUDot;
 			pMapDot->v = (Facet.MapCoords.YAxis | Point) - m_csVDot;
@@ -9181,6 +9474,13 @@ void UD3D9RenderDevice::EndTileBufferingNoCheck(void) {
 	//Unlock vertexColor and texCoord0 buffers
 	UnlockVertexColorBuffer();
 	UnlockTexCoordBuffer(0);
+
+	//Set view matrix
+	/*D3DMATRIX d3dView = { +1.0f,  0.0f,  0.0f,  0.0f,
+						   0.0f, -1.0f,  0.0f,  0.0f,
+						   0.0f,  0.0f, -1.0f,  0.0f,
+						   0.0f,  0.0f,  0.0f, +1.0f };
+	m_d3dDevice->SetTransform(D3DTS_VIEW, &d3dView);*/
 
 	//Draw the quads (stored as triangles)
 	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, m_curVertexBufferPos, m_bufferedVerts / 3);

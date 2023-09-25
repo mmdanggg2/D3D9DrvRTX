@@ -150,7 +150,7 @@ typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
 #define MAX_TMUNITS			4		// vogel: maximum number of texture mapping units supported
 
 //Must be at least 2000
-#define VERTEX_ARRAY_SIZE	4000	// vogel: better safe than sorry
+#define VERTEX_ARRAY_SIZE	100000	// vogel: better safe than sorry
 
 
 /*-----------------------------------------------------------------------------
@@ -953,6 +953,8 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	D3DPRESENT_PARAMETERS m_d3dpp;
 	bool m_doSoftwareVertexInit;
 
+	FSceneNode* currentFrame;
+
 
 #ifdef BGRA_MAKE
 #undef BGRA_MAKE
@@ -1234,6 +1236,10 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2);
 	void Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2);
 	void Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FLOAT X1, FLOAT Y1, FLOAT X2, FLOAT Y2, FLOAT Z);
+	
+	void SetStaticBsp(FStaticBspInfoBase& StaticBspInfo) override;
+	void DrawStaticBspNode(INT iNode, FSurfaceInfo& Surface) override;
+	void DrawStaticBspSurf(INT iSurf, FSurfaceInfo& Surface) override;
 
 	void ClearZ(FSceneNode* Frame);
 	void PushHit(const BYTE* Data, INT Count);
@@ -1579,6 +1585,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void FASTCALL RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture_FP(FTextureInfo &);
 
 	INT FASTCALL BufferStaticComplexSurfaceGeometry(const FSurfaceFacet&);
+	INT FASTCALL BufferStaticSurfaceGeometry(const FStaticBspInfoBase& staticBspInfo, const std::vector<FStaticBspSurf>& surfaces);
 	INT FASTCALL BufferStaticComplexSurfaceGeometry_VP(const FSurfaceFacet&);
 	DWORD FASTCALL BufferDetailTextureData(FLOAT);
 #ifdef UTGLR_INCLUDE_SSE_CODE
