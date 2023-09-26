@@ -476,11 +476,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 
 	//Current vertex declaration state tracking
 	IDirect3DVertexDeclaration9 *m_curVertexDecl;
-	//Current vertex shader state tracking
-	IDirect3DVertexShader9 *m_curVertexShader;
-	//Current pixel shader state tracking
-	IDirect3DPixelShader9 *m_curPixelShader;
-
 	//Vertex and primary color
 	FGLVertex m_csVertexArray[VERTEX_ARRAY_SIZE];
 	IDirect3DVertexBuffer9 *m_d3dVertexColorBuffer;
@@ -614,32 +609,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	//Texture state cache information
 	BYTE m_texEnableBits;
 
-	//Vertex program handles
-	IDirect3DVertexShader9 *m_vpDefaultRenderingState;
-	IDirect3DVertexShader9 *m_vpDefaultRenderingStateWithFog;
-	IDirect3DVertexShader9 *m_vpDefaultRenderingStateWithLinearFog;
-	IDirect3DVertexShader9 *m_vpComplexSurface[MAX_TMUNITS];
-	IDirect3DVertexShader9 *m_vpDetailTexture;
-	IDirect3DVertexShader9 *m_vpComplexSurfaceSingleTextureAndDetailTexture;
-	IDirect3DVertexShader9 *m_vpComplexSurfaceDualTextureAndDetailTexture;
-
-	//Fragment program handles
-	IDirect3DPixelShader9 *m_fpDefaultRenderingState;
-	IDirect3DPixelShader9 *m_fpDefaultRenderingStateWithFog;
-	IDirect3DPixelShader9 *m_fpDefaultRenderingStateWithLinearFog;
-	IDirect3DPixelShader9 *m_fpComplexSurfaceSingleTexture;
-	IDirect3DPixelShader9 *m_fpComplexSurfaceDualTextureModulated;
-	IDirect3DPixelShader9 *m_fpComplexSurfaceTripleTextureModulated;
-	IDirect3DPixelShader9 *m_fpComplexSurfaceSingleTextureWithFog;
-	IDirect3DPixelShader9 *m_fpComplexSurfaceDualTextureModulatedWithFog;
-	IDirect3DPixelShader9 *m_fpComplexSurfaceTripleTextureModulatedWithFog;
-	IDirect3DPixelShader9 *m_fpDetailTexture;
-	IDirect3DPixelShader9 *m_fpDetailTextureTwoLayer;
-	IDirect3DPixelShader9 *m_fpSingleTextureAndDetailTexture;
-	IDirect3DPixelShader9 *m_fpSingleTextureAndDetailTextureTwoLayer;
-	IDirect3DPixelShader9 *m_fpDualTextureAndDetailTexture;
-	IDirect3DPixelShader9 *m_fpDualTextureAndDetailTextureTwoLayer;
-
 
 	struct FByteGammaRamp {
 		BYTE red[256];
@@ -716,7 +685,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	// Hardware constraints.
 	struct {
 		UBOOL SinglePassDetail;
-		UBOOL UseFragmentProgram;
 	} DCV;
 
 	FLOAT LODBias;
@@ -754,7 +722,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	UBOOL UseTexPool;
 	INT DynamicTexIdRecycleLevel;
 	UBOOL TexDXT1ToDXT3;
-	UBOOL UseFragmentProgram;
 	INT SwapInterval;
 	INT FrameRateLimit;
 #if defined UTGLR_DX_BUILD || defined UTGLR_RUNE_BUILD
@@ -832,7 +799,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	FLOAT PL_LODBias;
 	UBOOL PL_UseDetailAlpha;
 	UBOOL PL_SinglePassDetail;
-	UBOOL PL_UseFragmentProgram;
 	UBOOL PL_UseSSE;
 	UBOOL PL_UseSSE2;
 
@@ -849,9 +815,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	bool m_rpMasked;
 	bool m_rpSetDepthEqual;
 	DWORD m_rpColor;
-
-	void (UD3D9RenderDevice::*m_pRenderPassesNoCheckSetupProc)(void);
-	void (FASTCALL UD3D9RenderDevice::*m_pRenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTextureProc)(FTextureInfo &);
 
 	DWORD (FASTCALL UD3D9RenderDevice::*m_pBufferDetailTextureDataProc)(FLOAT);
 
@@ -1487,34 +1450,13 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 		if (m_curVertexDecl != m_standardNTextureVertexDecl[0]) {
 			SetVertexDeclNoCheck(m_standardNTextureVertexDecl[0]);
 		}
-
-		//Keep vertex programs enabled if using vertex program mode
-		IDirect3DVertexShader9 *vertexShader = (UseFragmentProgram) ? m_vpDefaultRenderingState : NULL;
-		if (m_curVertexShader != vertexShader) {
-			SetVertexShaderNoCheck(vertexShader);
-		}
-
-		//Keep fragment programs enabled if using fragment program mode
-		IDirect3DPixelShader9 *pixelShader = (UseFragmentProgram) ? m_fpDefaultRenderingState : NULL;
-		if (m_curPixelShader != pixelShader) {
-			SetPixelShaderNoCheck(pixelShader);
-		}
 	}
-	inline void FASTCALL SetStreamState(IDirect3DVertexDeclaration9 *vertexDecl, IDirect3DVertexShader9 *vertexShader, IDirect3DPixelShader9 *pixelShader) {
+	inline void FASTCALL SetStreamState(IDirect3DVertexDeclaration9 *vertexDecl) {
 		if (m_curVertexDecl != vertexDecl) {
 			SetVertexDeclNoCheck(vertexDecl);
 		}
-		if (m_curVertexShader != vertexShader) {
-			SetVertexShaderNoCheck(vertexShader);
-		}
-		if (m_curPixelShader != pixelShader) {
-			SetPixelShaderNoCheck(pixelShader);
-		}
 	}
 	void FASTCALL SetVertexDeclNoCheck(IDirect3DVertexDeclaration9 *vertexDecl);
-	void FASTCALL SetVertexShaderNoCheck(IDirect3DVertexShader9 *vertexShader);
-	void FASTCALL SetPixelShaderNoCheck(IDirect3DPixelShader9 *pixelShader);
-
 	inline void SetDefaultProjectionState(void) {
 		//See if non-default projection is active
 		if (m_nearZRangeHackProjectionActive) {
@@ -1540,13 +1482,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 		}
 	}
 	void FASTCALL SetAAStateNoCheck(bool AAEnable);
-
-	bool FASTCALL LoadVertexProgram(IDirect3DVertexShader9 **, const DWORD *, const TCHAR *);
-	bool FASTCALL LoadFragmentProgram(IDirect3DPixelShader9 **, const DWORD *, const TCHAR *);
-
-	bool InitializeFragmentPrograms(void);
-	void TryInitializeFragmentProgramMode(void);
-	void ShutdownFragmentProgramMode(void);
 
 	void FASTCALL SetProjectionStateNoCheck(bool);
 	void SetOrthoProjection(void);
@@ -1580,20 +1515,16 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void FASTCALL RenderPassesExec_SingleOrDualTextureAndDetailTexture(FTextureInfo &DetailTextureInfo);
 
 	void RenderPassesNoCheckSetup(void);
-	void RenderPassesNoCheckSetup_FP(void);
 	void FASTCALL RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture(FTextureInfo &);
-	void FASTCALL RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture_FP(FTextureInfo &);
 
 	INT FASTCALL BufferStaticComplexSurfaceGeometry(const FSurfaceFacet&);
 	INT FASTCALL BufferStaticSurfaceGeometry(const FStaticBspInfoBase& staticBspInfo, const std::vector<FStaticBspSurf>& surfaces);
-	INT FASTCALL BufferStaticComplexSurfaceGeometry_VP(const FSurfaceFacet&);
 	DWORD FASTCALL BufferDetailTextureData(FLOAT);
 #ifdef UTGLR_INCLUDE_SSE_CODE
 	DWORD FASTCALL BufferDetailTextureData_SSE2(FLOAT);
 #endif //UTGLR_INCLUDE_SSE_CODE
 
 	void FASTCALL DrawDetailTexture(FTextureInfo &, bool);
-	void FASTCALL DrawDetailTexture_FP(FTextureInfo &);
 
 	void FASTCALL BufferAdditionalClippedVerts(FTransTexture** Pts, INT NumPts);
 };

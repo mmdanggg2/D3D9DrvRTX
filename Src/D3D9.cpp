@@ -70,425 +70,6 @@ static const char *g_d3d9DllName = "d3d9.dll";
 
 static const TCHAR *g_pSection = TEXT("D3D9Drv.D3D9RenderDevice");
 
-
-/*-----------------------------------------------------------------------------
-	Vertex programs.
------------------------------------------------------------------------------*/
-
-//Vertex shader definitions
-///////////////////////////
-
-//Vertex shader output registers
-// o0 - Transformed position
-// o1 - Primary color
-// o2 - Secondary color
-// o3 - Normal
-// o4 - TexCoord 0
-// o5 - TexCoord 1
-// o6 - TexCoord 2
-// o7 - TexCoord 3
-// o8 - TexCoord 4 / Position
-
-//Vertex shader global constants
-// [c0 - c3] - Projection matrix
-// c4 - Complex surface XAxis and UDot
-// c5 - Complex surface YAxis and VDot
-// [c6 - c9] - Up to 4 texture [UPan, VPan, UMult, VMult]
-
-#if 0
-static const char *g_tempShaderString =
-	"vs_3_0\n"
-
-	"dcl_position v0\n"
-	"dcl_color v5\n"
-	"dcl_texcoord0 v7\n"
-
-	"dcl_position o0.xyzw\n"
-	"dcl_color o1.rgba\n"
-	"dcl_texcoord0 o4.xy\n"
-
-	"mov o4.xy, v7\n"
-
-	"mov o1, v5\n"
-
-	"m4x4 o0, v0, c0\n"
-;
-#endif
-static const DWORD g_vpDefaultRenderingState[] = {
-	0xFFFE0300, 0x0200001F, 0x80000000, 0x900F0000, 0x0200001F, 0x8000000A, 0x900F0005, 0x0200001F, 
-	0x80000005, 0x900F0007, 0x0200001F, 0x80000000, 0xE00F0000, 0x0200001F, 0x8000000A, 0xE00F0001, 
-	0x0200001F, 0x80000005, 0xE0030004, 0x02000001, 0xE0030004, 0x90E40007, 0x02000001, 0xE00F0001, 
-	0x90E40005, 0x03000014, 0xE00F0000, 0x90E40000, 0xA0E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"vs_3_0\n"
-
-	"dcl_position v0\n"
-	"dcl_color v5\n"
-	"dcl_color1 v6\n"
-	"dcl_texcoord0 v7\n"
-
-	"dcl_position o0.xyzw\n"
-	"dcl_color o1.rgba\n"
-	"dcl_color1 o2.rgba\n"
-	"dcl_texcoord0 o4.xy\n"
-
-	"mov o4.xy, v7\n"
-
-	"mov o1, v5\n"
-	"mov o2, v6\n"
-
-	"m4x4 o0, v0, c0\n"
-;
-#endif
-static const DWORD g_vpDefaultRenderingStateWithFog[] = {
-	0xFFFE0300, 0x0200001F, 0x80000000, 0x900F0000, 0x0200001F, 0x8000000A, 0x900F0005, 0x0200001F, 
-	0x8001000A, 0x900F0006, 0x0200001F, 0x80000005, 0x900F0007, 0x0200001F, 0x80000000, 0xE00F0000, 
-	0x0200001F, 0x8000000A, 0xE00F0001, 0x0200001F, 0x8001000A, 0xE00F0002, 0x0200001F, 0x80000005, 
-	0xE0030004, 0x02000001, 0xE0030004, 0x90E40007, 0x02000001, 0xE00F0001, 0x90E40005, 0x02000001, 
-	0xE00F0002, 0x90E40006, 0x03000014, 0xE00F0000, 0x90E40000, 0xA0E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"vs_3_0\n"
-
-	"dcl_position v0\n"
-	"dcl_color v5\n"
-	"dcl_texcoord0 v7\n"
-
-	"dcl_position o0.xyzw\n"
-	"dcl_color o1.rgba\n"
-	"dcl_texcoord0 o4.xy\n"
-	"dcl_texcoord4 o8.xyzw\n"
-
-	"mov o4.xy, v7\n"
-
-	"mov o1, v5\n"
-
-	"m4x4 o0, v0, c0\n"
-	"mov o8, v0\n"
-;
-#endif
-static const DWORD g_vpDefaultRenderingStateWithLinearFog[] = {
-	0xFFFE0300, 0x0200001F, 0x80000000, 0x900F0000, 0x0200001F, 0x8000000A, 0x900F0005, 0x0200001F, 
-	0x80000005, 0x900F0007, 0x0200001F, 0x80000000, 0xE00F0000, 0x0200001F, 0x8000000A, 0xE00F0001, 
-	0x0200001F, 0x80000005, 0xE0030004, 0x0200001F, 0x80040005, 0xE00F0008, 0x02000001, 0xE0030004, 
-	0x90E40007, 0x02000001, 0xE00F0001, 0x90E40005, 0x03000014, 0xE00F0000, 0x90E40000, 0xA0E40000, 
-	0x02000001, 0xE00F0008, 0x90E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"vs_3_0\n"
-
-	"dcl_position v0\n"
-	"dcl_color v5\n"
-
-	"dcl_position o0.xyzw\n"
-	"dcl_color o1.rgba\n"
-	"dcl_texcoord0 o4.xy\n"
-
-	"dp3 r0.x, v0, c4\n"
-	"dp3 r0.y, v0, c5\n"
-	"add r0.x, r0.x, -c4.w\n"
-	"add r0.y, r0.y, -c5.w\n"
-
-	"add r1.xy, r0.xy, -c6.xy\n"
-	"mul o4.xy, r1.xy, c6.zw\n"
-
-	"mov o1, v5\n"
-
-	"m4x4 o0, v0, c0\n"
-;
-#endif
-static const DWORD g_vpComplexSurfaceSingleTexture[] = {
-	0xFFFE0300, 0x0200001F, 0x80000000, 0x900F0000, 0x0200001F, 0x8000000A, 0x900F0005, 0x0200001F, 
-	0x80000000, 0xE00F0000, 0x0200001F, 0x8000000A, 0xE00F0001, 0x0200001F, 0x80000005, 0xE0030004, 
-	0x03000008, 0x80010000, 0x90E40000, 0xA0E40004, 0x03000008, 0x80020000, 0x90E40000, 0xA0E40005, 
-	0x03000002, 0x80010000, 0x80000000, 0xA1FF0004, 0x03000002, 0x80020000, 0x80550000, 0xA1FF0005, 
-	0x03000002, 0x80030001, 0x80540000, 0xA1540006, 0x03000005, 0xE0030004, 0x80540001, 0xA0FE0006, 
-	0x02000001, 0xE00F0001, 0x90E40005, 0x03000014, 0xE00F0000, 0x90E40000, 0xA0E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"vs_3_0\n"
-
-	"dcl_position v0\n"
-	"dcl_color v5\n"
-
-	"dcl_position o0.xyzw\n"
-	"dcl_color o1.rgba\n"
-	"dcl_texcoord0 o4.xy\n"
-	"dcl_texcoord1 o5.xy\n"
-
-	"dp3 r0.x, v0, c4\n"
-	"dp3 r0.y, v0, c5\n"
-	"add r0.x, r0.x, -c4.w\n"
-	"add r0.y, r0.y, -c5.w\n"
-
-	"add r1.xy, r0.xy, -c6.xy\n"
-	"mul o4.xy, r1.xy, c6.zw\n"
-
-	"add r1.xy, r0.xy, -c7.xy\n"
-	"mul o5.xy, r1.xy, c7.zw\n"
-
-	"mov o1, v5\n"
-
-	"m4x4 o0, v0, c0\n"
-;
-#endif
-static const DWORD g_vpComplexSurfaceDualTexture[] = {
-	0xFFFE0300, 0x0200001F, 0x80000000, 0x900F0000, 0x0200001F, 0x8000000A, 0x900F0005, 0x0200001F, 
-	0x80000000, 0xE00F0000, 0x0200001F, 0x8000000A, 0xE00F0001, 0x0200001F, 0x80000005, 0xE0030004, 
-	0x0200001F, 0x80010005, 0xE0030005, 0x03000008, 0x80010000, 0x90E40000, 0xA0E40004, 0x03000008, 
-	0x80020000, 0x90E40000, 0xA0E40005, 0x03000002, 0x80010000, 0x80000000, 0xA1FF0004, 0x03000002, 
-	0x80020000, 0x80550000, 0xA1FF0005, 0x03000002, 0x80030001, 0x80540000, 0xA1540006, 0x03000005, 
-	0xE0030004, 0x80540001, 0xA0FE0006, 0x03000002, 0x80030001, 0x80540000, 0xA1540007, 0x03000005, 
-	0xE0030005, 0x80540001, 0xA0FE0007, 0x02000001, 0xE00F0001, 0x90E40005, 0x03000014, 0xE00F0000, 
-	0x90E40000, 0xA0E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"vs_3_0\n"
-
-	"dcl_position v0\n"
-	"dcl_color v5\n"
-
-	"dcl_position o0.xyzw\n"
-	"dcl_color o1.rgba\n"
-	"dcl_texcoord0 o4.xy\n"
-	"dcl_texcoord1 o5.xy\n"
-	"dcl_texcoord2 o6.xy\n"
-
-	"dp3 r0.x, v0, c4\n"
-	"dp3 r0.y, v0, c5\n"
-	"add r0.x, r0.x, -c4.w\n"
-	"add r0.y, r0.y, -c5.w\n"
-
-	"add r1.xy, r0.xy, -c6.xy\n"
-	"mul o4.xy, r1.xy, c6.zw\n"
-
-	"add r1.xy, r0.xy, -c7.xy\n"
-	"mul o5.xy, r1.xy, c7.zw\n"
-
-	"add r1.xy, r0.xy, -c8.xy\n"
-	"mul o6.xy, r1.xy, c8.zw\n"
-
-	"mov o1, v5\n"
-
-	"m4x4 o0, v0, c0\n"
-;
-#endif
-static const DWORD g_vpComplexSurfaceTripleTexture[] = {
-	0xFFFE0300, 0x0200001F, 0x80000000, 0x900F0000, 0x0200001F, 0x8000000A, 0x900F0005, 0x0200001F, 
-	0x80000000, 0xE00F0000, 0x0200001F, 0x8000000A, 0xE00F0001, 0x0200001F, 0x80000005, 0xE0030004, 
-	0x0200001F, 0x80010005, 0xE0030005, 0x0200001F, 0x80020005, 0xE0030006, 0x03000008, 0x80010000, 
-	0x90E40000, 0xA0E40004, 0x03000008, 0x80020000, 0x90E40000, 0xA0E40005, 0x03000002, 0x80010000, 
-	0x80000000, 0xA1FF0004, 0x03000002, 0x80020000, 0x80550000, 0xA1FF0005, 0x03000002, 0x80030001, 
-	0x80540000, 0xA1540006, 0x03000005, 0xE0030004, 0x80540001, 0xA0FE0006, 0x03000002, 0x80030001, 
-	0x80540000, 0xA1540007, 0x03000005, 0xE0030005, 0x80540001, 0xA0FE0007, 0x03000002, 0x80030001, 
-	0x80540000, 0xA1540008, 0x03000005, 0xE0030006, 0x80540001, 0xA0FE0008, 0x02000001, 0xE00F0001, 
-	0x90E40005, 0x03000014, 0xE00F0000, 0x90E40000, 0xA0E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"vs_3_0\n"
-
-	"dcl_position v0\n"
-	"dcl_color v5\n"
-
-	"dcl_position o0.xyzw\n"
-	"dcl_color o1.rgba\n"
-	"dcl_texcoord0 o4.xy\n"
-	"dcl_texcoord1 o5.xy\n"
-	"dcl_texcoord2 o6.xy\n"
-	"dcl_texcoord3 o7.xy\n"
-
-	"dp3 r0.x, v0, c4\n"
-	"dp3 r0.y, v0, c5\n"
-	"add r0.x, r0.x, -c4.w\n"
-	"add r0.y, r0.y, -c5.w\n"
-
-	"add r1.xy, r0.xy, -c6.xy\n"
-	"mul o4.xy, r1.xy, c6.zw\n"
-
-	"add r1.xy, r0.xy, -c7.xy\n"
-	"mul o5.xy, r1.xy, c7.zw\n"
-
-	"add r1.xy, r0.xy, -c8.xy\n"
-	"mul o6.xy, r1.xy, c8.zw\n"
-
-	"add r1.xy, r0.xy, -c9.xy\n"
-	"mul o7.xy, r1.xy, c9.zw\n"
-
-	"mov o1, v5\n"
-
-	"m4x4 o0, v0, c0\n"
-;
-#endif
-static const DWORD g_vpComplexSurfaceQuadTexture[] = {
-	0xFFFE0300, 0x0200001F, 0x80000000, 0x900F0000, 0x0200001F, 0x8000000A, 0x900F0005, 0x0200001F, 
-	0x80000000, 0xE00F0000, 0x0200001F, 0x8000000A, 0xE00F0001, 0x0200001F, 0x80000005, 0xE0030004, 
-	0x0200001F, 0x80010005, 0xE0030005, 0x0200001F, 0x80020005, 0xE0030006, 0x0200001F, 0x80030005, 
-	0xE0030007, 0x03000008, 0x80010000, 0x90E40000, 0xA0E40004, 0x03000008, 0x80020000, 0x90E40000, 
-	0xA0E40005, 0x03000002, 0x80010000, 0x80000000, 0xA1FF0004, 0x03000002, 0x80020000, 0x80550000, 
-	0xA1FF0005, 0x03000002, 0x80030001, 0x80540000, 0xA1540006, 0x03000005, 0xE0030004, 0x80540001, 
-	0xA0FE0006, 0x03000002, 0x80030001, 0x80540000, 0xA1540007, 0x03000005, 0xE0030005, 0x80540001, 
-	0xA0FE0007, 0x03000002, 0x80030001, 0x80540000, 0xA1540008, 0x03000005, 0xE0030006, 0x80540001, 
-	0xA0FE0008, 0x03000002, 0x80030001, 0x80540000, 0xA1540009, 0x03000005, 0xE0030007, 0x80540001, 
-	0xA0FE0009, 0x02000001, 0xE00F0001, 0x90E40005, 0x03000014, 0xE00F0000, 0x90E40000, 0xA0E40000, 
-	0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"vs_3_0\n"
-
-	"dcl_position v0\n"
-	"dcl_color v5\n"
-	"dcl_texcoord4 v8\n"
-
-	"dcl_position o0.xyzw\n"
-	"dcl_color o1.rgba\n"
-	"dcl_texcoord0 o4.xyzw\n"
-	"dcl_texcoord4 o8.xyzw\n"
-
-	"def c10, 4.223f, 4.223f, 0.0f, 1.0f\n"
-
-	"dp3 r0.x, v0, c4\n"
-	"dp3 r0.y, v0, c5\n"
-	"add r0.x, r0.x, -c4.w\n"
-	"add r0.y, r0.y, -c5.w\n"
-
-	"add r1.xy, r0.xy, -c6.xy\n"
-	"mul r1.xy, r1.xy, c6.zw\n"
-	"mul o4.xyzw, r1.xyxy, c10.wwxy\n"
-
-	"mov o1, v5\n"
-
-	"m4x4 o0, v0, c0\n"
-	"mov o8, v0\n"
-;
-#endif
-static const DWORD g_vpDetailTexture[] = {
-	0xFFFE0300, 0x0200001F, 0x80000000, 0x900F0000, 0x0200001F, 0x8000000A, 0x900F0005, 0x0200001F, 
-	0x80040005, 0x900F0008, 0x0200001F, 0x80000000, 0xE00F0000, 0x0200001F, 0x8000000A, 0xE00F0001, 
-	0x0200001F, 0x80000005, 0xE00F0004, 0x0200001F, 0x80040005, 0xE00F0008, 0x05000051, 0xA00F000A, 
-	0x408722D1, 0x408722D1, 0x00000000, 0x3F800000, 0x03000008, 0x80010000, 0x90E40000, 0xA0E40004, 
-	0x03000008, 0x80020000, 0x90E40000, 0xA0E40005, 0x03000002, 0x80010000, 0x80000000, 0xA1FF0004, 
-	0x03000002, 0x80020000, 0x80550000, 0xA1FF0005, 0x03000002, 0x80030001, 0x80540000, 0xA1540006, 
-	0x03000005, 0x80030001, 0x80540001, 0xA0FE0006, 0x03000005, 0xE00F0004, 0x80440001, 0xA04F000A, 
-	0x02000001, 0xE00F0001, 0x90E40005, 0x03000014, 0xE00F0000, 0x90E40000, 0xA0E40000, 0x02000001, 
-	0xE00F0008, 0x90E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"vs_3_0\n"
-
-	"dcl_position v0\n"
-	"dcl_color v5\n"
-	"dcl_texcoord4 v8\n"
-
-	"dcl_position o0.xyzw\n"
-	"dcl_color o1.rgba\n"
-	"dcl_texcoord0 o4.xy\n"
-	"dcl_texcoord1 o5.xyzw\n"
-	"dcl_texcoord4 o8.xyzw\n"
-
-	"def c10, 4.223f, 4.223f, 0.0f, 1.0f\n"
-
-	"dp3 r0.x, v0, c4\n"
-	"dp3 r0.y, v0, c5\n"
-	"add r0.x, r0.x, -c4.w\n"
-	"add r0.y, r0.y, -c5.w\n"
-
-	"add r1.xy, r0.xy, -c6.xy\n"
-	"mul o4.xy, r1.xy, c6.zw\n"
-
-	"add r1.xy, r0.xy, -c7.xy\n"
-	"mul r1.xy, r1.xy, c7.zw\n"
-	"mul o5.xyzw, r1.xyxy, c10.wwxy\n"
-
-	"mov o1, v5\n"
-
-	"m4x4 o0, v0, c0\n"
-	"mov o8, v0\n"
-;
-#endif
-static const DWORD g_vpComplexSurfaceSingleTextureAndDetailTexture[] = {
-	0xFFFE0300, 0x0200001F, 0x80000000, 0x900F0000, 0x0200001F, 0x8000000A, 0x900F0005, 0x0200001F, 
-	0x80040005, 0x900F0008, 0x0200001F, 0x80000000, 0xE00F0000, 0x0200001F, 0x8000000A, 0xE00F0001, 
-	0x0200001F, 0x80000005, 0xE0030004, 0x0200001F, 0x80010005, 0xE00F0005, 0x0200001F, 0x80040005, 
-	0xE00F0008, 0x05000051, 0xA00F000A, 0x408722D1, 0x408722D1, 0x00000000, 0x3F800000, 0x03000008, 
-	0x80010000, 0x90E40000, 0xA0E40004, 0x03000008, 0x80020000, 0x90E40000, 0xA0E40005, 0x03000002, 
-	0x80010000, 0x80000000, 0xA1FF0004, 0x03000002, 0x80020000, 0x80550000, 0xA1FF0005, 0x03000002, 
-	0x80030001, 0x80540000, 0xA1540006, 0x03000005, 0xE0030004, 0x80540001, 0xA0FE0006, 0x03000002, 
-	0x80030001, 0x80540000, 0xA1540007, 0x03000005, 0x80030001, 0x80540001, 0xA0FE0007, 0x03000005, 
-	0xE00F0005, 0x80440001, 0xA04F000A, 0x02000001, 0xE00F0001, 0x90E40005, 0x03000014, 0xE00F0000, 
-	0x90E40000, 0xA0E40000, 0x02000001, 0xE00F0008, 0x90E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"vs_3_0\n"
-
-	"dcl_position v0\n"
-	"dcl_color v5\n"
-	"dcl_texcoord4 v8\n"
-
-	"dcl_position o0.xyzw\n"
-	"dcl_color o1.rgba\n"
-	"dcl_texcoord0 o4.xy\n"
-	"dcl_texcoord1 o5.xy\n"
-	"dcl_texcoord2 o6.xyzw\n"
-	"dcl_texcoord4 o8.xyzw\n"
-
-	"def c10, 4.223f, 4.223f, 0.0f, 1.0f\n"
-
-	"dp3 r0.x, v0, c4\n"
-	"dp3 r0.y, v0, c5\n"
-	"add r0.x, r0.x, -c4.w\n"
-	"add r0.y, r0.y, -c5.w\n"
-
-	"add r1.xy, r0.xy, -c6.xy\n"
-	"mul o4.xy, r1.xy, c6.zw\n"
-
-	"add r1.xy, r0.xy, -c7.xy\n"
-	"mul o5.xy, r1.xy, c7.zw\n"
-
-	"add r1.xy, r0.xy, -c8.xy\n"
-	"mul r1.xy, r1.xy, c8.zw\n"
-	"mul o6.xyzw, r1.xyxy, c10.wwxy\n"
-
-	"mov o1, v5\n"
-
-	"m4x4 o0, v0, c0\n"
-	"mov o8, v0\n"
-;
-#endif
-static const DWORD g_vpComplexSurfaceDualTextureAndDetailTexture[] = {
-	0xFFFE0300, 0x0200001F, 0x80000000, 0x900F0000, 0x0200001F, 0x8000000A, 0x900F0005, 0x0200001F, 
-	0x80040005, 0x900F0008, 0x0200001F, 0x80000000, 0xE00F0000, 0x0200001F, 0x8000000A, 0xE00F0001, 
-	0x0200001F, 0x80000005, 0xE0030004, 0x0200001F, 0x80010005, 0xE0030005, 0x0200001F, 0x80020005, 
-	0xE00F0006, 0x0200001F, 0x80040005, 0xE00F0008, 0x05000051, 0xA00F000A, 0x408722D1, 0x408722D1, 
-	0x00000000, 0x3F800000, 0x03000008, 0x80010000, 0x90E40000, 0xA0E40004, 0x03000008, 0x80020000, 
-	0x90E40000, 0xA0E40005, 0x03000002, 0x80010000, 0x80000000, 0xA1FF0004, 0x03000002, 0x80020000, 
-	0x80550000, 0xA1FF0005, 0x03000002, 0x80030001, 0x80540000, 0xA1540006, 0x03000005, 0xE0030004, 
-	0x80540001, 0xA0FE0006, 0x03000002, 0x80030001, 0x80540000, 0xA1540007, 0x03000005, 0xE0030005, 
-	0x80540001, 0xA0FE0007, 0x03000002, 0x80030001, 0x80540000, 0xA1540008, 0x03000005, 0x80030001, 
-	0x80540001, 0xA0FE0008, 0x03000005, 0xE00F0006, 0x80440001, 0xA04F000A, 0x02000001, 0xE00F0001, 
-	0x90E40005, 0x03000014, 0xE00F0000, 0x90E40000, 0xA0E40000, 0x02000001, 0xE00F0008, 0x90E40000, 
-	0x0000FFFF
-};
-
-
 //Stream definitions
 ////////////////////
 
@@ -549,673 +130,10 @@ static const D3DVERTEXELEMENT9 g_twoColorSingleTextureStreamDef[] = {
 
 
 /*-----------------------------------------------------------------------------
-	Fragment programs.
------------------------------------------------------------------------------*/
-
-//Pixel shader definitions
-///////////////////////////
-
-//Pixel shader input registers
-// v0 - Unused
-// v1 - Primary color
-// v2 - Secondary color
-// v3 - Normal
-// v4 - TexCoord 0
-// v5 - TexCoord 1
-// v6 - TexCoord 2
-// v7 - TexCoord 3
-// v8 - TexCoord 4 / Position
-
-//Pixel shader global constants
-// c0.x - Alpha test level
-// c0.g - Unused
-// c0.b - Unused
-// c0.a - Lightmap blend scale factor
-// c3   - Linear fog color
-// c4.x - Linear fog [1.0 / (end - start)]
-// c4.y - Linear fog [end / (end - start)]
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_color v1.rgba\n"
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-
-	"texld r0, v4, s0\n"
-
-	"mul r0, r0, v1\n"
-
-	"sub r4, r0.aaaa, c0.xxxx\n"
-	"texkill r4\n"
-
-	"mov oC0, r0\n"
-;
-#endif
-static const DWORD g_fpDefaultRenderingState[] = {
-	0xFFFF0300, 0x0200001F, 0x8000000A, 0x900F0001, 0x0200001F, 0x80000005, 0x90030004, 0x0200001F, 
-	0x90000000, 0xA00F0800, 0x03000042, 0x800F0000, 0x90E40004, 0xA0E40800, 0x03000005, 0x800F0000, 
-	0x80E40000, 0x90E40001, 0x03000002, 0x800F0004, 0x80FF0000, 0xA1000000, 0x01000041, 0x800F0004, 
-	0x02000001, 0x800F0800, 0x80E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_color v1.rgba\n"
-	"dcl_color1 v2.rgba\n"
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-
-	"texld r0, v4, s0\n"
-
-	"mul r0, r0, v1\n"
-	"add r0.rgb, r0, v2\n"
-
-	"sub r4, r0.aaaa, c0.xxxx\n"
-	"texkill r4\n"
-
-	"mov oC0, r0\n"
-;
-#endif
-static const DWORD g_fpDefaultRenderingStateWithFog[] = {
-	0xFFFF0300, 0x0200001F, 0x8000000A, 0x900F0001, 0x0200001F, 0x8001000A, 0x900F0002, 0x0200001F, 
-	0x80000005, 0x90030004, 0x0200001F, 0x90000000, 0xA00F0800, 0x03000042, 0x800F0000, 0x90E40004, 
-	0xA0E40800, 0x03000005, 0x800F0000, 0x80E40000, 0x90E40001, 0x03000002, 0x80070000, 0x80E40000, 
-	0x90E40002, 0x03000002, 0x800F0004, 0x80FF0000, 0xA1000000, 0x01000041, 0x800F0004, 0x02000001, 
-	0x800F0800, 0x80E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_color v1.rgba\n"
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-	"dcl_texcoord4 v8.xyzw\n"
-
-	"texld r0, v4, s0\n"
-
-	"mul r0, r0, v1\n"
-
-	"sub r4, r0.aaaa, c0.xxxx\n"
-	"texkill r4\n"
-
-	"mad_sat r1.x, -v8.z, c4.x, c4.y\n"
-	"lrp r0.rgb, r1.xxxx, r0, c3\n"
-
-	"mov oC0, r0\n"
-;
-#endif
-static const DWORD g_fpDefaultRenderingStateWithLinearFog[] = {
-	0xFFFF0300, 0x0200001F, 0x8000000A, 0x900F0001, 0x0200001F, 0x80000005, 0x90030004, 0x0200001F, 
-	0x90000000, 0xA00F0800, 0x0200001F, 0x80040005, 0x900F0008, 0x03000042, 0x800F0000, 0x90E40004, 
-	0xA0E40800, 0x03000005, 0x800F0000, 0x80E40000, 0x90E40001, 0x03000002, 0x800F0004, 0x80FF0000, 
-	0xA1000000, 0x01000041, 0x800F0004, 0x04000004, 0x80110001, 0x91AA0008, 0xA0000004, 0xA0550004, 
-	0x04000012, 0x80070000, 0x80000001, 0x80E40000, 0xA0E40003, 0x02000001, 0x800F0800, 0x80E40000, 
-	0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-
-	"texld r0, v4, s0\n"
-
-	"sub r4, r0.aaaa, c0.xxxx\n"
-	"texkill r4\n"
-
-	"mov oC0, r0\n"
-;
-#endif
-static const DWORD g_fpComplexSurfaceSingleTexture[] = {
-	0xFFFF0300, 0x0200001F, 0x80000005, 0x90030004, 0x0200001F, 0x90000000, 0xA00F0800, 0x03000042, 
-	0x800F0000, 0x90E40004, 0xA0E40800, 0x03000002, 0x800F0004, 0x80FF0000, 0xA1000000, 0x01000041, 
-	0x800F0004, 0x02000001, 0x800F0800, 0x80E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-	"dcl_texcoord1 v5.xy\n"
-	"dcl_2d s1\n"
-
-	"texld r0, v4, s0\n"
-	"texld r1, v5, s1\n"
-
-	"mul r0, r0, r1\n"
-	"mul r0.rgb, r0, c0.aaaa\n"
-
-	"sub r4, r0.aaaa, c0.xxxx\n"
-	"texkill r4\n"
-
-	"mov oC0, r0\n"
-;
-#endif
-static const DWORD g_fpComplexSurfaceDualTextureModulated[] = {
-	0xFFFF0300, 0x0200001F, 0x80000005, 0x90030004, 0x0200001F, 0x90000000, 0xA00F0800, 0x0200001F, 
-	0x80010005, 0x90030005, 0x0200001F, 0x90000000, 0xA00F0801, 0x03000042, 0x800F0000, 0x90E40004, 
-	0xA0E40800, 0x03000042, 0x800F0001, 0x90E40005, 0xA0E40801, 0x03000005, 0x800F0000, 0x80E40000, 
-	0x80E40001, 0x03000005, 0x80070000, 0x80E40000, 0xA0FF0000, 0x03000002, 0x800F0004, 0x80FF0000, 
-	0xA1000000, 0x01000041, 0x800F0004, 0x02000001, 0x800F0800, 0x80E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-	"dcl_texcoord1 v5.xy\n"
-	"dcl_2d s1\n"
-	"dcl_texcoord2 v6.xy\n"
-	"dcl_2d s2\n"
-
-	"texld r0, v4, s0\n"
-	"texld r1, v5, s1\n"
-	"texld r2, v6, s2\n"
-
-	"mul r0, r0, r1\n"
-	"mul r0.rgb, r0, c0.aaaa\n"
-
-	"mul r0, r0, r2\n"
-	"mul r0.rgb, r0, c0.aaaa\n"
-
-	"sub r4, r0.aaaa, c0.xxxx\n"
-	"texkill r4\n"
-
-	"mov oC0, r0\n"
-;
-#endif
-static const DWORD g_fpComplexSurfaceTripleTextureModulated[] = {
-	0xFFFF0300, 0x0200001F, 0x80000005, 0x90030004, 0x0200001F, 0x90000000, 0xA00F0800, 0x0200001F, 
-	0x80010005, 0x90030005, 0x0200001F, 0x90000000, 0xA00F0801, 0x0200001F, 0x80020005, 0x90030006, 
-	0x0200001F, 0x90000000, 0xA00F0802, 0x03000042, 0x800F0000, 0x90E40004, 0xA0E40800, 0x03000042, 
-	0x800F0001, 0x90E40005, 0xA0E40801, 0x03000042, 0x800F0002, 0x90E40006, 0xA0E40802, 0x03000005, 
-	0x800F0000, 0x80E40000, 0x80E40001, 0x03000005, 0x80070000, 0x80E40000, 0xA0FF0000, 0x03000005, 
-	0x800F0000, 0x80E40000, 0x80E40002, 0x03000005, 0x80070000, 0x80E40000, 0xA0FF0000, 0x03000002, 
-	0x800F0004, 0x80FF0000, 0xA1000000, 0x01000041, 0x800F0004, 0x02000001, 0x800F0800, 0x80E40000, 
-	0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-	"dcl_texcoord1 v5.xy\n"
-	"dcl_2d s1\n"
-
-	"def c1, 1.0f, 1.0f, 1.0f, 1.0f\n"
-
-	"texld r0, v4, s0\n"
-	"texld r1, v5, s1\n"
-
-	"sub r4, r0.aaaa, c0.xxxx\n"
-	"texkill r4\n"
-
-	"sub r1.a, c1.a, r1.a\n"
-	"mad r0.rgb, r0, r1.aaaa, r1\n"
-
-	"mov oC0, r0\n"
-;
-#endif
-static const DWORD g_fpComplexSurfaceSingleTextureWithFog[] = {
-	0xFFFF0300, 0x0200001F, 0x80000005, 0x90030004, 0x0200001F, 0x90000000, 0xA00F0800, 0x0200001F, 
-	0x80010005, 0x90030005, 0x0200001F, 0x90000000, 0xA00F0801, 0x05000051, 0xA00F0001, 0x3F800000, 
-	0x3F800000, 0x3F800000, 0x3F800000, 0x03000042, 0x800F0000, 0x90E40004, 0xA0E40800, 0x03000042, 
-	0x800F0001, 0x90E40005, 0xA0E40801, 0x03000002, 0x800F0004, 0x80FF0000, 0xA1000000, 0x01000041, 
-	0x800F0004, 0x03000002, 0x80080001, 0xA0FF0001, 0x81FF0001, 0x04000004, 0x80070000, 0x80E40000, 
-	0x80FF0001, 0x80E40001, 0x02000001, 0x800F0800, 0x80E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-	"dcl_texcoord1 v5.xy\n"
-	"dcl_2d s1\n"
-	"dcl_texcoord2 v6.xy\n"
-	"dcl_2d s2\n"
-
-	"def c1, 1.0f, 1.0f, 1.0f, 1.0f\n"
-
-	"texld r0, v4, s0\n"
-	"texld r1, v5, s1\n"
-	"texld r2, v6, s2\n"
-
-	"mul r0, r0, r1\n"
-	"mul r0.rgb, r0, c0.aaaa\n"
-
-	"sub r4, r0.aaaa, c0.xxxx\n"
-	"texkill r4\n"
-
-	"sub r2.a, c1.a, r2.a\n"
-	"mad r0.rgb, r0, r2.aaaa, r2\n"
-
-	"mov oC0, r0\n"
-;
-#endif
-static const DWORD g_fpComplexSurfaceDualTextureModulatedWithFog[] = {
-	0xFFFF0300, 0x0200001F, 0x80000005, 0x90030004, 0x0200001F, 0x90000000, 0xA00F0800, 0x0200001F, 
-	0x80010005, 0x90030005, 0x0200001F, 0x90000000, 0xA00F0801, 0x0200001F, 0x80020005, 0x90030006, 
-	0x0200001F, 0x90000000, 0xA00F0802, 0x05000051, 0xA00F0001, 0x3F800000, 0x3F800000, 0x3F800000, 
-	0x3F800000, 0x03000042, 0x800F0000, 0x90E40004, 0xA0E40800, 0x03000042, 0x800F0001, 0x90E40005, 
-	0xA0E40801, 0x03000042, 0x800F0002, 0x90E40006, 0xA0E40802, 0x03000005, 0x800F0000, 0x80E40000, 
-	0x80E40001, 0x03000005, 0x80070000, 0x80E40000, 0xA0FF0000, 0x03000002, 0x800F0004, 0x80FF0000, 
-	0xA1000000, 0x01000041, 0x800F0004, 0x03000002, 0x80080002, 0xA0FF0001, 0x81FF0002, 0x04000004, 
-	0x80070000, 0x80E40000, 0x80FF0002, 0x80E40002, 0x02000001, 0x800F0800, 0x80E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-	"dcl_texcoord1 v5.xy\n"
-	"dcl_2d s1\n"
-	"dcl_texcoord2 v6.xy\n"
-	"dcl_2d s2\n"
-	"dcl_texcoord3 v7.xy\n"
-	"dcl_2d s3\n"
-
-	"def c1, 1.0f, 1.0f, 1.0f, 1.0f\n"
-
-	"texld r0, v4, s0\n"
-	"texld r1, v5, s1\n"
-	"texld r2, v6, s2\n"
-	"texld r3, v7, s3\n"
-
-	"mul r0, r0, r1\n"
-	"mul r0.rgb, r0, c0.aaaa\n"
-
-	"mul r0, r0, r2\n"
-	"mul r0.rgb, r0, c0.aaaa\n"
-
-	"sub r4, r0.aaaa, c0.xxxx\n"
-	"texkill r4\n"
-
-	"sub r3.a, c1.a, r3.a\n"
-	"mad r0.rgb, r0, r3.aaaa, r3\n"
-
-	"mov oC0, r0\n"
-;
-#endif
-static const DWORD g_fpComplexSurfaceTripleTextureModulatedWithFog[] = {
-	0xFFFF0300, 0x0200001F, 0x80000005, 0x90030004, 0x0200001F, 0x90000000, 0xA00F0800, 0x0200001F, 
-	0x80010005, 0x90030005, 0x0200001F, 0x90000000, 0xA00F0801, 0x0200001F, 0x80020005, 0x90030006, 
-	0x0200001F, 0x90000000, 0xA00F0802, 0x0200001F, 0x80030005, 0x90030007, 0x0200001F, 0x90000000, 
-	0xA00F0803, 0x05000051, 0xA00F0001, 0x3F800000, 0x3F800000, 0x3F800000, 0x3F800000, 0x03000042, 
-	0x800F0000, 0x90E40004, 0xA0E40800, 0x03000042, 0x800F0001, 0x90E40005, 0xA0E40801, 0x03000042, 
-	0x800F0002, 0x90E40006, 0xA0E40802, 0x03000042, 0x800F0003, 0x90E40007, 0xA0E40803, 0x03000005, 
-	0x800F0000, 0x80E40000, 0x80E40001, 0x03000005, 0x80070000, 0x80E40000, 0xA0FF0000, 0x03000005, 
-	0x800F0000, 0x80E40000, 0x80E40002, 0x03000005, 0x80070000, 0x80E40000, 0xA0FF0000, 0x03000002, 
-	0x800F0004, 0x80FF0000, 0xA1000000, 0x01000041, 0x800F0004, 0x03000002, 0x80080003, 0xA0FF0001, 
-	0x81FF0003, 0x04000004, 0x80070000, 0x80E40000, 0x80FF0003, 0x80E40003, 0x02000001, 0x800F0800, 
-	0x80E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_color v1.rgba\n"
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-	"dcl_texcoord4 v8.xyzw\n"
-
-	"def c1, 0.002631578947f, 0.999f, 0.0f, 1.0f\n"
-
-	"mul_sat r1.x, v8.z, c1.x\n"
-	"sub r0, c1.yyyy, r1.xxxx\n"
-	"texkill r0\n"
-
-	"texld r0, v4, s0\n"
-	"lrp r2, r1.xxxx, v1, r0\n"
-
-	"mov oC0, r2\n"
-;
-#endif
-static const DWORD g_fpDetailTexture[] = {
-	0xFFFF0300, 0x0200001F, 0x8000000A, 0x900F0001, 0x0200001F, 0x80000005, 0x90030004, 0x0200001F, 
-	0x90000000, 0xA00F0800, 0x0200001F, 0x80040005, 0x900F0008, 0x05000051, 0xA00F0001, 0x3B2C7692, 
-	0x3F7FBE77, 0x00000000, 0x3F800000, 0x03000005, 0x80110001, 0x90AA0008, 0xA0000001, 0x03000002, 
-	0x800F0000, 0xA0550001, 0x81000001, 0x01000041, 0x800F0000, 0x03000042, 0x800F0000, 0x90E40004, 
-	0xA0E40800, 0x04000012, 0x800F0002, 0x80000001, 0x90E40001, 0x80E40000, 0x02000001, 0x800F0800, 
-	0x80E40002, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_color v1.rgba\n"
-	"dcl_texcoord0 v4.xyzw\n"
-	"dcl_2d s0\n"
-	"dcl_texcoord4 v8.xyzw\n"
-
-	"def c1, 0.002631578947f, 0.999f, 0.0f, 1.0f\n"
-	"def c2, 4.223f, 4.223f, 0.0f, 1.0f\n"
-
-	"mul_sat r1.x, v8.z, c1.x\n"
-	"sub r0, c1.yyyy, r1.xxxx\n"
-	"texkill r0\n"
-
-	"texld r0, v4.xy, s0\n"
-	"lrp r2, r1.xxxx, v1, r0\n"
-
-	"mul_sat r1.x, r1.x, c2.x\n"
-
-	"texld r0, v4.zw, s0\n"
-	"lrp r3, r1.xxxx, v1, r0\n"
-
-	"mul r2, r2, r3\n"
-	"add r2, r2, r2\n"
-
-	"mov oC0, r2\n"
-;
-#endif
-static const DWORD g_fpDetailTextureTwoLayer[] = {
-	0xFFFF0300, 0x0200001F, 0x8000000A, 0x900F0001, 0x0200001F, 0x80000005, 0x900F0004, 0x0200001F, 
-	0x90000000, 0xA00F0800, 0x0200001F, 0x80040005, 0x900F0008, 0x05000051, 0xA00F0001, 0x3B2C7692, 
-	0x3F7FBE77, 0x00000000, 0x3F800000, 0x05000051, 0xA00F0002, 0x408722D1, 0x408722D1, 0x00000000, 
-	0x3F800000, 0x03000005, 0x80110001, 0x90AA0008, 0xA0000001, 0x03000002, 0x800F0000, 0xA0550001, 
-	0x81000001, 0x01000041, 0x800F0000, 0x03000042, 0x800F0000, 0x90540004, 0xA0E40800, 0x04000012, 
-	0x800F0002, 0x80000001, 0x90E40001, 0x80E40000, 0x03000005, 0x80110001, 0x80000001, 0xA0000002, 
-	0x03000042, 0x800F0000, 0x90FE0004, 0xA0E40800, 0x04000012, 0x800F0003, 0x80000001, 0x90E40001, 
-	0x80E40000, 0x03000005, 0x800F0002, 0x80E40002, 0x80E40003, 0x03000002, 0x800F0002, 0x80E40002, 
-	0x80E40002, 0x02000001, 0x800F0800, 0x80E40002, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_color v1.rgba\n"
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-	"dcl_texcoord1 v5.xy\n"
-	"dcl_2d s1\n"
-	"dcl_texcoord4 v8.xyzw\n"
-
-	"def c1, 0.002631578947f, 0.999f, 0.0f, 1.0f\n"
-
-	"texld r0, v4, s0\n"
-
-	"sub r4, r0.aaaa, c0.xxxx\n"
-	"texkill r4\n"
-
-	"mul_sat r1.x, v8.z, c1.x\n"
-	"if_le r1.x, c1.y\n"
-		"texld r2, v5, s1\n"
-		"lrp r3, r1.xxxx, v1, r2\n"
-
-		"mul r0.rgb, r0, r3\n"
-		"add r0.rgb, r0, r0\n"
-	"endif\n"
-
-	"mov oC0, r0\n"
-;
-#endif
-static const DWORD g_fpSingleTextureAndDetailTexture[] = {
-	0xFFFF0300, 0x0200001F, 0x8000000A, 0x900F0001, 0x0200001F, 0x80000005, 0x90030004, 0x0200001F, 
-	0x90000000, 0xA00F0800, 0x0200001F, 0x80010005, 0x90030005, 0x0200001F, 0x90000000, 0xA00F0801, 
-	0x0200001F, 0x80040005, 0x900F0008, 0x05000051, 0xA00F0001, 0x3B2C7692, 0x3F7FBE77, 0x00000000, 
-	0x3F800000, 0x03000042, 0x800F0000, 0x90E40004, 0xA0E40800, 0x03000002, 0x800F0004, 0x80FF0000, 
-	0xA1000000, 0x01000041, 0x800F0004, 0x03000005, 0x80110001, 0x90AA0008, 0xA0000001, 0x02060029, 
-	0x80000001, 0xA0550001, 0x03000042, 0x800F0002, 0x90E40005, 0xA0E40801, 0x04000012, 0x800F0003, 
-	0x80000001, 0x90E40001, 0x80E40002, 0x03000005, 0x80070000, 0x80E40000, 0x80E40003, 0x03000002, 
-	0x80070000, 0x80E40000, 0x80E40000, 0x0000002B, 0x02000001, 0x800F0800, 0x80E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_color v1.rgba\n"
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-	"dcl_texcoord1 v5.xyzw\n"
-	"dcl_2d s1\n"
-	"dcl_texcoord4 v8.xyzw\n"
-
-	"def c1, 0.002631578947f, 0.999f, 0.0f, 1.0f\n"
-	"def c2, 4.223f, 4.223f, 0.0f, 1.0f\n"
-
-	"texld r0, v4, s0\n"
-
-	"sub r4, r0.aaaa, c0.xxxx\n"
-	"texkill r4\n"
-
-	"mul_sat r1.x, v8.z, c1.x\n"
-	"if_le r1.x, c1.y\n"
-		"texld r2, v5.xy, s1\n"
-		"lrp r3, r1.xxxx, v1, r2\n"
-
-		"mul r0.rgb, r0, r3\n"
-		"add r0.rgb, r0, r0\n"
-
-		"mul_sat r1.x, r1.x, c2.x\n"
-
-		"texld r2, v5.zw, s1\n"
-		"lrp r3, r1.xxxx, v1, r2\n"
-
-		"mul r0.rgb, r0, r3\n"
-		"add r0.rgb, r0, r0\n"
-	"endif\n"
-
-	"mov oC0, r0\n"
-;
-#endif
-static const DWORD g_fpSingleTextureAndDetailTextureTwoLayer[] = {
-	0xFFFF0300, 0x0200001F, 0x8000000A, 0x900F0001, 0x0200001F, 0x80000005, 0x90030004, 0x0200001F, 
-	0x90000000, 0xA00F0800, 0x0200001F, 0x80010005, 0x900F0005, 0x0200001F, 0x90000000, 0xA00F0801, 
-	0x0200001F, 0x80040005, 0x900F0008, 0x05000051, 0xA00F0001, 0x3B2C7692, 0x3F7FBE77, 0x00000000, 
-	0x3F800000, 0x05000051, 0xA00F0002, 0x408722D1, 0x408722D1, 0x00000000, 0x3F800000, 0x03000042, 
-	0x800F0000, 0x90E40004, 0xA0E40800, 0x03000002, 0x800F0004, 0x80FF0000, 0xA1000000, 0x01000041, 
-	0x800F0004, 0x03000005, 0x80110001, 0x90AA0008, 0xA0000001, 0x02060029, 0x80000001, 0xA0550001, 
-	0x03000042, 0x800F0002, 0x90540005, 0xA0E40801, 0x04000012, 0x800F0003, 0x80000001, 0x90E40001, 
-	0x80E40002, 0x03000005, 0x80070000, 0x80E40000, 0x80E40003, 0x03000002, 0x80070000, 0x80E40000, 
-	0x80E40000, 0x03000005, 0x80110001, 0x80000001, 0xA0000002, 0x03000042, 0x800F0002, 0x90FE0005, 
-	0xA0E40801, 0x04000012, 0x800F0003, 0x80000001, 0x90E40001, 0x80E40002, 0x03000005, 0x80070000, 
-	0x80E40000, 0x80E40003, 0x03000002, 0x80070000, 0x80E40000, 0x80E40000, 0x0000002B, 0x02000001, 
-	0x800F0800, 0x80E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_color v1.rgba\n"
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-	"dcl_texcoord1 v5.xy\n"
-	"dcl_2d s1\n"
-	"dcl_texcoord2 v6.xy\n"
-	"dcl_2d s2\n"
-	"dcl_texcoord4 v8.xyzw\n"
-
-	"def c1, 0.002631578947f, 0.999f, 0.0f, 1.0f\n"
-
-	"texld r0, v4, s0\n"
-	"texld r1, v5, s1\n"
-
-	"mul r0, r0, r1\n"
-	"mul r0.rgb, r0, c0.aaaa\n"
-
-	"sub r4, r0.aaaa, c0.xxxx\n"
-	"texkill r4\n"
-
-	"mul_sat r1.x, v8.z, c1.x\n"
-	"if_le r1.x, c1.y\n"
-		"texld r2, v6, s2\n"
-		"lrp r3, r1.xxxx, v1, r2\n"
-
-		"mul r0.rgb, r0, r3\n"
-		"add r0.rgb, r0, r0\n"
-	"endif\n"
-
-	"mov oC0, r0\n"
-;
-#endif
-static const DWORD g_fpDualTextureAndDetailTexture[] = {
-	0xFFFF0300, 0x0200001F, 0x8000000A, 0x900F0001, 0x0200001F, 0x80000005, 0x90030004, 0x0200001F, 
-	0x90000000, 0xA00F0800, 0x0200001F, 0x80010005, 0x90030005, 0x0200001F, 0x90000000, 0xA00F0801, 
-	0x0200001F, 0x80020005, 0x90030006, 0x0200001F, 0x90000000, 0xA00F0802, 0x0200001F, 0x80040005, 
-	0x900F0008, 0x05000051, 0xA00F0001, 0x3B2C7692, 0x3F7FBE77, 0x00000000, 0x3F800000, 0x03000042, 
-	0x800F0000, 0x90E40004, 0xA0E40800, 0x03000042, 0x800F0001, 0x90E40005, 0xA0E40801, 0x03000005, 
-	0x800F0000, 0x80E40000, 0x80E40001, 0x03000005, 0x80070000, 0x80E40000, 0xA0FF0000, 0x03000002, 
-	0x800F0004, 0x80FF0000, 0xA1000000, 0x01000041, 0x800F0004, 0x03000005, 0x80110001, 0x90AA0008, 
-	0xA0000001, 0x02060029, 0x80000001, 0xA0550001, 0x03000042, 0x800F0002, 0x90E40006, 0xA0E40802, 
-	0x04000012, 0x800F0003, 0x80000001, 0x90E40001, 0x80E40002, 0x03000005, 0x80070000, 0x80E40000, 
-	0x80E40003, 0x03000002, 0x80070000, 0x80E40000, 0x80E40000, 0x0000002B, 0x02000001, 0x800F0800, 
-	0x80E40000, 0x0000FFFF
-};
-
-#if 0
-static const char *g_tempShaderString =
-	"ps_3_0\n"
-
-	"dcl_color v1.rgba\n"
-	"dcl_texcoord0 v4.xy\n"
-	"dcl_2d s0\n"
-	"dcl_texcoord1 v5.xy\n"
-	"dcl_2d s1\n"
-	"dcl_texcoord2 v6.xyzw\n"
-	"dcl_2d s2\n"
-	"dcl_texcoord4 v8.xyzw\n"
-
-	"def c1, 0.002631578947f, 0.999f, 0.0f, 1.0f\n"
-	"def c2, 4.223f, 4.223f, 0.0f, 1.0f\n"
-
-	"texld r0, v4, s0\n"
-	"texld r1, v5, s1\n"
-
-	"mul r0, r0, r1\n"
-	"mul r0.rgb, r0, c0.aaaa\n"
-
-	"sub r4, r0.aaaa, c0.xxxx\n"
-	"texkill r4\n"
-
-	"mul_sat r1.x, v8.z, c1.x\n"
-	"if_le r1.x, c1.y\n"
-		"texld r2, v6.xy, s2\n"
-		"lrp r3, r1.xxxx, v1, r2\n"
-
-		"mul r0.rgb, r0, r3\n"
-		"add r0.rgb, r0, r0\n"
-
-		"mul_sat r1.x, r1.x, c2.x\n"
-
-		"texld r2, v6.zw, s2\n"
-		"lrp r3, r1.xxxx, v1, r2\n"
-
-		"mul r0.rgb, r0, r3\n"
-		"add r0.rgb, r0, r0\n"
-	"endif\n"
-
-	"mov oC0, r0\n"
-;
-#endif
-static const DWORD g_fpDualTextureAndDetailTextureTwoLayer[] = {
-	0xFFFF0300, 0x0200001F, 0x8000000A, 0x900F0001, 0x0200001F, 0x80000005, 0x90030004, 0x0200001F, 
-	0x90000000, 0xA00F0800, 0x0200001F, 0x80010005, 0x90030005, 0x0200001F, 0x90000000, 0xA00F0801, 
-	0x0200001F, 0x80020005, 0x900F0006, 0x0200001F, 0x90000000, 0xA00F0802, 0x0200001F, 0x80040005, 
-	0x900F0008, 0x05000051, 0xA00F0001, 0x3B2C7692, 0x3F7FBE77, 0x00000000, 0x3F800000, 0x05000051, 
-	0xA00F0002, 0x408722D1, 0x408722D1, 0x00000000, 0x3F800000, 0x03000042, 0x800F0000, 0x90E40004, 
-	0xA0E40800, 0x03000042, 0x800F0001, 0x90E40005, 0xA0E40801, 0x03000005, 0x800F0000, 0x80E40000, 
-	0x80E40001, 0x03000005, 0x80070000, 0x80E40000, 0xA0FF0000, 0x03000002, 0x800F0004, 0x80FF0000, 
-	0xA1000000, 0x01000041, 0x800F0004, 0x03000005, 0x80110001, 0x90AA0008, 0xA0000001, 0x02060029, 
-	0x80000001, 0xA0550001, 0x03000042, 0x800F0002, 0x90540006, 0xA0E40802, 0x04000012, 0x800F0003, 
-	0x80000001, 0x90E40001, 0x80E40002, 0x03000005, 0x80070000, 0x80E40000, 0x80E40003, 0x03000002, 
-	0x80070000, 0x80E40000, 0x80E40000, 0x03000005, 0x80110001, 0x80000001, 0xA0000002, 0x03000042, 
-	0x800F0002, 0x90FE0006, 0xA0E40802, 0x04000012, 0x800F0003, 0x80000001, 0x90E40001, 0x80E40002, 
-	0x03000005, 0x80070000, 0x80E40000, 0x80E40003, 0x03000002, 0x80070000, 0x80E40000, 0x80E40000, 
-	0x0000002B, 0x02000001, 0x800F0800, 0x80E40000, 0x0000FFFF
-};
-
-
-/*-----------------------------------------------------------------------------
 	D3D9Drv.
 -----------------------------------------------------------------------------*/
 
 IMPLEMENT_CLASS(UD3D9RenderDevice);
-
-
-#ifdef UTD3D9R_INCLUDE_SHADER_ASM
-void UD3D9RenderDevice::AssembleShader(void) {
-	HRESULT hResult;
-	LPD3DXBUFFER pBufCompiled = NULL;
-	LPD3DXBUFFER pBufErrors = NULL;
-
-	dout << L"Enter shader assembly" << std::endl;
-
-	hResult = D3DXAssembleShader(g_tempShaderString, strlen(g_tempShaderString), NULL, NULL,
-		0, &pBufCompiled, &pBufErrors);
-	if (FAILED(hResult)) {
-		DWORD bufSize;
-		std::string sMsg;
-		DWORD u;
-		VOID *bufPtr;
-
-		dout << L"ERROR ASSEMBLING SHADER" << std::endl;
-
-		bufSize = pBufErrors->GetBufferSize();
-		bufPtr = pBufErrors->GetBufferPointer();
-		dout << L"Size = " << bufSize << std::endl;
-		for (u = 0; u < bufSize; u++) {
-			sMsg += *((const char *)bufPtr + u);
-		}
-		dout << L"Data = " << appFromAnsi(sMsg.c_str()) << std::endl;
-
-		//Free buffers
-		if (pBufCompiled) pBufCompiled->Release();
-		if (pBufErrors) pBufErrors->Release();
-
-		return;
-	}
-	dout << L"SHADER ASSEMBLED OKAY" << std::endl;
-
-	{
-		DWORD compBufSize = pBufCompiled->GetBufferSize();
-		VOID *compBufPtr = pBufCompiled->GetBufferPointer();
-		DWORD u;
-		std::basic_string<TCHAR> sMsg;
-
-		dout << L"Compiled Size = " << compBufSize << std::endl;
-		dout << L"Data = " << std::endl;
-		for (u = 0; u < compBufSize; u += 4) {
-			if ((u % 32) == 0) {
-				dout << sMsg << std::endl;
-				sMsg.resize(0);
-			}
-			sMsg += L"0x" + HexString(*(DWORD *)((BYTE *)compBufPtr + u), 32) + L", ";
-		}
-		dout << sMsg << std::endl;
-	}
-
-	dout << L"Leave shader assembly" << std::endl;
-
-	//Free buffers
-	if (pBufCompiled) pBufCompiled->Release();
-	if (pBufErrors) pBufErrors->Release();
-
-	return;
-}
-#endif
 
 
 void UD3D9RenderDevice::StaticConstructor() {
@@ -1274,7 +192,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(1,  TEXT("UseTexPool"), CPP_PROPERTY_LOCAL(UseTexPool), 1);
 	SC_AddIntConfigParam(TEXT("DynamicTexIdRecycleLevel"), CPP_PROPERTY_LOCAL(DynamicTexIdRecycleLevel), 100);
 	SC_AddBoolConfigParam(1,  TEXT("TexDXT1ToDXT3"), CPP_PROPERTY_LOCAL(TexDXT1ToDXT3), 0);
-	SC_AddBoolConfigParam(0,  TEXT("UseFragmentProgram"), CPP_PROPERTY_LOCAL_DCV(UseFragmentProgram), 0);
 	SC_AddIntConfigParam(TEXT("SwapInterval"), CPP_PROPERTY_LOCAL(SwapInterval), -1);
 	SC_AddIntConfigParam(TEXT("FrameRateLimit"), CPP_PROPERTY_LOCAL(FrameRateLimit), 0);
 #if UTGLR_USES_SCENENODEHACK
@@ -1330,34 +247,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 		m_standardNTextureVertexDecl[u] = NULL;
 	}
 	m_twoColorSingleTextureVertexDecl = NULL;
-
-	//Mark all vertex shader definitions as not created
-	m_vpDefaultRenderingState = NULL;
-	m_vpDefaultRenderingStateWithFog = NULL;
-	m_vpDefaultRenderingStateWithLinearFog = NULL;
-	for (u = 0; u < MAX_TMUNITS; u++) {
-		m_vpComplexSurface[u] = NULL;
-	}
-	m_vpDetailTexture = NULL;
-	m_vpComplexSurfaceSingleTextureAndDetailTexture = NULL;
-	m_vpComplexSurfaceDualTextureAndDetailTexture = NULL;
-
-	//Mark all fragment shader definitions as not created
-	m_fpDefaultRenderingState = NULL;
-	m_fpDefaultRenderingStateWithFog = NULL;
-	m_fpDefaultRenderingStateWithLinearFog = NULL;
-	m_fpComplexSurfaceSingleTexture = NULL;
-	m_fpComplexSurfaceDualTextureModulated = NULL;
-	m_fpComplexSurfaceTripleTextureModulated = NULL;
-	m_fpComplexSurfaceSingleTextureWithFog = NULL;
-	m_fpComplexSurfaceDualTextureModulatedWithFog = NULL;
-	m_fpComplexSurfaceTripleTextureModulatedWithFog = NULL;
-	m_fpDetailTexture = NULL;
-	m_fpDetailTextureTwoLayer = NULL;
-	m_fpSingleTextureAndDetailTexture = NULL;
-	m_fpSingleTextureAndDetailTextureTwoLayer = NULL;
-	m_fpDualTextureAndDetailTexture = NULL;
-	m_fpDualTextureAndDetailTextureTwoLayer = NULL;
 
 	//Reset TMUnits in case resource cleanup code is ever called before this is initialized
 	TMUnits = 0;
@@ -2676,7 +1565,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTexPool);
 		UTGLR_DEBUG_SHOW_PARAM_REG(DynamicTexIdRecycleLevel);
 		UTGLR_DEBUG_SHOW_PARAM_REG(TexDXT1ToDXT3);
-		UTGLR_DEBUG_SHOW_PARAM_DCV(UseFragmentProgram);
 		UTGLR_DEBUG_SHOW_PARAM_REG(SwapInterval);
 		UTGLR_DEBUG_SHOW_PARAM_REG(FrameRateLimit);
 #if UTGLR_USES_SCENENODEHACK
@@ -2924,7 +1812,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	PL_LODBias = LODBias;
 	PL_UseDetailAlpha = UseDetailAlpha;
 	PL_SinglePassDetail = SinglePassDetail;
-	PL_UseFragmentProgram = UseFragmentProgram;
 	PL_UseSSE = UseSSE;
 	PL_UseSSE2 = UseSSE2;
 
@@ -3000,7 +1887,6 @@ void UD3D9RenderDevice::ConfigValidate_RefreshDCV(void) {
 	#define UTGLR_REFRESH_DCV(_name) _name = DCV._name
 
 	UTGLR_REFRESH_DCV(SinglePassDetail);
-	UTGLR_REFRESH_DCV(UseFragmentProgram);
 
 	#undef UTGLR_REFRESH_DCV
 
@@ -3008,8 +1894,6 @@ void UD3D9RenderDevice::ConfigValidate_RefreshDCV(void) {
 }
 
 void UD3D9RenderDevice::ConfigValidate_RequiredExtensions(void) {
-	if (m_d3dCaps.PixelShaderVersion < D3DPS_VERSION(3,0)) UseFragmentProgram = 0;
-	if (m_d3dCaps.VertexShaderVersion < D3DVS_VERSION(3,0)) UseFragmentProgram = 0;
 	if (!(m_d3dCaps.TextureOpCaps & D3DTEXOPCAPS_BLENDCURRENTALPHA)) DetailTextures = 0;
 	if (!(m_d3dCaps.TextureOpCaps & D3DTEXOPCAPS_BLENDCURRENTALPHA)) UseDetailAlpha = 0;
 	if (!m_alphaTextureCap) UseDetailAlpha = 0;
@@ -3048,10 +1932,6 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 
 	unsigned int u;
 	HRESULT hResult;
-
-#ifdef UTD3D9R_INCLUDE_SHADER_ASM
-	AssembleShader();
-#endif
 
 	//Set view matrix
 	D3DMATRIX d3dView = { +1.0f,  0.0f,  0.0f,  0.0f,
@@ -3204,26 +2084,12 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	}
 
 
-	//Setup fragment programs
-	if (UseFragmentProgram) {
-		//Attempt to initialize fragment program mode
-		TryInitializeFragmentProgramMode();
-	}
-
-
 	//Set default stream definition
 	hResult = m_d3dDevice->SetVertexDeclaration(m_standardNTextureVertexDecl[0]);
 	if (FAILED(hResult)) {
 		appErrorf(TEXT("SetVertexDeclaration failed"));
 	}
 	m_curVertexDecl = m_standardNTextureVertexDecl[0];
-
-	//No vertex shader current at initialization
-	m_curVertexShader = NULL;
-
-	//No pixel shader current at initialization
-	m_curPixelShader = NULL;
-
 
 	//Initialize texture state cache information
 	m_texEnableBits = 0x1;
@@ -3257,9 +2123,6 @@ void UD3D9RenderDevice::FreePermanentResources(void) {
 
 	unsigned int u;
 	HRESULT hResult;
-
-	//Free fragment programs if they were allocated and leave fragment program mode if necessary
-	ShutdownFragmentProgramMode();
 
 
 	//Unset stream sources
@@ -3525,7 +2388,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 
 
 	bool flushTextures = false;
-	bool needShaderReload = false;
 
 
 	//DCV refresh
@@ -3612,9 +2474,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 	if (DetailTextures != PL_DetailTextures) {
 		PL_DetailTextures = DetailTextures;
 		flushTextures = true;
-		if (DetailTextures) {
-			needShaderReload = true;
-		}
 	}
 
 	if (UseDetailAlpha != PL_UseDetailAlpha) {
@@ -3626,44 +2485,8 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 
 	if (SinglePassDetail != PL_SinglePassDetail) {
 		PL_SinglePassDetail = SinglePassDetail;
-		if (SinglePassDetail) {
-			needShaderReload = true;
-		}
 	}
 
-
-	if (UseFragmentProgram != PL_UseFragmentProgram) {
-		PL_UseFragmentProgram = UseFragmentProgram;
-		if (UseFragmentProgram) {
-			//Attempt to initialize fragment program mode
-			TryInitializeFragmentProgramMode();
-			needShaderReload = false;
-		}
-		else {
-			//Free fragment programs if they were allocated and leave fragment program mode if necessary
-			ShutdownFragmentProgramMode();
-		}
-	}
-
-	//Check if fragment program reload is necessary
-	if (UseFragmentProgram) {
-		if (needShaderReload) {
-			//Attempt to initialize fragment program mode
-			TryInitializeFragmentProgramMode();
-		}
-	}
-
-	//Not using fixed function alpha test with fragment programs
-	if (UseFragmentProgram) {
-		//Disabled fixed function alpha test if currently enabled
-		if (m_alphaTestEnabled) {
-			m_alphaTestEnabled = false;
-			m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
-
-			//Select a blending state with no alpha test
-			SetBlend(PF_Occlude);
-		}
-	}
 
 	//Smooth masked textures bit controls alpha blend for masked textures
 	m_smoothMaskedTexturesBit = 0;
@@ -3671,12 +2494,7 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 	if (SmoothMaskedTextures) {
 		//Use alpha to coverage if using AA and enough samples, and if supported at all
 		//Also requiring fragment program mode for alpha to coverage with D3D9
-		if (UseFragmentProgram && m_usingAA && (m_initNumAASamples >= 4) && m_supportsAlphaToCoverage) {
-			m_useAlphaToCoverageForMasked = true;
-		}
-		else {
-			m_smoothMaskedTexturesBit = PF_Masked;
-		}
+		m_smoothMaskedTexturesBit = PF_Masked;
 	}
 
 
@@ -3706,15 +2524,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 	}
 
 
-	//Shared fragment program parameters
-	if (UseFragmentProgram) {
-		//Lightmap blend scale factor
-		m_fsBlendInfo[3] = (OneXBlending) ? 1.0f : 2.0f;
-
-		m_d3dDevice->SetPixelShaderConstantF(0, m_fsBlendInfo, 1);
-	}
-
-
 	//Initialize buffer verts proc pointers
 	m_pBuffer3BasicVertsProc = Buffer3BasicVerts;
 	m_pBuffer3ColoredVertsProc = Buffer3ColoredVerts;
@@ -3733,17 +2542,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 #endif //UTGLR_INCLUDE_SSE_CODE
 
 	m_pBuffer3VertsProc = NULL;
-
-
-	//Initialize render passes no check proc pointers
-	if (UseFragmentProgram) {
-		m_pRenderPassesNoCheckSetupProc = &UD3D9RenderDevice::RenderPassesNoCheckSetup_FP;
-		m_pRenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTextureProc = &UD3D9RenderDevice::RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture_FP;
-	}
-	else {
-		m_pRenderPassesNoCheckSetupProc = &UD3D9RenderDevice::RenderPassesNoCheckSetup;
-		m_pRenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTextureProc = &UD3D9RenderDevice::RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture;
-	}
 
 	//Initialize buffer detail texture data proc pointer
 	m_pBufferDetailTextureDataProc = &UD3D9RenderDevice::BufferDetailTextureData;
@@ -4177,12 +2975,7 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	//m_csPtCount set later from return value
 	//Sets MultiDrawFirstArray and MultiDrawCountArray
 	INT numVerts;
-	if (UseFragmentProgram) {
-		numVerts = BufferStaticComplexSurfaceGeometry_VP(Facet);
-	}
-	else {
-		numVerts = BufferStaticComplexSurfaceGeometry(Facet);
-	}
+	numVerts = BufferStaticComplexSurfaceGeometry(Facet);
 
 	//Reject invalid surfaces early
 	if (numVerts == 0) {
@@ -4267,17 +3060,6 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	m_rpSetDepthEqual = false;
 	m_rpColor = 0xFFFFFFFF;
 
-
-	//Do static render passes state setup
-	if (UseFragmentProgram) {
-		const FVector &XAxis = Facet.MapCoords.XAxis;
-		const FVector &YAxis = Facet.MapCoords.YAxis;
-		FLOAT vsParams[8] = { XAxis.X, XAxis.Y, XAxis.Z, m_csUDot,
-							  YAxis.X, YAxis.Y, YAxis.Z, m_csVDot };
-
-		m_d3dDevice->SetVertexShaderConstantF(4, vsParams, 2);
-	}
-
 	AddRenderPass(Surface.Texture, PolyFlags & ~PF_FlatShaded, 0.0f);
 
 	if (Surface.MacroTexture) {
@@ -4330,14 +3112,7 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 					m_rpSetDepthEqual = true;
 				}
 			}
-
-			//This function should only be called if at least one polygon will be detail textured
-			if (UseFragmentProgram) {
-				DrawDetailTexture_FP(*Surface.DetailTexture);
-			}
-			else {
-				DrawDetailTexture(*Surface.DetailTexture, clipDetailTexture);
-			}
+			DrawDetailTexture(*Surface.DetailTexture, clipDetailTexture);
 		}
 	}
 	else {
@@ -4548,35 +3323,14 @@ void UD3D9RenderDevice::PreDrawGouraud(FSceneNode* Frame, FLOAT FogDistance, FPl
 
 		//Enable fog
 		m_gpFogEnabled = true;
-		if (UseFragmentProgram) {
-			FLOAT psParams[8];
-			FLOAT rcpFogLen;
+		//Enable fog
+		m_d3dDevice->SetRenderState(D3DRS_FOGENABLE, TRUE);
 
-			//Fog color
-			psParams[0] = FogColor.X;
-			psParams[1] = FogColor.Y;
-			psParams[2] = FogColor.Z;
-			psParams[3] = FogColor.W;
-
-			//Fog distance info
-			rcpFogLen = 1.0f / (FogDistance - 0.0f);
-			psParams[4] = rcpFogLen;
-			psParams[5] = FogDistance * rcpFogLen;
-			psParams[6] = 0.0f;
-			psParams[7] = 0.0f;
-
-			m_d3dDevice->SetPixelShaderConstantF(3, psParams, 2);
-		}
-		else {
-			//Enable fog
-			m_d3dDevice->SetRenderState(D3DRS_FOGENABLE, TRUE);
-
-			//Default fog mode is LINEAR
-			//Default fog start is 0.0f
-			m_d3dDevice->SetRenderState(D3DRS_FOGCOLOR, FPlaneTo_BGRAClamped(&FogColor));
-			FLOAT fFogDistance = FogDistance;
-			m_d3dDevice->SetRenderState(D3DRS_FOGEND, *(DWORD *)&fFogDistance);
-		}
+		//Default fog mode is LINEAR
+		//Default fog start is 0.0f
+		m_d3dDevice->SetRenderState(D3DRS_FOGCOLOR, FPlaneTo_BGRAClamped(&FogColor));
+		FLOAT fFogDistance = FogDistance;
+		m_d3dDevice->SetRenderState(D3DRS_FOGEND, *(DWORD *)&fFogDistance);
 	}
 
 	unguard;
@@ -4596,12 +3350,8 @@ void UD3D9RenderDevice::PostDrawGouraud(FLOAT FogDistance) {
 
 		//Disable fog
 		m_gpFogEnabled = false;
-		if (UseFragmentProgram) {
-		}
-		else {
-			//Disable fog
-			m_d3dDevice->SetRenderState(D3DRS_FOGENABLE, FALSE);
-		}
+		//Disable fog
+		m_d3dDevice->SetRenderState(D3DRS_FOGENABLE, FALSE);
 	}
 
 	unguard;
@@ -4609,6 +3359,7 @@ void UD3D9RenderDevice::PostDrawGouraud(FLOAT FogDistance) {
 #endif
 
 void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, DWORD PolyFlags, FSpanBuffer* Span) {
+	return;
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 {
 	static int si;
@@ -4646,26 +3397,8 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 
 	{
 		IDirect3DVertexDeclaration9 *vertexDecl = (drawFog) ? m_twoColorSingleTextureVertexDecl : m_standardNTextureVertexDecl[0];
-		IDirect3DVertexShader9 *vertexShader = NULL;
-		IDirect3DPixelShader9 *pixelShader = NULL;
-
-		if (UseFragmentProgram) {
-			vertexShader = m_vpDefaultRenderingState;
-			pixelShader = m_fpDefaultRenderingState;
-			if (drawFog) {
-				vertexShader = m_vpDefaultRenderingStateWithFog;
-				pixelShader = m_fpDefaultRenderingStateWithFog;
-			}
-#ifdef UTGLR_RUNE_BUILD
-			if (m_gpFogEnabled) {
-				vertexShader = m_vpDefaultRenderingStateWithLinearFog;
-				pixelShader = m_fpDefaultRenderingStateWithLinearFog;
-			}
-#endif
-		}
-
 		//Set stream state
-		SetStreamState(vertexDecl, vertexShader, pixelShader);
+		SetStreamState(vertexDecl);
 	}
 
 	//Make sure at least NumPts entries are left in the vertex buffers
@@ -4740,6 +3473,7 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 }
 
 void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, DWORD PolyFlags, FSpanBuffer* Span) {
+	return;
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 {
 	static int si;
@@ -4899,26 +3633,9 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 
 		{
 			IDirect3DVertexDeclaration9 *vertexDecl = (m_requestedColorFlags & CF_FOG_MODE) ? m_twoColorSingleTextureVertexDecl : m_standardNTextureVertexDecl[0];
-			IDirect3DVertexShader9 *vertexShader = NULL;
-			IDirect3DPixelShader9 *pixelShader = NULL;
-
-			if (UseFragmentProgram) {
-				vertexShader = m_vpDefaultRenderingState;
-				pixelShader = m_fpDefaultRenderingState;
-				if (m_requestedColorFlags & CF_FOG_MODE) {
-					vertexShader = m_vpDefaultRenderingStateWithFog;
-					pixelShader = m_fpDefaultRenderingStateWithFog;
-				}
-#ifdef UTGLR_RUNE_BUILD
-				if (m_gpFogEnabled) {
-					vertexShader = m_vpDefaultRenderingStateWithLinearFog;
-					pixelShader = m_fpDefaultRenderingStateWithLinearFog;
-				}
-#endif
-			}
 
 			//Set stream state
-			SetStreamState(vertexDecl, vertexShader, pixelShader);
+			SetStreamState(vertexDecl);
 		}
 
 		//Select a buffer verts proc
@@ -7659,27 +6376,18 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags) {
 		if (blendFlags & PF_AlphaBlend) {
 			m_fsBlendInfo[0] = 0.01f;
 
-			if (UseFragmentProgram) {
-				m_d3dDevice->SetPixelShaderConstantF(0, m_fsBlendInfo, 1);
-			}
-			else {
-				m_alphaTestEnabled = true;
-				m_d3dDevice->SetRenderState(D3DRS_ALPHAREF, 1);
-				m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
-			}
+			m_alphaTestEnabled = true;
+			m_d3dDevice->SetRenderState(D3DRS_ALPHAREF, 1);
+			m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
+
 		}
 		else if (blendFlags & PF_Masked) {
 			//Enable alpha test with alpha ref of D3D9 version of 0.5
 			m_fsBlendInfo[0] = (127.0f / 255.0f) + 1e-6f;
 
-			if (UseFragmentProgram) {
-				m_d3dDevice->SetPixelShaderConstantF(0, m_fsBlendInfo, 1);
-			}
-			else {
-				m_alphaTestEnabled = true;
-				m_d3dDevice->SetRenderState(D3DRS_ALPHAREF, 127);
-				m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
-			}
+			m_alphaTestEnabled = true;
+			m_d3dDevice->SetRenderState(D3DRS_ALPHAREF, 127);
+			m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
 
 			if (m_useAlphaToCoverageForMasked) {
 				m_alphaToCoverageEnabled = true;
@@ -7690,13 +6398,8 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags) {
 			//Disable alpha test
 			m_fsBlendInfo[0] = 0.0f;
 
-			if (UseFragmentProgram) {
-				m_d3dDevice->SetPixelShaderConstantF(0, m_fsBlendInfo, 1);
-			}
-			else {
-				m_alphaTestEnabled = false;
-				m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
-			}
+			m_alphaTestEnabled = false;
+			m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
 
 			if (m_useAlphaToCoverageForMasked) {
 				m_alphaToCoverageEnabled = false;
@@ -7872,48 +6575,6 @@ void UD3D9RenderDevice::SetVertexDeclNoCheck(IDirect3DVertexDeclaration9 *vertex
 
 	return;
 }
-
-void UD3D9RenderDevice::SetVertexShaderNoCheck(IDirect3DVertexShader9 *vertexShader) {
-	HRESULT hResult;
-	
-	//Set vertex shader
-	hResult = m_d3dDevice->SetVertexShader(vertexShader);
-	if (FAILED(hResult)) {
-		appErrorf(TEXT("SetVertexShader failed"));
-	}
-
-#ifdef D3D9_DEBUG
-	m_vpSwitchCount++;
-	if ((vertexShader != NULL) && (m_curVertexShader == NULL)) m_vpEnableCount++;
-#endif
-
-	//Save new current vertex shader
-	m_curVertexShader = vertexShader;
-
-	return;
-}
-
-void UD3D9RenderDevice::SetPixelShaderNoCheck(IDirect3DPixelShader9 *pixelShader) {
-	HRESULT hResult;
-
-	//Set pixel shader
-	hResult = m_d3dDevice->SetPixelShader(pixelShader);
-	if (FAILED(hResult)) {
-		appErrorf(TEXT("SetPixelShader failed"));
-	}
-
-#ifdef D3D9_DEBUG
-	m_fpSwitchCount++;
-	if ((pixelShader != NULL) && (m_curPixelShader == NULL)) m_fpEnableCount++;
-#endif
-
-	//Save new current pixel shader
-	m_curPixelShader = pixelShader;
-
-	return;
-}
-
-
 void UD3D9RenderDevice::SetAAStateNoCheck(bool AAEnable) {
 	//Save new AA state
 	m_curAAEnable = AAEnable;
@@ -7924,325 +6585,6 @@ void UD3D9RenderDevice::SetAAStateNoCheck(bool AAEnable) {
 
 	//Set new AA state
 	m_d3dDevice->SetRenderState(D3DRS_MULTISAMPLEANTIALIAS, (AAEnable) ? TRUE : FALSE);
-
-	return;
-}
-
-
-bool UD3D9RenderDevice::LoadVertexProgram(IDirect3DVertexShader9 **ppShader, const DWORD *pFunction, const TCHAR *pName) {
-	HRESULT hResult;
-
-	if (DebugBit(DEBUG_BIT_BASIC)) {
-		dout << TEXT("utd3d9r: Loading vertex program \"") << pName << TEXT("\"") << std::endl;
-	}
-
-	hResult = m_d3dDevice->CreateVertexShader(pFunction, ppShader);
-	if (FAILED(hResult)) {
-		if (DebugBit(DEBUG_BIT_BASIC)) {
-			dout << TEXT("utd3d9r: Vertex program load error") << std::endl;
-		}
-
-		return false;
-	}
-
-	return true;
-}
-
-bool UD3D9RenderDevice::LoadFragmentProgram(IDirect3DPixelShader9 **ppShader, const DWORD *pFunction, const TCHAR *pName) {
-	HRESULT hResult;
-
-	if (DebugBit(DEBUG_BIT_BASIC)) {
-		dout << TEXT("utd3d9r: Loading fragment program \"") << pName << TEXT("\"") << std::endl;
-	}
-
-	hResult = m_d3dDevice->CreatePixelShader(pFunction, ppShader);
-	if (FAILED(hResult)) {
-		if (DebugBit(DEBUG_BIT_BASIC)) {
-			dout << TEXT("utd3d9r: Fragment program load error") << std::endl;
-		}
-
-		return false;
-	}
-
-	return true;
-}
-
-
-bool UD3D9RenderDevice::InitializeFragmentPrograms(void) {
-	bool initOk = true;
-
-
-	//Create vertex programs if not already created
-	#define UTGLR_VS_CONDITIONAL_LOAD(_var, _vp, _name) \
-		if (!_var) { \
-			initOk &= LoadVertexProgram(&_var, _vp, _name); \
-		}
-
-
-	//Default rendering state
-	UTGLR_VS_CONDITIONAL_LOAD(m_vpDefaultRenderingState, g_vpDefaultRenderingState,
-		TEXT("Default rendering state"));
-
-	//Default rendering state with fog
-	UTGLR_VS_CONDITIONAL_LOAD(m_vpDefaultRenderingStateWithFog, g_vpDefaultRenderingStateWithFog,
-		TEXT("Default rendering state with fog"));
-
-	//Default rendering state with linear fog
-	UTGLR_VS_CONDITIONAL_LOAD(m_vpDefaultRenderingStateWithLinearFog, g_vpDefaultRenderingStateWithLinearFog,
-		TEXT("Default rendering state with linear fog"));
-
-
-	//Complex surface single texture
-	UTGLR_VS_CONDITIONAL_LOAD(m_vpComplexSurface[0], g_vpComplexSurfaceSingleTexture,
-		TEXT("Complex surface single texture"));
-
-	if (TMUnits >= 2) {
-		//Complex surface dual texture
-		UTGLR_VS_CONDITIONAL_LOAD(m_vpComplexSurface[1], g_vpComplexSurfaceDualTexture,
-			TEXT("Complex surface dual texture"));
-	}
-
-	if (TMUnits >= 3) {
-		//Complex surface triple texture
-		UTGLR_VS_CONDITIONAL_LOAD(m_vpComplexSurface[2], g_vpComplexSurfaceTripleTexture,
-			TEXT("Complex surface triple texture"));
-	}
-
-	if (TMUnits >= 4) {
-		//Complex surface quad texture
-		UTGLR_VS_CONDITIONAL_LOAD(m_vpComplexSurface[3], g_vpComplexSurfaceQuadTexture,
-			TEXT("Complex surface quad texture"));
-	}
-
-
-	if (DetailTextures) {
-		//Detail texture
-		UTGLR_VS_CONDITIONAL_LOAD(m_vpDetailTexture, g_vpDetailTexture,
-			TEXT("Detail texture"));
-
-		//Complex surface single texture and detail texture
-		UTGLR_VS_CONDITIONAL_LOAD(m_vpComplexSurfaceSingleTextureAndDetailTexture, g_vpComplexSurfaceSingleTextureAndDetailTexture,
-			TEXT("Complex surface single texture and detail texture"));
-
-		//Complex surface dual texture and detail texture
-		UTGLR_VS_CONDITIONAL_LOAD(m_vpComplexSurfaceDualTextureAndDetailTexture, g_vpComplexSurfaceDualTextureAndDetailTexture,
-			TEXT("Complex surface dual texture and detail texture"));
-	}
-
-
-	#undef UTGLR_VS_CONDITIONAL_LOAD
-
-
-	//Create fragment programs if not already created
-	#define UTGLR_PS_CONDITIONAL_LOAD(_var, _fp, _name) \
-		if (!_var) { \
-			initOk &= LoadFragmentProgram(&_var, _fp, _name); \
-		}
-
-
-	//Default rendering state
-	UTGLR_PS_CONDITIONAL_LOAD(m_fpDefaultRenderingState, g_fpDefaultRenderingState,
-		TEXT("Default rendering state"));
-
-	//Default rendering state with fog
-	UTGLR_PS_CONDITIONAL_LOAD(m_fpDefaultRenderingStateWithFog, g_fpDefaultRenderingStateWithFog,
-		TEXT("Default rendering state with fog"));
-
-	//Default rendering state with linear fog
-	UTGLR_PS_CONDITIONAL_LOAD(m_fpDefaultRenderingStateWithLinearFog, g_fpDefaultRenderingStateWithLinearFog,
-		TEXT("Default rendering state with linear fog"));
-
-
-	//Complex surface single texture
-	UTGLR_PS_CONDITIONAL_LOAD(m_fpComplexSurfaceSingleTexture, g_fpComplexSurfaceSingleTexture,
-		TEXT("Complex surface single texture"));
-
-	//Complex surface dual texture modulated
-	UTGLR_PS_CONDITIONAL_LOAD(m_fpComplexSurfaceDualTextureModulated, g_fpComplexSurfaceDualTextureModulated,
-		TEXT("Complex surface dual texture modulated"));
-
-	//Complex surface triple texture modulated
-	UTGLR_PS_CONDITIONAL_LOAD(m_fpComplexSurfaceTripleTextureModulated, g_fpComplexSurfaceTripleTextureModulated,
-		TEXT("Complex surface triple texture modulated"));
-
-
-	//Complex surface single texture with fog
-	UTGLR_PS_CONDITIONAL_LOAD(m_fpComplexSurfaceSingleTextureWithFog, g_fpComplexSurfaceSingleTextureWithFog,
-		TEXT("Complex surface single texture with fog"));
-
-	//Complex surface dual texture modulated with fog
-	UTGLR_PS_CONDITIONAL_LOAD(m_fpComplexSurfaceDualTextureModulatedWithFog, g_fpComplexSurfaceDualTextureModulatedWithFog,
-		TEXT("Complex surface dual texture modulated with fog"));
-
-	//Complex surface triple texture modulated with fog
-	UTGLR_PS_CONDITIONAL_LOAD(m_fpComplexSurfaceTripleTextureModulatedWithFog, g_fpComplexSurfaceTripleTextureModulatedWithFog,
-		TEXT("Complex surface triple texture modulated with fog"));
-
-
-	if (DetailTextures) {
-		//Detail texture
-		UTGLR_PS_CONDITIONAL_LOAD(m_fpDetailTexture, g_fpDetailTexture,
-			TEXT("Detail texture"));
-
-		//Detail texture two layer
-		UTGLR_PS_CONDITIONAL_LOAD(m_fpDetailTextureTwoLayer, g_fpDetailTextureTwoLayer,
-			TEXT("Detail texture two layer"));
-
-		//Single texture and detail texture
-		UTGLR_PS_CONDITIONAL_LOAD(m_fpSingleTextureAndDetailTexture, g_fpSingleTextureAndDetailTexture,
-			TEXT("Complex surface single texture and detail texture"));
-
-		//Single texture and detail texture two layer
-		UTGLR_PS_CONDITIONAL_LOAD(m_fpSingleTextureAndDetailTextureTwoLayer, g_fpSingleTextureAndDetailTextureTwoLayer,
-			TEXT("Complex surface single texture and detail texture two layer"));
-
-		//Dual texture and detail texture
-		UTGLR_PS_CONDITIONAL_LOAD(m_fpDualTextureAndDetailTexture, g_fpDualTextureAndDetailTexture,
-			TEXT("Complex surface dual texture and detail texture"));
-
-		//Dual texture and detail texture two layer
-		UTGLR_PS_CONDITIONAL_LOAD(m_fpDualTextureAndDetailTextureTwoLayer, g_fpDualTextureAndDetailTextureTwoLayer,
-			TEXT("Complex surface dual texture and detail texture two layer"));
-	}
-
-
-	#undef UTGLR_PS_CONDITIONAL_LOAD
-
-	return initOk;
-}
-
-//Attempts to initializes fragment program mode
-//Safe to call multiple times as already created fragment programs will not be recreated
-void UD3D9RenderDevice::TryInitializeFragmentProgramMode(void) {
-	//Initialize fragment programs
-	if (!InitializeFragmentPrograms()) {
-		//Shutdown fragment program mode
-		ShutdownFragmentProgramMode();
-
-		//Disable fragment program mode
-		DCV.UseFragmentProgram = 0;
-		UseFragmentProgram = 0;
-		PL_UseFragmentProgram = 0;
-
-		if (DebugBit(DEBUG_BIT_BASIC)) dout << TEXT("utd3d9r: Fragment program initialization failed") << std::endl;
-	}
-
-	return;
-}
-
-//Shuts down fragment program mode if it is active
-//Freeing the fragment program names takes care of releasing resources
-//Safe to call even if fragment program mode is not supported or was never initialized
-void UD3D9RenderDevice::ShutdownFragmentProgramMode(void) {
-	//Make sure that a vertex program is not current
-	SetVertexShaderNoCheck(NULL);
-
-	//Make sure that a fragment program is not current
-	SetPixelShaderNoCheck(NULL);
-
-
-	#define UTGLR_VS_RELEASE(_var) \
-		if (_var) { \
-			_var->Release(); \
-			_var = NULL; \
-		}
-
-	//Free vertex programs if they were created
-
-	//Default rendering state
-	UTGLR_VS_RELEASE(m_vpDefaultRenderingState);
-
-	//Default rendering state with fog
-	UTGLR_VS_RELEASE(m_vpDefaultRenderingStateWithFog);
-
-	//Default rendering state with linear fog
-	UTGLR_VS_RELEASE(m_vpDefaultRenderingStateWithLinearFog);
-
-
-	//Complex surface single texture
-	UTGLR_VS_RELEASE(m_vpComplexSurface[0]);
-
-	//Complex surface double texture
-	UTGLR_VS_RELEASE(m_vpComplexSurface[1]);
-
-	//Complex surface triple texture
-	UTGLR_VS_RELEASE(m_vpComplexSurface[2]);
-
-	//Complex surface quad texture
-	UTGLR_VS_RELEASE(m_vpComplexSurface[3]);
-
-
-	//Detail texture
-	UTGLR_VS_RELEASE(m_vpDetailTexture);
-
-	//Complex surface single texture and detail texture
-	UTGLR_VS_RELEASE(m_vpComplexSurfaceSingleTextureAndDetailTexture);
-
-	//Complex surface dual texture and detail texture
-	UTGLR_VS_RELEASE(m_vpComplexSurfaceDualTextureAndDetailTexture);
-
-
-	#undef UTGLR_VS_RELEASE
-
-
-	#define UTGLR_PS_RELEASE(_var) \
-		if (_var) { \
-			_var->Release(); \
-			_var = NULL; \
-		}
-
-	//Free fragment programs if they were created
-
-	//Default rendering state
-	UTGLR_PS_RELEASE(m_fpDefaultRenderingState);
-
-	//Default rendering state with fog
-	UTGLR_PS_RELEASE(m_fpDefaultRenderingStateWithFog);
-
-	//Default rendering state with linear fog
-	UTGLR_PS_RELEASE(m_fpDefaultRenderingStateWithLinearFog);
-
-
-	//Complex surface single texture
-	UTGLR_PS_RELEASE(m_fpComplexSurfaceSingleTexture);
-
-	//Complex surface dual texture modulated
-	UTGLR_PS_RELEASE(m_fpComplexSurfaceDualTextureModulated);
-
-	//Complex surface triple texture modulated
-	UTGLR_PS_RELEASE(m_fpComplexSurfaceTripleTextureModulated);
-
-
-	//Complex surface single texture with fog
-	UTGLR_PS_RELEASE(m_fpComplexSurfaceSingleTextureWithFog);
-
-	//Complex surface dual texture modulated with fog
-	UTGLR_PS_RELEASE(m_fpComplexSurfaceDualTextureModulatedWithFog);
-
-	//Complex surface triple texture modulated with fog
-	UTGLR_PS_RELEASE(m_fpComplexSurfaceTripleTextureModulatedWithFog);
-
-
-	//Detail texture
-	UTGLR_PS_RELEASE(m_fpDetailTexture);
-
-	//Detail texture two layer
-	UTGLR_PS_RELEASE(m_fpDetailTextureTwoLayer);
-
-	//Single texture and detail texture
-	UTGLR_PS_RELEASE(m_fpSingleTextureAndDetailTexture);
-
-	//Single texture and detail texture two layer
-	UTGLR_PS_RELEASE(m_fpSingleTextureAndDetailTextureTwoLayer);
-
-	//Dual texture and detail texture
-	UTGLR_PS_RELEASE(m_fpDualTextureAndDetailTexture);
-
-	//Dual texture and detail texture two layer
-	UTGLR_PS_RELEASE(m_fpDualTextureAndDetailTextureTwoLayer);
-
-
-	#undef UTGLR_PS_RELEASE
 
 	return;
 }
@@ -8316,30 +6658,6 @@ void UD3D9RenderDevice::SetProjectionStateNoCheck(bool requestNearZRangeHackProj
 
 	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &d3dProj);
 
-	if (UseFragmentProgram) {
-		FLOAT vsTransMatrix[16];
-
-		//Transpose and scale by -1y and -1z
-		vsTransMatrix[0]  = d3dProj.m[0][0];
-		vsTransMatrix[1]  = -d3dProj.m[1][0];
-		vsTransMatrix[2]  = -d3dProj.m[2][0];
-		vsTransMatrix[3]  = d3dProj.m[3][0];
-		vsTransMatrix[4]  = d3dProj.m[0][1];
-		vsTransMatrix[5]  = -d3dProj.m[1][1];
-		vsTransMatrix[6]  = -d3dProj.m[2][1];
-		vsTransMatrix[7]  = d3dProj.m[3][1];
-		vsTransMatrix[8]  = d3dProj.m[0][2];
-		vsTransMatrix[9]  = -d3dProj.m[1][2];
-		vsTransMatrix[10] = -d3dProj.m[2][2];
-		vsTransMatrix[11] = d3dProj.m[3][2];
-		vsTransMatrix[12] = d3dProj.m[0][3];
-		vsTransMatrix[13] = -d3dProj.m[1][3];
-		vsTransMatrix[14] = -d3dProj.m[2][3];
-		vsTransMatrix[15] = d3dProj.m[3][3];
-
-		m_d3dDevice->SetVertexShaderConstantF(0, vsTransMatrix, 4);
-	}
-
 	return;
 }
 
@@ -8384,30 +6702,6 @@ void UD3D9RenderDevice::SetOrthoProjection(void) {
 
 	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &d3dProj);
 
-	if (UseFragmentProgram) {
-		FLOAT vsTransMatrix[16];
-
-		//Transpose and scale by -1y and -1z
-		vsTransMatrix[0]  = d3dProj.m[0][0];
-		vsTransMatrix[1]  = -d3dProj.m[1][0];
-		vsTransMatrix[2]  = -d3dProj.m[2][0];
-		vsTransMatrix[3]  = d3dProj.m[3][0];
-		vsTransMatrix[4]  = d3dProj.m[0][1];
-		vsTransMatrix[5]  = -d3dProj.m[1][1];
-		vsTransMatrix[6]  = -d3dProj.m[2][1];
-		vsTransMatrix[7]  = d3dProj.m[3][1];
-		vsTransMatrix[8]  = d3dProj.m[0][2];
-		vsTransMatrix[9]  = -d3dProj.m[1][2];
-		vsTransMatrix[10] = -d3dProj.m[2][2];
-		vsTransMatrix[11] = d3dProj.m[3][2];
-		vsTransMatrix[12] = d3dProj.m[0][3];
-		vsTransMatrix[13] = -d3dProj.m[1][3];
-		vsTransMatrix[14] = -d3dProj.m[2][3];
-		vsTransMatrix[15] = d3dProj.m[3][3];
-
-		m_d3dDevice->SetVertexShaderConstantF(0, vsTransMatrix, 4);
-	}
-
 	return;
 }
 
@@ -8423,7 +6717,7 @@ void UD3D9RenderDevice::RenderPassesExec(void) {
 	}
 
 	//Call the render passes no check setup proc
-	(this->*m_pRenderPassesNoCheckSetupProc)();
+	RenderPassesNoCheckSetup();
 
 	m_rpTMUnits = 1;
 	m_rpForceSingle = true;
@@ -8470,7 +6764,7 @@ void UD3D9RenderDevice::RenderPassesExec_SingleOrDualTextureAndDetailTexture(FTe
 	//The depth function will never need to be changed due to single pass rendering here
 
 	//Call the render passes no check setup dual texture and detail texture proc
-	(this->*m_pRenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTextureProc)(DetailTextureInfo);
+	RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture(DetailTextureInfo);
 
 	//Single texture rendering does not need to be forced here since the detail texture is always the last pass
 
@@ -8522,7 +6816,7 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 	} while (++i < m_rpPassCount);
 
 	//Set stream state based on number of texture units in use
-	SetStreamState(m_standardNTextureVertexDecl[m_rpPassCount - 1], NULL, NULL);
+	SetStreamState(m_standardNTextureVertexDecl[m_rpPassCount - 1]);
 
 	//Check for additional enabled texture units that should be disabled
 	DisableSubsequentTextures(m_rpPassCount);
@@ -8584,95 +6878,6 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 }
 
 //Must be called with (m_rpPassCount > 0)
-void UD3D9RenderDevice::RenderPassesNoCheckSetup_FP(void) {
-	INT i;
-	FLOAT vsParams[MAX_TMUNITS * 4];
-	IDirect3DPixelShader9 *pixelShader = NULL;
-
-	SetBlend(MultiPass.TMU[0].PolyFlags);
-
-	//Look for a fragment program that can use if they're enabled
-	if (UseFragmentProgram) {
-		if (m_rpPassCount == 1) {
-			pixelShader = m_fpComplexSurfaceSingleTexture;
-		}
-		else if (m_rpPassCount == 2) {
-			if (MultiPass.TMU[1].PolyFlags == PF_Modulated) {
-				pixelShader = m_fpComplexSurfaceDualTextureModulated;
-			}
-			else if (MultiPass.TMU[1].PolyFlags == PF_Highlighted) {
-				pixelShader = m_fpComplexSurfaceSingleTextureWithFog;
-			}
-		}
-		else if (m_rpPassCount == 3) {
-			if (MultiPass.TMU[2].PolyFlags == PF_Modulated) {
-				pixelShader = m_fpComplexSurfaceTripleTextureModulated;
-			}
-			else if (MultiPass.TMU[2].PolyFlags == PF_Highlighted) {
-				pixelShader = m_fpComplexSurfaceDualTextureModulatedWithFog;
-			}
-		}
-		else if (m_rpPassCount == 4) {
-			if (MultiPass.TMU[3].PolyFlags == PF_Highlighted) {
-				pixelShader = m_fpComplexSurfaceTripleTextureModulatedWithFog;
-			}
-		}
-	}
-
-	//Must use a fragment program with ps3.0
-	if (pixelShader == NULL) {
-		pixelShader = m_fpComplexSurfaceSingleTexture;
-	}
-
-	i = 0;
-	do {
-		//No TexEnv setup for fragment program
-
-		SetTexture(i, *MultiPass.TMU[i].Info, MultiPass.TMU[i].PolyFlags, MultiPass.TMU[i].PanBias);
-
-		vsParams[(i * 4) + 0] = TexInfo[i].UPan;
-		vsParams[(i * 4) + 1] = TexInfo[i].VPan;
-		vsParams[(i * 4) + 2] = TexInfo[i].UMult;
-		vsParams[(i * 4) + 3] = TexInfo[i].VMult;
-	} while (++i < m_rpPassCount);
-	m_d3dDevice->SetVertexShaderConstantF(6, vsParams, m_rpPassCount);
-
-	//Set vertex program based on number of texture units in use
-	//Set fragment program if found a suitable one
-	SetStreamState(m_oneColorVertexDecl, m_vpComplexSurface[m_rpPassCount - 1], pixelShader);
-
-	//Check for additional enabled texture units that should be disabled
-	DisableSubsequentTextures(m_rpPassCount);
-
-	//Make sure at least m_csPtCount entries are left in the vertex buffers
-	if ((m_curVertexBufferPos + m_csPtCount) >= VERTEX_ARRAY_SIZE) {
-		FlushVertexBuffers();
-	}
-
-	//Lock vertexColor buffer
-	LockVertexColorBuffer();
-
-	//Write vertex and color
-	const FGLVertex *pSrcVertexArray = m_csVertexArray;
-	FGLVertexColor *pVertexColorArray = m_pVertexColorArray;
-	DWORD rpColor = m_rpColor;
-	i = m_csPtCount;
-	do {
-		pVertexColorArray->x = pSrcVertexArray->x;
-		pVertexColorArray->y = pSrcVertexArray->y;
-		pVertexColorArray->z = pSrcVertexArray->z;
-		pVertexColorArray->color = rpColor;
-		pSrcVertexArray++;
-		pVertexColorArray++;
-	} while (--i != 0);
-
-	//Unlock vertexColor buffer
-	UnlockVertexColorBuffer();
-
-	return;
-}
-
-//Must be called with (m_rpPassCount > 0)
 void UD3D9RenderDevice::RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture(FTextureInfo &DetailTextureInfo) {
 	INT i;
 	INT t;
@@ -8705,7 +6910,7 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTex
 	SetTextureNoPanBias(1, DetailTextureInfo, PF_Modulated);
 
 	//Set stream state based on number of texture units in use
-	SetStreamState(m_standardNTextureVertexDecl[m_rpPassCount - 1], NULL, NULL);
+	SetStreamState(m_standardNTextureVertexDecl[m_rpPassCount - 1]);
 
 	//Check for additional enabled texture units that should be disabled
 	DisableSubsequentTextures(m_rpPassCount);
@@ -8782,103 +6987,6 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTex
 	return;
 }
 
-//Must be called with (m_rpPassCount > 0)
-void UD3D9RenderDevice::RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture_FP(FTextureInfo &DetailTextureInfo) {
-	INT i;
-	DWORD detailTexUnit;
-	IDirect3DVertexShader9 *vertexShader = NULL;
-	IDirect3DPixelShader9 *pixelShader = NULL;
-	FLOAT vsParams[3 * 4];
-
-	//One extra texture unit used for detail texture
-	m_rpPassCount += 1;
-
-	//Detail texture is in the last texture unit
-	detailTexUnit = (m_rpPassCount - 1);
-
-	if (m_rpPassCount == 2) {
-		vertexShader = m_vpComplexSurfaceSingleTextureAndDetailTexture;
-	}
-	else {
-		vertexShader = m_vpComplexSurfaceDualTextureAndDetailTexture;
-	}
-	if (DetailMax >= 2) {
-		if (m_rpPassCount == 2) {
-			pixelShader = m_fpSingleTextureAndDetailTextureTwoLayer;
-		}
-		else {
-			pixelShader = m_fpDualTextureAndDetailTextureTwoLayer;
-		}
-	}
-	else {
-		if (m_rpPassCount == 2) {
-			pixelShader = m_fpSingleTextureAndDetailTexture;
-		}
-		else {
-			pixelShader = m_fpDualTextureAndDetailTexture;
-		}
-	}
-
-	SetBlend(MultiPass.TMU[0].PolyFlags);
-
-	//First one or two textures in first two texture units
-	i = 0;
-	do {
-		//No TexEnv setup for fragment program
-		//Only works with modulated
-
-		SetTexture(i, *MultiPass.TMU[i].Info, MultiPass.TMU[i].PolyFlags, MultiPass.TMU[i].PanBias);
-
-		vsParams[(i * 4) + 0] = TexInfo[i].UPan;
-		vsParams[(i * 4) + 1] = TexInfo[i].VPan;
-		vsParams[(i * 4) + 2] = TexInfo[i].UMult;
-		vsParams[(i * 4) + 3] = TexInfo[i].VMult;
-	} while (++i < detailTexUnit);
-
-	//Detail texture in second or third texture unit
-	//No TexEnv to set in fragment program mode
-	SetTextureNoPanBias(detailTexUnit, DetailTextureInfo, PF_Modulated);
-
-	vsParams[(detailTexUnit * 4) + 0] = TexInfo[detailTexUnit].UPan;
-	vsParams[(detailTexUnit * 4) + 1] = TexInfo[detailTexUnit].VPan;
-	vsParams[(detailTexUnit * 4) + 2] = TexInfo[detailTexUnit].UMult;
-	vsParams[(detailTexUnit * 4) + 3] = TexInfo[detailTexUnit].VMult;
-	m_d3dDevice->SetVertexShaderConstantF(6, vsParams, m_rpPassCount);
-
-	//Set stream state
-	SetStreamState(m_oneColorVertexDecl, vertexShader, pixelShader);
-
-	//Check for additional enabled texture units that should be disabled
-	DisableSubsequentTextures(m_rpPassCount);
-
-	//Make sure at least m_csPtCount entries are left in the vertex buffers
-	if ((m_curVertexBufferPos + m_csPtCount) >= VERTEX_ARRAY_SIZE) {
-		FlushVertexBuffers();
-	}
-
-	//Lock vertexColor buffer
-	LockVertexColorBuffer();
-
-	//Write vertex and color
-	const FGLVertex *pSrcVertexArray = m_csVertexArray;
-	FGLVertexColor *pVertexColorArray = m_pVertexColorArray;
-	DWORD detailColor = m_detailTextureColor4ub | 0xFF000000;
-	i = m_csPtCount;
-	do {
-		pVertexColorArray->x = pSrcVertexArray->x;
-		pVertexColorArray->y = pSrcVertexArray->y;
-		pVertexColorArray->z = pSrcVertexArray->z;
-		pVertexColorArray->color = detailColor;
-		pSrcVertexArray++;
-		pVertexColorArray++;
-	} while (--i != 0);
-
-	//Unlock vertexColor buffer
-	UnlockVertexColorBuffer();
-
-	return;
-}
-
 //Modified this routine to always set up detail texture state
 //It should only be called if at least one polygon will be detail textured
 void UD3D9RenderDevice::DrawDetailTexture(FTextureInfo &DetailTextureInfo, bool clipDetailTexture) {
@@ -8896,7 +7004,7 @@ void UD3D9RenderDevice::DrawDetailTexture(FTextureInfo &DetailTextureInfo, bool 
 		SetTexEnv(1, PF_Memorized);
 
 		//Set stream state for two textures
-		SetStreamState(m_standardNTextureVertexDecl[1], NULL, NULL);
+		SetStreamState(m_standardNTextureVertexDecl[1]);
 
 		//Check for additional enabled texture units that should be disabled
 		DisableSubsequentTextures(2);
@@ -8911,7 +7019,7 @@ void UD3D9RenderDevice::DrawDetailTexture(FTextureInfo &DetailTextureInfo, bool 
 		}
 
 		//Set stream state for one texture
-		SetStreamState(m_standardNTextureVertexDecl[0], NULL, NULL);
+		SetStreamState(m_standardNTextureVertexDecl[0]);
 
 		//Check for additional enabled texture units that should be disabled
 		DisableSubsequentTextures(1);
@@ -9163,80 +7271,6 @@ void UD3D9RenderDevice::DrawDetailTexture(FTextureInfo &DetailTextureInfo, bool 
 	return;
 }
 
-//Modified this routine to always set up detail texture state
-//It should only be called if at least one polygon will be detail textured
-void UD3D9RenderDevice::DrawDetailTexture_FP(FTextureInfo &DetailTextureInfo) {
-	INT Index = 0;
-
-	//Setup detail texture state
-	SetBlend(PF_Modulated);
-
-	//No TexEnv to set in fragment program mode
-	SetTextureNoPanBias(0, DetailTextureInfo, PF_Modulated);
-
-	FLOAT vsParams[4] = { TexInfo[0].UPan, TexInfo[0].VPan, TexInfo[0].UMult, TexInfo[0].VMult };
-	m_d3dDevice->SetVertexShaderConstantF(6, vsParams, 1);
-
-	//Set vertex program and fragment program for detail texture
-	IDirect3DPixelShader9 *pixelShader = m_fpDetailTexture;
-	if (DetailMax >= 2) pixelShader = m_fpDetailTextureTwoLayer;
-	SetStreamState(m_oneColorVertexDecl, m_vpDetailTexture, pixelShader);
-
-	//Check for additional enabled texture units that should be disabled
-	DisableSubsequentTextures(1);
-
-	DWORD detailColor = m_detailTextureColor4ub | 0xFF000000;
-	INT *pNumPts = &MultiDrawCountArray[0];
-	DWORD *pDetailTextureIsNear = DetailTextureIsNearArray;
-	DWORD csPolyCount = m_csPolyCount;
-	for (DWORD PolyNum = 0; PolyNum < csPolyCount; PolyNum++, pNumPts++, pDetailTextureIsNear++) {
-		INT NumPts = *pNumPts;
-		DWORD isNearBits = *pDetailTextureIsNear;
-		INT i;
-
-		//Skip the polygon if it will not be detail textured
-		if (isNearBits == 0) {
-			Index += NumPts;
-			continue;
-		}
-
-		//Make sure at least NumPts entries are left in the vertex buffers
-		if ((m_curVertexBufferPos + NumPts) >= VERTEX_ARRAY_SIZE) {
-			FlushVertexBuffers();
-		}
-
-		//Lock vertexColor buffer
-		LockVertexColorBuffer();
-
-		//Write vertex
-		const FGLVertex *pSrcVertexArray = &m_csVertexArray[Index];
-		FGLVertexColor *pVertexColorArray = m_pVertexColorArray;
-		for (i = 0; i < NumPts; i++) {
-			pVertexColorArray[i].x = pSrcVertexArray[i].x;
-			pVertexColorArray[i].y = pSrcVertexArray[i].y;
-			pVertexColorArray[i].z = pSrcVertexArray[i].z;
-			pVertexColorArray[i].color = detailColor;
-		}
-
-		//Unlock vertexColor buffers
-		UnlockVertexColorBuffer();
-
-		//Draw the triangles
-		m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos, NumPts - 2);
-
-		//Advance vertex buffer position
-		m_curVertexBufferPos += NumPts;
-
-		Index += NumPts;
-	}
-
-
-	//Clear detail texture state
-	//TexEnv 0 was left in default state of PF_Modulated
-
-	return;
-}
-
 
 INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet) {
 	INT Index = 0;
@@ -9268,42 +7302,6 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 			pMapDot->u = (Facet.MapCoords.XAxis | Point) - m_csUDot;
 			pMapDot->v = (Facet.MapCoords.YAxis | Point) - m_csVDot;
 			pMapDot++;
-
-			pVertex->x = Point.X;
-			pVertex->y = Point.Y;
-			pVertex->z = Point.Z;
-			pVertex++;
-		} while (--NumPts != 0);
-	}
-
-	return Index;
-}
-
-INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry_VP(const FSurfaceFacet& Facet) {
-	INT Index = 0;
-
-	//Buffer static geometry
-	m_csPolyCount = 0;
-	FGLVertex *pVertex = &m_csVertexArray[0];
-	for (FSavedPoly* Poly = Facet.Polys; Poly; Poly = Poly->Next) {
-		//Skip if no points
-		INT NumPts = Poly->NumPts;
-		if (NumPts <= 0) {
-			continue;
-		}
-
-		DWORD csPolyCount = m_csPolyCount;
-		MultiDrawFirstArray[csPolyCount] = Index;
-		MultiDrawCountArray[csPolyCount] = NumPts;
-		m_csPolyCount = csPolyCount + 1;
-
-		Index += NumPts;
-		if (Index > VERTEX_ARRAY_SIZE) {
-			return 0;
-		}
-		FTransform **pPts = &Poly->Pts[0];
-		do {
-			const FVector &Point = (*pPts++)->Point;
 
 			pVertex->x = Point.X;
 			pVertex->y = Point.Y;
