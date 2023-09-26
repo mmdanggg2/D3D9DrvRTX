@@ -7,6 +7,18 @@
 =============================================================================*/
 
 
+#include <windows.h>
+
+#define DIRECT3D_VERSION 0x0900
+#include <d3d9.h>
+
+#define UTGLR_NO_APP_MALLOC
+#include <stdlib.h>
+
+#include "Render.h"
+#include "UnRender.h"
+
+
 //Make sure valid build config selected
 #undef UTGLR_VALID_BUILD_CONFIG
 

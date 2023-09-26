@@ -48,10 +48,8 @@ TODO:
 
 =============================================================================*/
 
-#include "D3D9Drv.h"
-#include "..\Inc\UTGLRD3D9.h"
+#include "D3D9RenderDevice.h"
 #include <DirectXMath.h>
-#include "Render.h"
 
 #ifdef WIN32
 #include <mmsystem.h>
