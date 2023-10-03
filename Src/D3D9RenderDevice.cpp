@@ -206,7 +206,12 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(0,  TEXT("ZRangeHack"), CPP_PROPERTY_LOCAL(ZRangeHack), UTGLR_DEFAULT_ZRangeHack);
 
 	SurfaceSelectionColor = FColor(0, 0, 31, 31);
-	new(GetClass(), TEXT("SurfaceSelectionColor"), RF_Public)UStructProperty(CPP_PROPERTY(SurfaceSelectionColor), TEXT("Options"), CPF_Config, FindObjectChecked<UStruct>(NULL, TEXT("Core.Object.Color"), 1));
+	//new(GetClass(), TEXT("SurfaceSelectionColor"), RF_Public)UStructProperty(CPP_PROPERTY(SurfaceSelectionColor), TEXT("Options"), CPF_Config, FindObjectChecked<UStruct>(NULL, TEXT("Core.Object.Color"), 1));
+	UStruct* ColorStruct = FindObject<UStruct>(UObject::StaticClass(), TEXT("Color"));
+	if (!ColorStruct)
+		ColorStruct = new(UObject::StaticClass(), TEXT("Color")) UStruct(NULL);
+	ColorStruct->PropertiesSize = sizeof(FColor);
+	new(GetClass(), TEXT("SurfaceSelectionColor"), RF_Public)UStructProperty(CPP_PROPERTY(SurfaceSelectionColor), TEXT("Options"), CPF_Config, ColorStruct);
 
 #undef CPP_PROPERTY_LOCAL
 #undef CPP_PROPERTY_LOCAL_DCV
@@ -4332,7 +4337,7 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 }
 
 
-D3DCOLORVALUE hsvToRgb(unsigned char h, unsigned char s, unsigned char v) {
+static D3DCOLORVALUE hsvToRgb(unsigned char h, unsigned char s, unsigned char v) {
 	float H = h / 255.0f;
 	float S = s / 255.0f;
 	float V = v / 255.0f;
@@ -4372,15 +4377,122 @@ D3DCOLORVALUE hsvToRgb(unsigned char h, unsigned char s, unsigned char v) {
 	return rgbColor;
 }
 
-std::wostream& operator<<(std::wostream& os, const D3DMATRIX& mat) {
-	os << std::fixed << std::setprecision(2);
-	for (int i = 0; i < 4; ++i) {
-		for (int j = 0; j < 4; ++j) {
-			os << mat.m[i][j] << L' ';
-		}
-		os << L'\n';
+void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
+	guard(UD3D9RenderDevice::renderActor);
+	UMesh* mesh = actor->Mesh;
+	if (!mesh)
+		return;
+	int numTris;
+	FTransTexture* samples;
+	bool isLod;
+
+	dout << "rendering actor " << actor->GetName() << std::endl;
+
+	if (mesh->IsA(ULodMesh::StaticClass())) {
+		isLod = true;
+		ULodMesh* meshLod = (ULodMesh*)mesh;
+		FTransTexture* allSamples = NewZeroed<FTransTexture>(GMem, meshLod->ModelVerts + meshLod->SpecialVerts);
+		// First samples are special coordinates
+		samples = &allSamples[meshLod->SpecialVerts];
+		int lodReq = meshLod->ModelVerts;
+		meshLod->GetFrame(&allSamples->Point, sizeof(samples[0]), GMath.UnitCoords, actor, lodReq);
+		numTris = meshLod->Faces.Num();
+	} else {
+		isLod = false;
+		samples = NewZeroed<FTransTexture>(GMem, mesh->FrameVerts);
+		mesh->GetFrame(&samples->Point, sizeof(samples[0]), GMath.UnitCoords, actor);
+		numTris = mesh->Tris.Num();
 	}
-	return os;
+
+	UTexture* textures[16]{};
+	FTextureInfo texInfos[16]{};
+
+	for (int i = 0; i < mesh->Textures.Num(); i++) {
+		UTexture* tex = mesh->Textures(i);
+		if (!tex)
+			continue;
+		textures[i] = tex->Get(frame->Viewport->CurrentTime);
+		textures[i]->Lock(texInfos[i], frame->Viewport->CurrentTime, -1, this);
+	}
+
+	typedef std::tuple<FTextureInfo*, DWORD> SurfKey;
+	std::map<SurfKey, std::vector<FTransTexture>> surfaceMap{};
+
+	for (INT i = 0; i < numTris; i++) {
+		FTransTexture points[3];
+		DWORD polyFlags;
+		INT texIdx;
+		FMeshUV triUV[3];
+		if (isLod) {
+			ULodMesh* meshLod = (ULodMesh*)mesh;
+			FMeshFace& face = meshLod->Faces(i);
+			for (int j = 0; j < 3; j++) {
+				FMeshWedge& wedge = meshLod->Wedges(face.iWedge[j]);
+				points[j] = samples[wedge.iVertex];
+				triUV[j] = wedge.TexUV;
+			}
+			FMeshMaterial& mat = meshLod->Materials(face.MaterialIndex);
+			texIdx = mat.TextureIndex;
+			polyFlags = mat.PolyFlags;
+		} else {
+			FMeshTri& tri = mesh->Tris(i);
+			points[0] = samples[tri.iVertex[0]];
+			points[1] = samples[tri.iVertex[1]];
+			points[2] = samples[tri.iVertex[2]];
+			polyFlags = tri.PolyFlags;
+			texIdx = tri.TextureIndex;
+			for (int j = 0; j < 3; j++)
+				triUV[j] = tri.Tex[j];
+		}
+
+		
+		if (!(points[0].Flags & points[1].Flags & points[2].Flags)) {
+			if ((polyFlags & (PF_TwoSided | PF_Flat | PF_Invisible)) != (PF_Flat)) {
+
+				FTextureInfo* texInfo = &texInfos[texIdx];
+				if (!texInfo->Texture) {
+					continue;
+				}
+				float scaleU = texInfo->UScale * texInfo->USize / 256.0;
+				float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
+
+				for (INT j = 0; j < 3; j++) {
+					FTransTexture vert = points[j];
+					vert.U = triUV[j].U * scaleU;
+					vert.V = triUV[j].V * scaleV;
+
+					surfaceMap[std::make_tuple(texInfo, polyFlags)].push_back(vert);
+				}
+			}
+		}
+	}
+	
+	for (std::pair<SurfKey, std::vector<FTransTexture>> entry : surfaceMap) {
+		DWORD polyFlags = std::get<1>(entry.first);
+		FTextureInfo* texInfo = std::get<0>(entry.first);
+
+		m_csPtCount = BufferTriangleSurfaceGeometry(entry.second);
+
+		//Initialize render passes state information
+		m_rpPassCount = 0;
+		m_rpTMUnits = TMUnits;
+		m_rpForceSingle = false;
+		m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
+		m_rpColor = 0xFFFFFFFF;
+
+		AddRenderPass(texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
+
+		RenderPasses();
+	}
+
+	for (int i = 0; i < mesh->Textures.Num(); i++) {
+		UTexture* tex = textures[i];
+		if (!tex)
+			continue;
+		tex->Unlock(texInfos[i]);
+	}
+
+	unguard;
 }
 
 void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
@@ -4456,7 +4568,7 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 
 	m_d3dDevice->SetTransform(D3DTS_VIEW, &view);
 
-	m_d3dDevice->SetRenderState(D3DRS_LIGHTING, TRUE);
+	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, TRUE);
 
 	lightCount = 0;
 
@@ -4477,21 +4589,36 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 			lightCount++;
 		}
 	}
-	assert(lightCount <= m_d3dCaps.MaxActiveLights);
+	//assert(lightCount <= m_d3dCaps.MaxActiveLights);
+
+	for (int i = 0; i < staticBspInfo.Level->Actors.Num(); i++) {
+		AActor* actor = staticBspInfo.Level->Actors(i);
+		if (!actor || actor->bHidden)
+			continue;
+		renderActor(currentFrame, actor);
+	}
+
 	typedef std::tuple<UTexture*, DWORD> SurfKey;
-	std::map<SurfKey, std::vector<FStaticBspSurf>> surfaceMap{};
+	std::map<SurfKey, std::vector<FTransTexture>> surfaceMap{};
 	for (int i = 0; i < staticBspInfo.SurfList.Num(); i++) {
 		FStaticBspSurf surface = staticBspInfo.SurfList(i);
 		if (surface.Texture == nullptr || (surface.PolyFlags & (PF_Invisible | PF_FakeBackdrop)))
 			continue;
-		surfaceMap[std::make_tuple(surface.Texture, surface.PolyFlags)].push_back(surface);
+		for (int j = 0; j < surface.VertexCount; j++) {
+			FTransTexture vertex = FTransTexture();
+			FStaticBspVertex bspVert = staticBspInfo.VertList(surface.VertexStart + j);
+			vertex.Point = bspVert.Point;
+			vertex.U = bspVert.TextureU + surface.PanU;
+			vertex.V = bspVert.TextureV + surface.PanV;
+			surfaceMap[std::make_tuple(surface.Texture, surface.PolyFlags)].push_back(vertex);
+		}
 	}
 
-	for (std::pair<SurfKey, std::vector<FStaticBspSurf>> entry : surfaceMap) {
+	for (std::pair<SurfKey, std::vector<FTransTexture>> entry : surfaceMap) {
 		UTexture* texture = std::get<0>(entry.first);
 		DWORD polyFlags = std::get<1>(entry.first);
 
-		m_csPtCount = BufferStaticSurfaceGeometry(staticBspInfo, entry.second);
+		m_csPtCount = BufferTriangleSurfaceGeometry(entry.second);
 
 		//Initialize render passes state information
 		m_rpPassCount = 0;
@@ -4512,12 +4639,12 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 
 	m_d3dDevice->SetTransform(D3DTS_VIEW, &oldView);
 	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &oldProj);
-	m_d3dDevice->SetRenderState(D3DRS_LIGHTING, FALSE);
+	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, FALSE);
 
 	unguard;
 }
 
-INT UD3D9RenderDevice::BufferStaticSurfaceGeometry(const FStaticBspInfoBase& staticBspInfo, const std::vector<FStaticBspSurf>& surfaces) {
+INT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FTransTexture>& vertices) {
 	INT Index = 0;
 
 	// Buffer "static" geometry.
@@ -4525,36 +4652,34 @@ INT UD3D9RenderDevice::BufferStaticSurfaceGeometry(const FStaticBspInfoBase& sta
 	FGLMapDot* pMapDot = &MapDotArray[0];
 	FGLVertex* pVertex = &m_csVertexArray[0];
 
-	for (FStaticBspSurf surface : surfaces) {
-		// I was promised to be given triangles
-		assert(surface.VertexCount % 3 == 0);
-		int tris = surface.VertexCount / 3;
+	// I was promised to be given triangles
+	assert(vertices.size() % 3 == 0);
+	int tris = vertices.size() / 3;
 
-		for (int i = 0; i < tris; i++) {
-			INT numPts = 3;
+	for (int i = 0; i < tris; i++) {
+		INT numPts = 3;
 
-			DWORD csPolyCount = m_csPolyCount;
-			MultiDrawFirstArray[csPolyCount] = Index;
-			MultiDrawCountArray[csPolyCount] = numPts;
-			m_csPolyCount = csPolyCount + 1;
+		DWORD csPolyCount = m_csPolyCount;
+		MultiDrawFirstArray[csPolyCount] = Index;
+		MultiDrawCountArray[csPolyCount] = numPts;
+		m_csPolyCount = csPolyCount + 1;
 
-			Index += numPts;
-			if (Index > VERTEX_ARRAY_SIZE) {
-				return 0;
-			}
-			for (int j = 0; j < numPts; j++) {
-				FStaticBspVertex vert = staticBspInfo.VertList(surface.VertexStart + ((i * 3) + j));
-
-				pMapDot->u = vert.TextureU + surface.PanU;
-				pMapDot->v = vert.TextureV + surface.PanV;
-				pMapDot++;
-
-				pVertex->x = vert.Point.X;
-				pVertex->y = vert.Point.Y;
-				pVertex->z = vert.Point.Z;
-				pVertex++;
-			};
+		Index += numPts;
+		if (Index > VERTEX_ARRAY_SIZE) {
+			return 0;
 		}
+		for (int j = 0; j < numPts; j++) {
+			FTransTexture vert = vertices[(i * 3) + j];
+
+			pMapDot->u = vert.U;
+			pMapDot->v = vert.V;
+			pMapDot++;
+
+			pVertex->x = vert.Point.X;
+			pVertex->y = vert.Point.Y;
+			pVertex->z = vert.Point.Z;
+			pVertex++;
+		};
 	}
 
 	return Index;

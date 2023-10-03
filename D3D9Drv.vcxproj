@@ -237,6 +237,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Src\c_gclip.cpp" />
+    <ClCompile Include="Src\D3D9DebugUtils.cpp" />
     <ClCompile Include="Src\D3D9Drv.cpp" />
     <ClCompile Include="Src\D3D9Render.cpp" />
     <ClCompile Include="Src\D3D9RenderDevice.cpp" />
@@ -244,7 +245,7 @@
   <ItemGroup>
     <ClInclude Include="Inc\c_gclip.h" />
     <ClInclude Include="Inc\c_rbtree.h" />
-    <ClInclude Include="Inc\D3D9Drv.h" />
+    <ClInclude Include="Inc\D3D9DebugUtils.h" />
     <ClInclude Include="Inc\D3D9Render.h" />
     <ClInclude Include="Inc\D3D9RenderDevice.h" />
   </ItemGroup>

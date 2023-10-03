@@ -7,8 +7,6 @@
 =============================================================================*/
 
 
-#include <windows.h>
-
 #define DIRECT3D_VERSION 0x0900
 #include <d3d9.h>
 
@@ -46,6 +44,7 @@
 #endif
 #undef UTGLR_VALID_BUILD_CONFIG
 
+#include "D3D9DebugUtils.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -60,9 +59,6 @@
 #pragma warning(disable : 4245)
 
 #pragma warning(disable : 4146)
-#include <sstream>
-#include <iostream>
-#include <iomanip>
 
 #include "c_gclip.h"
 
@@ -382,48 +378,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 #ifdef UTD3D9R_INCLUDE_SHADER_ASM
 	void AssembleShader(void);
 #endif
-
-	class ods_buf : public std::basic_stringbuf<TCHAR, std::char_traits<TCHAR> > {
-	public:
-		virtual ~ods_buf() {
-			sync();
-		}
-
-	protected:
-		int sync() {
-#ifdef WIN32
-			//Output the string
-			OutputDebugStringW(str().c_str());
-#else
-			//Add non-win32 debug output code here
-#endif
-
-			//Clear the buffer
-			str(std::basic_string<TCHAR>());
-			
-			return 0;
-		}
-	};
-	class ods_stream : public std::basic_ostream<TCHAR, std::char_traits<TCHAR> > {
-	public:
-		ods_stream() : std::basic_ostream<TCHAR, std::char_traits<TCHAR> >(new ods_buf()) {
-		}
-		~ods_stream() {
-			delete rdbuf();
-		}
-	};
-
-	std::basic_string<TCHAR> HexString(DWORD data, DWORD numBits = 4) {
-		std::basic_ostringstream<TCHAR> strHexNum;
-
-		strHexNum << std::hex;
-		strHexNum.fill('0');
-		strHexNum << std::uppercase;
-		strHexNum << std::setw(((numBits + 3) & -4) / 4);
-		strHexNum << data;
-
-		return strHexNum.str();
-	}
 
 	//Debug stream
 	ods_stream dout;
@@ -1216,6 +1170,8 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void DrawStaticBspNode(INT iNode, FSurfaceInfo& Surface) override;
 	void DrawStaticBspSurf(INT iSurf, FSurfaceInfo& Surface) override;
 
+	void renderActor(FSceneNode* frame, AActor* actor);
+
 	void ClearZ(FSceneNode* Frame);
 	void PushHit(const BYTE* Data, INT Count);
 	void PopHit(INT Count, UBOOL bForce);
@@ -1530,7 +1486,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void FASTCALL RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture(FTextureInfo &);
 
 	INT FASTCALL BufferStaticComplexSurfaceGeometry(const FSurfaceFacet&);
-	INT FASTCALL BufferStaticSurfaceGeometry(const FStaticBspInfoBase& staticBspInfo, const std::vector<FStaticBspSurf>& surfaces);
+	INT FASTCALL BufferTriangleSurfaceGeometry(const std::vector<FTransTexture>& vertices);
 	DWORD FASTCALL BufferDetailTextureData(FLOAT);
 #ifdef UTGLR_INCLUDE_SSE_CODE
 	DWORD FASTCALL BufferDetailTextureData_SSE2(FLOAT);
