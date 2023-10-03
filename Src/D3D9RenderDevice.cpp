@@ -4386,7 +4386,7 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 	FTransTexture* samples;
 	bool isLod;
 
-	dout << "rendering actor " << actor->GetName() << std::endl;
+	//dout << "rendering actor " << actor->GetName() << std::endl;
 
 	if (mesh->IsA(ULodMesh::StaticClass())) {
 		isLod = true;
@@ -4408,9 +4408,12 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 	FTextureInfo texInfos[16]{};
 
 	for (int i = 0; i < mesh->Textures.Num(); i++) {
-		UTexture* tex = mesh->Textures(i);
-		if (!tex)
+		UTexture* tex = mesh->GetTexture(i, actor);
+		if (!tex && actor->Texture) {
+			tex = actor->Texture;
+		} else if (!tex) {
 			continue;
+		}
 		textures[i] = tex->Get(frame->Viewport->CurrentTime);
 		textures[i]->Lock(texInfos[i], frame->Viewport->CurrentTime, -1, this);
 	}
@@ -4593,9 +4596,10 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 
 	for (int i = 0; i < staticBspInfo.Level->Actors.Num(); i++) {
 		AActor* actor = staticBspInfo.Level->Actors(i);
-		if (!actor || actor->bHidden)
+		if (!actor || actor->bHidden || actor == currentFrame->Viewport->Actor)
 			continue;
-		renderActor(currentFrame, actor);
+		if (actor->DrawType == DT_Mesh)
+			renderActor(currentFrame, actor);
 	}
 
 	typedef std::tuple<UTexture*, DWORD> SurfKey;

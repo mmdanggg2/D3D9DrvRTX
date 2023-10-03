@@ -20,8 +20,9 @@ void UD3D9Render::StaticConstructor() {
 void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	guard(UD3D9Render::DrawWorld);
 	if (GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
+		UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
 		FStaticBspInfoBase staticBsp = FStaticBspInfoBase(frame->Level);
-		((UD3D9RenderDevice*)GRenderDevice)->SetStaticBsp(staticBsp);
+		d3d9Dev->SetStaticBsp(staticBsp);
 		return;
 	}
 	Super::DrawWorld(frame);
