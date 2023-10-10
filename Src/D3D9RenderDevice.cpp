@@ -4336,6 +4336,52 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 	unguard;
 }
 
+#include <unordered_map>
+#include <unordered_set>
+
+template <typename T>
+class UniqueValueArray {
+public:
+	bool insert(int index, T value) {
+		auto result = unique_values.insert(value);
+		value_map[index] = const_cast<T*>(&(*result.first));
+		return result.second;
+	}
+
+	T& at(int index) {
+		auto it = value_map.find(index);
+		if (it == value_map.end()) {
+			throw std::out_of_range("Invalid index");
+		} else {
+			return *it->second;
+		}
+	}
+
+	bool has(int index) {
+		return value_map.find(index) != value_map.end();
+	}
+
+	int getIndex(T value) {
+		for (auto pair : value_map) {
+			if (*pair.second == value) {
+				return pair.first;
+			}
+		}
+		return -1;
+	}
+
+	auto begin() {
+		return unique_values.begin();
+	}
+
+	auto end() {
+		return unique_values.end();
+	}
+
+private:
+	std::unordered_map<int, T*> value_map;
+	std::unordered_set<T> unique_values;
+};
 
 static D3DCOLORVALUE hsvToRgb(unsigned char h, unsigned char s, unsigned char v) {
 	float H = h / 255.0f;
@@ -4377,7 +4423,66 @@ static D3DCOLORVALUE hsvToRgb(unsigned char h, unsigned char s, unsigned char v)
 	return rgbColor;
 }
 
+static DirectX::FXMVECTOR FVecToDXVec(const FVector& vec) {
+	return DirectX::XMVectorSet(vec.X, vec.Y, vec.Z, 0.0f);
+}
+
+#define rotConvert(integer) (((float)integer) / ((float)MAXWORD) * (PI * 2))
+
+static DirectX::FXMVECTOR FRotToDXQuat(const FRotator& rot) {
+	return DirectX::XMQuaternionRotationRollPitchYaw(
+		rotConvert(rot.Pitch),
+		rotConvert(rot.Roll),
+		rotConvert(rot.Yaw)
+	);
+}
+
+static DirectX::FXMMATRIX FRotToDXRotMat(const FRotator& rot) {
+	using namespace DirectX;
+	XMMATRIX mat = XMMatrixIdentity();
+	mat *= XMMatrixRotationRollPitchYaw(-rotConvert(rot.Roll), 0, 0);
+	mat *= XMMatrixRotationRollPitchYaw(0, -rotConvert(rot.Pitch), 0);
+	mat *= XMMatrixRotationRollPitchYaw(0, 0, rotConvert(rot.Yaw));
+	return mat;
+}
+
+template <>
+struct std::hash<FVector> {
+	std::size_t operator()(const FVector& t) const {
+		std::size_t seed = 0;
+		seed ^= std::hash<FLOAT>()(t.X) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FLOAT>()(t.Y) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FLOAT>()(t.Z) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		return seed;
+	}
+};
+
+template <>
+struct std::hash<FTextureInfo> {
+	std::size_t operator()(const FTextureInfo& t) const {
+		std::size_t seed = 0;
+		seed ^= std::hash<UTexture*>()(t.Texture) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.LOD) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.NumMips) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FVector>()(t.Pan) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<QWORD>()(t.CacheID) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<QWORD>()(t.PaletteCacheID) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.UClamp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.USize) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FLOAT>()(t.UScale) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.VClamp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.VSize) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FLOAT>()(t.VScale) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		return seed;
+	}
+};
+
+bool operator==(const FTextureInfo& lhs, const FTextureInfo& rhs) {
+	return std::hash<FTextureInfo>()(lhs) == std::hash<FTextureInfo>()(rhs);
+}
+
 void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
+	using namespace DirectX;
 	guard(UD3D9RenderDevice::renderActor);
 	UMesh* mesh = actor->Mesh;
 	if (!mesh)
@@ -4387,6 +4492,40 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 	bool isLod;
 
 	//dout << "rendering actor " << actor->GetName() << std::endl;
+
+	//FCoords actorCoord = GMath.UnitCoords * (actor->Location + actor->PrePivot) * actor->Rotation * FScale(FVector(1,1,1) * actor->DrawScale, 0.0, SHEER_None);
+	//actorCoord = actorCoord.Inverse();
+
+	//D3DMATRIX actorMatrix = {
+	//	actorCoord.XAxis.X, actorCoord.YAxis.X, actorCoord.ZAxis.X, 0,
+	//	actorCoord.XAxis.Y, actorCoord.YAxis.Y, actorCoord.ZAxis.Y, 0,
+	//	actorCoord.XAxis.Z, actorCoord.YAxis.Z, actorCoord.ZAxis.Z, 0,
+	//	actorCoord.Origin.X, actorCoord.Origin.Y, actorCoord.Origin.Z, 1.0f
+	//};
+	D3DMATRIX actorMatrix;
+	FXMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
+	//FXMMATRIX matRot = XMMatrixRotationQuaternion(FRotToDXQuat(actor->Rotation));
+	FXMMATRIX matRot = FRotToDXRotMat(actor->Rotation);
+	//FXMMATRIX matRot = XMMatrixRotationRollPitchYaw(rotConvert(actor->Rotation.Roll), rotConvert(actor->Rotation.Pitch), -rotConvert(actor->Rotation.Yaw));
+	FXMMATRIX matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
+
+	XMMATRIX mat = XMMatrixIdentity();
+	mat *= matScale;
+	mat *= matRot;
+	mat *= matLoc;
+	actorMatrix = reinterpret_cast<D3DMATRIX&>(mat);
+
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &actorMatrix);
+
+	// The old switcheroo, trick the game to not transform the mesh verts to object position
+	FVector origLoc = actor->Location;
+	FVector origPrePiv = actor->PrePivot;
+	FRotator origRot = actor->Rotation;
+	FLOAT origScale = actor->DrawScale;
+	actor->Location = FVector(0, 0, 0);
+	actor->PrePivot = FVector(0, 0, 0);
+	actor->Rotation = FRotator(0, 0, 0);
+	actor->DrawScale = 1.0f;
 
 	if (mesh->IsA(ULodMesh::StaticClass())) {
 		isLod = true;
@@ -4403,9 +4542,15 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 		mesh->GetFrame(&samples->Point, sizeof(samples[0]), GMath.UnitCoords, actor);
 		numTris = mesh->Tris.Num();
 	}
+	actor->Location = origLoc;
+	actor->PrePivot = origPrePiv;
+	actor->Rotation = origRot;
+	actor->DrawScale = origScale;
 
-	UTexture* textures[16]{};
-	FTextureInfo texInfos[16]{};
+	UniqueValueArray<UTexture*> textures;
+	UniqueValueArray<FTextureInfo> texInfos;
+	//UTexture* textures[16]{};
+	//FTextureInfo texInfos[16]{};
 
 	for (int i = 0; i < mesh->Textures.Num(); i++) {
 		UTexture* tex = mesh->GetTexture(i, actor);
@@ -4414,8 +4559,14 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 		} else if (!tex) {
 			continue;
 		}
-		textures[i] = tex->Get(frame->Viewport->CurrentTime);
-		textures[i]->Lock(texInfos[i], frame->Viewport->CurrentTime, -1, this);
+		tex = tex->Get(frame->Viewport->CurrentTime);
+		if (textures.insert(i, tex)) {
+			FTextureInfo texInfo{};
+			textures.at(i)->Lock(texInfo, frame->Viewport->CurrentTime, -1, this);
+			texInfos.insert(i, texInfo);
+		} else {
+			texInfos.insert(i, texInfos.at(textures.getIndex(tex)));
+		}
 	}
 
 	typedef std::tuple<FTextureInfo*, DWORD> SurfKey;
@@ -4451,8 +4602,8 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 		
 		if (!(points[0].Flags & points[1].Flags & points[2].Flags)) {
 			if ((polyFlags & (PF_TwoSided | PF_Flat | PF_Invisible)) != (PF_Flat)) {
-
-				FTextureInfo* texInfo = &texInfos[texIdx];
+				
+				FTextureInfo* texInfo = &texInfos.at(texIdx);
 				if (!texInfo->Texture) {
 					continue;
 				}
@@ -4489,10 +4640,12 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 	}
 
 	for (int i = 0; i < mesh->Textures.Num(); i++) {
-		UTexture* tex = textures[i];
+		if (!textures.has(i))
+			continue;
+		UTexture* tex = textures.at(i);
 		if (!tex)
 			continue;
-		tex->Unlock(texInfos[i]);
+		tex->Unlock(texInfos.at(i));
 	}
 
 	unguard;
@@ -4594,13 +4747,18 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 	}
 	//assert(lightCount <= m_d3dCaps.MaxActiveLights);
 
-	for (int i = 0; i < staticBspInfo.Level->Actors.Num(); i++) {
+	/*for (int i = 0; i < staticBspInfo.Level->Actors.Num(); i++) {
 		AActor* actor = staticBspInfo.Level->Actors(i);
 		if (!actor || actor->bHidden || actor == currentFrame->Viewport->Actor)
 			continue;
 		if (actor->DrawType == DT_Mesh)
 			renderActor(currentFrame, actor);
+	}*/
+
+	for (FDynamicSprite* sprite = currentFrame->Sprite; sprite; sprite = sprite->RenderNext) {
+		renderActor(currentFrame, sprite->Actor);
 	}
+	m_d3dDevice->SetTransform(D3DTS_WORLD, (D3DMATRIX*)&DirectX::XMMatrixIdentity());
 
 	typedef std::tuple<UTexture*, DWORD> SurfKey;
 	std::map<SurfKey, std::vector<FTransTexture>> surfaceMap{};

@@ -20,9 +20,19 @@ void UD3D9Render::StaticConstructor() {
 void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	guard(UD3D9Render::DrawWorld);
 	if (GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
+		FMemMark SceneMark(GSceneMem);
+		FMemMark MemMark(GMem);
+		FMemMark DynMark(GDynMem);
+		FMemMark VectorMark(VectorMem);
 		UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
+		OccludeFrame(frame);
 		FStaticBspInfoBase staticBsp = FStaticBspInfoBase(frame->Level);
+		d3d9Dev->currentFrame = frame;
 		d3d9Dev->SetStaticBsp(staticBsp);
+		MemMark.Pop();
+		DynMark.Pop();
+		SceneMark.Pop();
+		VectorMark.Pop();
 		return;
 	}
 	Super::DrawWorld(frame);
