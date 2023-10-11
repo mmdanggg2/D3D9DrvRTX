@@ -372,7 +372,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 #if defined UTGLR_DX_BUILD
 	DECLARE_CLASS(UD3D9RenderDevice, URenderDevice, CLASS_Config)
 #else
-	DECLARE_CLASS(UD3D9RenderDevice, URenderDeviceOldUnreal469, CLASS_Config, D3D9Drv)
+	DECLARE_CLASS(UD3D9RenderDevice, URenderDeviceOldUnreal469, CLASS_Config, D3D9DrvRTX)
 #endif
 
 #ifdef UTD3D9R_INCLUDE_SHADER_ASM

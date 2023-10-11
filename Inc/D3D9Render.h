@@ -4,7 +4,7 @@
 #include "D3D9DebugUtils.h"
 
 class UD3D9Render : public URender {
-	DECLARE_CLASS(UD3D9Render, URender, CLASS_Config, D3D9Drv);
+	DECLARE_CLASS(UD3D9Render, URender, CLASS_Config, D3D9DrvRTX);
 
 	ods_stream dout;
 

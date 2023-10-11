@@ -2,7 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="Src\c_gclip.cpp" />
-    <ClCompile Include="Src\D3D9Drv.cpp" />
+    <ClCompile Include="Src\D3D9DrvRTX.cpp" />
     <ClCompile Include="Src\D3D9Render.cpp" />
     <ClCompile Include="Src\D3D9RenderDevice.cpp" />
     <ClCompile Include="Src\D3D9DebugUtils.cpp" />

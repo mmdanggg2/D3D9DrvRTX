@@ -66,7 +66,7 @@ static const char *g_d3d9DllName = "d3d9d.dll";
 static const char *g_d3d9DllName = "d3d9.dll";
 #endif
 
-static const TCHAR *g_pSection = TEXT("D3D9Drv.D3D9RenderDevice");
+static const TCHAR *g_pSection = TEXT("D3D9DrvRTX.D3D9RenderDevice");
 
 //Stream definitions
 ////////////////////
@@ -4446,6 +4446,16 @@ static DirectX::FXMMATRIX FRotToDXRotMat(const FRotator& rot) {
 	return mat;
 }
 
+static D3DMATRIX FCoordToDXMat(const FCoords& coord) {
+	D3DMATRIX mat = {
+		coord.XAxis.X, coord.YAxis.X, coord.ZAxis.X, 0,
+		coord.XAxis.Y, coord.YAxis.Y, coord.ZAxis.Y, 0,
+		coord.XAxis.Z, coord.YAxis.Z, coord.ZAxis.Z, 0,
+		coord.Origin.X, coord.Origin.Y, coord.Origin.Z, 1.0f
+	};
+	return mat;
+}
+
 template <>
 struct std::hash<FVector> {
 	std::size_t operator()(const FVector& t) const {
@@ -4493,15 +4503,6 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 
 	//dout << "rendering actor " << actor->GetName() << std::endl;
 
-	//FCoords actorCoord = GMath.UnitCoords * (actor->Location + actor->PrePivot) * actor->Rotation * FScale(FVector(1,1,1) * actor->DrawScale, 0.0, SHEER_None);
-	//actorCoord = actorCoord.Inverse();
-
-	//D3DMATRIX actorMatrix = {
-	//	actorCoord.XAxis.X, actorCoord.YAxis.X, actorCoord.ZAxis.X, 0,
-	//	actorCoord.XAxis.Y, actorCoord.YAxis.Y, actorCoord.ZAxis.Y, 0,
-	//	actorCoord.XAxis.Z, actorCoord.YAxis.Z, actorCoord.ZAxis.Z, 0,
-	//	actorCoord.Origin.X, actorCoord.Origin.Y, actorCoord.Origin.Z, 1.0f
-	//};
 	D3DMATRIX actorMatrix;
 	FXMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
 	//FXMMATRIX matRot = XMMatrixRotationQuaternion(FRotToDXQuat(actor->Rotation));
@@ -4549,8 +4550,6 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 
 	UniqueValueArray<UTexture*> textures;
 	UniqueValueArray<FTextureInfo> texInfos;
-	//UTexture* textures[16]{};
-	//FTextureInfo texInfos[16]{};
 
 	for (int i = 0; i < mesh->Textures.Num(); i++) {
 		UTexture* tex = mesh->GetTexture(i, actor);
@@ -4639,13 +4638,10 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 		RenderPasses();
 	}
 
-	for (int i = 0; i < mesh->Textures.Num(); i++) {
-		if (!textures.has(i))
-			continue;
-		UTexture* tex = textures.at(i);
+	for (UTexture* tex : textures) {
 		if (!tex)
 			continue;
-		tex->Unlock(texInfos.at(i));
+		tex->Unlock(texInfos.at(textures.getIndex(tex)));
 	}
 
 	unguard;
@@ -4698,11 +4694,12 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 	m_d3dDevice->GetTransform(D3DTS_VIEW, &oldView);
 	D3DMATRIX oldProj;
 	m_d3dDevice->GetTransform(D3DTS_PROJECTION, &oldProj);
-
-	D3DMATRIX proj;
-	DirectX::XMStoreFloat4x4(
-		(DirectX::XMFLOAT4X4*)&proj,
-		DirectX::XMMatrixPerspectiveFovLH(Viewport->Actor->FovAngle * PI / 180.0f, (float)m_sceneNodeX / (float)m_sceneNodeY, 0.5f, 65536.0f)
+	using namespace DirectX;
+	float aspect = (float)m_sceneNodeX / (float)m_sceneNodeY;
+	float fov = Viewport->Actor->FovAngle * PI / 180.0f;
+	fov = 2.0 * atan(tan(fov * 0.5) / aspect);
+	D3DMATRIX proj = reinterpret_cast<D3DMATRIX&>(
+		XMMatrixPerspectiveFovLH(fov, aspect, 0.5f, 65536.0f)
 	);
 
 	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &proj);
@@ -4712,13 +4709,11 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 	FVector forward =  FVector(0.0f, 0.0f, 1.0f).TransformVectorBy(currentFrame->Uncoords);
 	FVector up = FVector(0.0f, -1.0f, 0.0f).TransformVectorBy(currentFrame->Uncoords);
 
-	D3DMATRIX view = D3DMATRIX();
-	DirectX::XMStoreFloat4x4(
-		(DirectX::XMFLOAT4X4*)&view,
-		DirectX::XMMatrixLookToLH(
-			DirectX::XMVectorSet(origin.X, origin.Y, origin.Z, 0.f),
-			DirectX::XMVectorSet(forward.X, forward.Y, forward.Z, 0.0f),
-			DirectX::XMVectorSet(up.X, up.Y, up.Z, 0.0f)
+	D3DMATRIX view = reinterpret_cast<D3DMATRIX&>(
+		XMMatrixLookToLH(
+			XMVectorSet(origin.X, origin.Y, origin.Z, 0.f),
+			XMVectorSet(forward.X, forward.Y, forward.Z, 0.0f),
+			XMVectorSet(up.X, up.Y, up.Z, 0.0f)
 		)
 	);
 
