@@ -16,5 +16,4 @@ class UD3D9Render : public URender {
 	void DrawWorld(FSceneNode* Frame) override;
 	void DrawActor(FSceneNode* Frame, AActor* Actor) override;
 
-
 };

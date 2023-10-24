@@ -127,6 +127,158 @@ static const D3DVERTEXELEMENT9 g_twoColorSingleTextureStreamDef[] = {
 };
 
 
+
+#include <unordered_map>
+#include <unordered_set>
+
+template <typename T>
+class UniqueValueArray {
+public:
+	bool insert(int index, T value) {
+		auto result = unique_values.insert(value);
+		value_map[index] = const_cast<T*>(&(*result.first));
+		return result.second;
+	}
+
+	T& at(int index) {
+		auto it = value_map.find(index);
+		if (it == value_map.end()) {
+			throw std::out_of_range("Invalid index");
+		} else {
+			return *it->second;
+		}
+	}
+
+	bool has(int index) {
+		return value_map.find(index) != value_map.end();
+	}
+
+	int getIndex(T value) {
+		for (auto pair : value_map) {
+			if (*pair.second == value) {
+				return pair.first;
+			}
+		}
+		return -1;
+	}
+
+	auto begin() {
+		return unique_values.begin();
+	}
+
+	auto end() {
+		return unique_values.end();
+	}
+
+private:
+	std::unordered_map<int, T*> value_map;
+	std::unordered_set<T> unique_values;
+};
+
+static D3DCOLORVALUE hsvToRgb(unsigned char h, unsigned char s, unsigned char v) {
+	float H = h / 255.0f;
+	float S = s / 255.0f;
+	float V = v / 255.0f;
+
+	float C = V * S;
+	float X = C * (1 - std::abs(fmod(H * 6, 2) - 1));
+	float m = V - C;
+
+	D3DCOLORVALUE rgbColor;
+
+	if (0 <= H && H < 1 / 6.0) {
+		rgbColor.r = C; rgbColor.g = X; rgbColor.b = 0;
+	} else if (1 / 6.0 <= H && H < 2 / 6.0) {
+		rgbColor.r = X; rgbColor.g = C; rgbColor.b = 0;
+	} else if (2 / 6.0 <= H && H < 3 / 6.0) {
+		rgbColor.r = 0; rgbColor.g = C; rgbColor.b = X;
+	} else if (3 / 6.0 <= H && H < 4 / 6.0) {
+		rgbColor.r = 0; rgbColor.g = X; rgbColor.b = C;
+	} else if (4 / 6.0 <= H && H < 5 / 6.0) {
+		rgbColor.r = X; rgbColor.g = 0; rgbColor.b = C;
+	} else {
+		rgbColor.r = C; rgbColor.g = 0; rgbColor.b = X;
+	}
+
+	rgbColor.r += m;
+	rgbColor.g += m;
+	rgbColor.b += m;
+
+	// Set alpha value to maximum
+	rgbColor.a = 1.0f;
+
+	return rgbColor;
+}
+
+static DirectX::FXMVECTOR FVecToDXVec(const FVector& vec) {
+	return DirectX::XMVectorSet(vec.X, vec.Y, vec.Z, 0.0f);
+}
+
+#define rotConvert(integer) (((float)integer) / ((float)MAXWORD) * (PI * 2))
+
+static DirectX::FXMVECTOR FRotToDXQuat(const FRotator& rot) {
+	return DirectX::XMQuaternionRotationRollPitchYaw(
+		rotConvert(rot.Pitch),
+		rotConvert(rot.Roll),
+		rotConvert(rot.Yaw)
+	);
+}
+
+static DirectX::FXMMATRIX FRotToDXRotMat(const FRotator& rot) {
+	using namespace DirectX;
+	XMMATRIX mat = XMMatrixIdentity();
+	mat *= XMMatrixRotationRollPitchYaw(-rotConvert(rot.Roll), 0, 0);
+	mat *= XMMatrixRotationRollPitchYaw(0, -rotConvert(rot.Pitch), 0);
+	mat *= XMMatrixRotationRollPitchYaw(0, 0, rotConvert(rot.Yaw));
+	return mat;
+}
+
+static D3DMATRIX FCoordToDXMat(const FCoords& coord) {
+	D3DMATRIX mat = {
+		coord.XAxis.X, coord.YAxis.X, coord.ZAxis.X, 0,
+		coord.XAxis.Y, coord.YAxis.Y, coord.ZAxis.Y, 0,
+		coord.XAxis.Z, coord.YAxis.Z, coord.ZAxis.Z, 0,
+		coord.Origin.X, coord.Origin.Y, coord.Origin.Z, 1.0f
+	};
+	return mat;
+}
+
+template <>
+struct std::hash<FVector> {
+	std::size_t operator()(const FVector& t) const {
+		std::size_t seed = 0;
+		seed ^= std::hash<FLOAT>()(t.X) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FLOAT>()(t.Y) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FLOAT>()(t.Z) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		return seed;
+	}
+};
+
+template <>
+struct std::hash<FTextureInfo> {
+	std::size_t operator()(const FTextureInfo& t) const {
+		std::size_t seed = 0;
+		seed ^= std::hash<UTexture*>()(t.Texture) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.LOD) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.NumMips) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FVector>()(t.Pan) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<QWORD>()(t.CacheID) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<QWORD>()(t.PaletteCacheID) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.UClamp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.USize) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FLOAT>()(t.UScale) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.VClamp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.VSize) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FLOAT>()(t.VScale) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		return seed;
+	}
+};
+
+bool operator==(const FTextureInfo& lhs, const FTextureInfo& rhs) {
+	return std::hash<FTextureInfo>()(lhs) == std::hash<FTextureInfo>()(rhs);
+}
+
+
 /*-----------------------------------------------------------------------------
 	D3D9Drv.
 -----------------------------------------------------------------------------*/
@@ -262,7 +414,7 @@ void UD3D9RenderDevice::StaticConstructor() {
 
 	DescFlags |= RDDESCF_Certified;
 
-	SupportsStaticBsp = true;
+	SupportsStaticBsp = false;
 	UseAmbientlessLightmaps = false;
 
 	unguard;
@@ -1937,11 +2089,11 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	HRESULT hResult;
 
 	//Set view matrix
-	D3DMATRIX d3dView = { +1.0f,  0.0f,  0.0f,  0.0f,
-						   0.0f, -1.0f,  0.0f,  0.0f,
-						   0.0f,  0.0f, -1.0f,  0.0f,
-						   0.0f,  0.0f,  0.0f, +1.0f };
-	m_d3dDevice->SetTransform(D3DTS_VIEW, &d3dView);
+	//D3DMATRIX d3dView = { +1.0f,  0.0f,  0.0f,  0.0f,
+	//					   0.0f, -1.0f,  0.0f,  0.0f,
+	//					   0.0f,  0.0f, -1.0f,  0.0f,
+	//					   0.0f,  0.0f,  0.0f, +1.0f };
+	//m_d3dDevice->SetTransform(D3DTS_VIEW, &d3dView);
 
 	//Little white texture for no texture operations
 	InitNoTextureSafe();
@@ -2907,7 +3059,6 @@ void UD3D9RenderDevice::Flush(UBOOL AllowPrecache) {
 
 
 void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet) {
-	return;/*
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 {
 	static int si;
@@ -3008,50 +3159,17 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 		}
 	}
 	
-	//FCoords coord = FCoords(Frame->Uncoords);
-	//FCoords coordRot = FCoords(FVector(0,0,0), coord.XAxis, coord.YAxis, coord.ZAxis);
-	//FMatrix fMat = FMatrixFromFCoords(Frame->Uncoords);
-	FCoords FC = Frame->Uncoords;
-	FMatrix fMat;
-	fMat.XPlane = FPlane(FC.XAxis.X, FC.XAxis.Y, FC.XAxis.Z, FC.Origin.X);
-	fMat.YPlane = FPlane(FC.ZAxis.X, FC.ZAxis.Y, FC.ZAxis.Z, FC.Origin.Z);
-	fMat.ZPlane = FPlane(FC.YAxis.X, FC.YAxis.Y, FC.YAxis.Z, FC.Origin.Y);
-	fMat.WPlane = FPlane(0.f, 0.f, 0.f, 1.f);
-	//dout << "coord: " << *coord.String() << std::endl;
-	D3DMATRIX view = {
-		fMat.M(0,0), fMat.M(0,1), fMat.M(0,2), fMat.M(0,3),
-		fMat.M(1,0), fMat.M(1,1), fMat.M(1,2), fMat.M(1,3),
-		fMat.M(2,0), fMat.M(2,1), fMat.M(2,2), fMat.M(2,3),
-		fMat.M(3,0), fMat.M(3,1), fMat.M(3,2), fMat.M(3,3),
-	};
-	/*D3DMATRIX view = {
-		fMat.XPlane.X, fMat.YPlane.X, fMat.ZPlane.X, fMat.WPlane.X,
-		fMat.XPlane.Y, fMat.YPlane.Y, fMat.ZPlane.Y, fMat.WPlane.Y,
-		fMat.XPlane.Z, fMat.YPlane.Z, fMat.ZPlane.Z, fMat.WPlane.Z,
-		fMat.XPlane.W, fMat.YPlane.W, fMat.ZPlane.W, fMat.WPlane.W,
-	};*/
-	/*D3DMATRIX view = {
-		fMat.XPlane.X, fMat.XPlane.Y, fMat.XPlane.Z, fMat.XPlane.W,
-		fMat.YPlane.X, fMat.YPlane.Y, fMat.YPlane.Z, fMat.YPlane.W,
-		fMat.ZPlane.X, fMat.ZPlane.Y, fMat.ZPlane.Z, fMat.ZPlane.W,
-		fMat.WPlane.X, fMat.WPlane.Y, fMat.WPlane.Z, fMat.WPlane.W,
-	};/
+	//FCoords coord = Frame->Uncoords;
+	//D3DMATRIX view = FCoordToDXMat(Frame->Uncoords);
 
+	//D3DMATRIX view = reinterpret_cast<D3DMATRIX&>(DirectX::XMMatrixLookAtRH(
+	//		DirectX::XMVectorSet(200.f, 200.f, 200.f, 0.f),
+	//		DirectX::g_XMZero,
+	//		DirectX::XMVectorSet(0, 0, 1, 0)
+	//	)
+	//);
 
-	char buf[1024];
-	std::sprintf(buf, "{\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n}", view._11, view._12, view._13, view._14, view._21, view._22, view._23, view._24, view._31, view._32, view._33, view._34, view._41, view._42, view._43, view._44);
-	//dout << buf << std::endl;
-
-	DirectX::XMStoreFloat4x4(
-		(DirectX::XMFLOAT4X4*)&view,
-		DirectX::XMMatrixLookAtRH(
-			DirectX::XMVectorSet(200.f, 200.f, 200.f, 0.f),
-			DirectX::g_XMZero,
-			DirectX::XMVectorSet(0, 0, 1, 0)
-		)
-	);
-
-	m_d3dDevice->SetTransform(D3DTS_VIEW, &view);
+	//m_d3dDevice->SetTransform(D3DTS_VIEW, &view);
 
 	DWORD PolyFlags = Surface.PolyFlags;
 
@@ -3196,7 +3314,7 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	}
 
 	unclockFast(ComplexCycles);
-	unguard;//*/
+	unguard;
 }
 
 #ifdef UTGLR_RUNE_BUILD
@@ -3362,7 +3480,6 @@ void UD3D9RenderDevice::PostDrawGouraud(FLOAT FogDistance) {
 #endif
 
 void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, DWORD PolyFlags, FSpanBuffer* Span) {
-	return;
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 {
 	static int si;
@@ -3476,7 +3593,6 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 }
 
 void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, DWORD PolyFlags, FSpanBuffer* Span) {
-	return;
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 {
 	static int si;
@@ -3716,16 +3832,33 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 	FLOAT PY1 = Y - Frame->FY2;
 	FLOAT PY2 = PY1 + YL;
 
-	FLOAT RPX1 = m_RFX2 * PX1;
-	FLOAT RPX2 = m_RFX2 * PX2;
-	FLOAT RPY1 = m_RFY2 * PY1;
-	FLOAT RPY2 = m_RFY2 * PY2;
-	if (!Frame->Viewport->IsOrtho()) {
-		RPX1 *= Z;
-		RPX2 *= Z;
-		RPY1 *= Z;
-		RPY2 *= Z;
-	}
+	FLOAT RPX1 = X;
+	FLOAT RPX2 = X + XL;
+	FLOAT RPY1 = Y;
+	FLOAT RPY2 = Y + YL;
+
+	//float ndcX = (2.0f * X / Frame->FX) - 1.0f;
+	//float ndcY = 1.0f - (2.0f * Y / Frame->FY);
+	//float ndcXL = 2.0f * XL / Frame->FX;
+	//float ndcYL = 2.0f * YL / Frame->FY;
+
+	//FLOAT RPX1 = ndcX;
+	//FLOAT RPX2 = ndcX + ndcXL;
+	//FLOAT RPY1 = ndcY;
+	//FLOAT RPY2 = ndcY + ndcYL;
+
+	//FLOAT RPX1 = m_RFX2 * PX1;
+	//FLOAT RPX2 = m_RFX2 * PX2;
+	//FLOAT RPY1 = m_RFY2 * PY1;
+	//FLOAT RPY2 = m_RFY2 * PY2;
+	//if (!Frame->Viewport->IsOrtho()) {
+	//	RPX1 *= Z;
+	//	RPX2 *= Z;
+	//	RPY1 *= Z;
+	//	RPY2 *= Z;
+	//}
+
+	Z = 0.5f;
 
 	//Hit select path
 	if (m_HitData) {
@@ -4336,160 +4469,6 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 	unguard;
 }
 
-#include <unordered_map>
-#include <unordered_set>
-
-template <typename T>
-class UniqueValueArray {
-public:
-	bool insert(int index, T value) {
-		auto result = unique_values.insert(value);
-		value_map[index] = const_cast<T*>(&(*result.first));
-		return result.second;
-	}
-
-	T& at(int index) {
-		auto it = value_map.find(index);
-		if (it == value_map.end()) {
-			throw std::out_of_range("Invalid index");
-		} else {
-			return *it->second;
-		}
-	}
-
-	bool has(int index) {
-		return value_map.find(index) != value_map.end();
-	}
-
-	int getIndex(T value) {
-		for (auto pair : value_map) {
-			if (*pair.second == value) {
-				return pair.first;
-			}
-		}
-		return -1;
-	}
-
-	auto begin() {
-		return unique_values.begin();
-	}
-
-	auto end() {
-		return unique_values.end();
-	}
-
-private:
-	std::unordered_map<int, T*> value_map;
-	std::unordered_set<T> unique_values;
-};
-
-static D3DCOLORVALUE hsvToRgb(unsigned char h, unsigned char s, unsigned char v) {
-	float H = h / 255.0f;
-	float S = s / 255.0f;
-	float V = v / 255.0f;
-
-	float C = V * S;
-	float X = C * (1 - std::abs(fmod(H * 6, 2) - 1));
-	float m = V - C;
-
-	D3DCOLORVALUE rgbColor;
-
-	if (0 <= H && H < 1 / 6.0) {
-		rgbColor.r = C; rgbColor.g = X; rgbColor.b = 0;
-	}
-	else if (1 / 6.0 <= H && H < 2 / 6.0) {
-		rgbColor.r = X; rgbColor.g = C; rgbColor.b = 0;
-	}
-	else if (2 / 6.0 <= H && H < 3 / 6.0) {
-		rgbColor.r = 0; rgbColor.g = C; rgbColor.b = X;
-	}
-	else if (3 / 6.0 <= H && H < 4 / 6.0) {
-		rgbColor.r = 0; rgbColor.g = X; rgbColor.b = C;
-	}
-	else if (4 / 6.0 <= H && H < 5 / 6.0) {
-		rgbColor.r = X; rgbColor.g = 0; rgbColor.b = C;
-	}
-	else {
-		rgbColor.r = C; rgbColor.g = 0; rgbColor.b = X;
-	}
-
-	rgbColor.r += m;
-	rgbColor.g += m;
-	rgbColor.b += m;
-
-	// Set alpha value to maximum
-	rgbColor.a = 1.0f;
-
-	return rgbColor;
-}
-
-static DirectX::FXMVECTOR FVecToDXVec(const FVector& vec) {
-	return DirectX::XMVectorSet(vec.X, vec.Y, vec.Z, 0.0f);
-}
-
-#define rotConvert(integer) (((float)integer) / ((float)MAXWORD) * (PI * 2))
-
-static DirectX::FXMVECTOR FRotToDXQuat(const FRotator& rot) {
-	return DirectX::XMQuaternionRotationRollPitchYaw(
-		rotConvert(rot.Pitch),
-		rotConvert(rot.Roll),
-		rotConvert(rot.Yaw)
-	);
-}
-
-static DirectX::FXMMATRIX FRotToDXRotMat(const FRotator& rot) {
-	using namespace DirectX;
-	XMMATRIX mat = XMMatrixIdentity();
-	mat *= XMMatrixRotationRollPitchYaw(-rotConvert(rot.Roll), 0, 0);
-	mat *= XMMatrixRotationRollPitchYaw(0, -rotConvert(rot.Pitch), 0);
-	mat *= XMMatrixRotationRollPitchYaw(0, 0, rotConvert(rot.Yaw));
-	return mat;
-}
-
-static D3DMATRIX FCoordToDXMat(const FCoords& coord) {
-	D3DMATRIX mat = {
-		coord.XAxis.X, coord.YAxis.X, coord.ZAxis.X, 0,
-		coord.XAxis.Y, coord.YAxis.Y, coord.ZAxis.Y, 0,
-		coord.XAxis.Z, coord.YAxis.Z, coord.ZAxis.Z, 0,
-		coord.Origin.X, coord.Origin.Y, coord.Origin.Z, 1.0f
-	};
-	return mat;
-}
-
-template <>
-struct std::hash<FVector> {
-	std::size_t operator()(const FVector& t) const {
-		std::size_t seed = 0;
-		seed ^= std::hash<FLOAT>()(t.X) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FLOAT>()(t.Y) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FLOAT>()(t.Z) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		return seed;
-	}
-};
-
-template <>
-struct std::hash<FTextureInfo> {
-	std::size_t operator()(const FTextureInfo& t) const {
-		std::size_t seed = 0;
-		seed ^= std::hash<UTexture*>()(t.Texture) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.LOD) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.NumMips) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FVector>()(t.Pan) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<QWORD>()(t.CacheID) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<QWORD>()(t.PaletteCacheID) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.UClamp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.USize) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FLOAT>()(t.UScale) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.VClamp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.VSize) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FLOAT>()(t.VScale) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		return seed;
-	}
-};
-
-bool operator==(const FTextureInfo& lhs, const FTextureInfo& rhs) {
-	return std::hash<FTextureInfo>()(lhs) == std::hash<FTextureInfo>()(rhs);
-}
 
 void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 	using namespace DirectX;
@@ -4505,9 +4484,7 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 
 	D3DMATRIX actorMatrix;
 	FXMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
-	//FXMMATRIX matRot = XMMatrixRotationQuaternion(FRotToDXQuat(actor->Rotation));
 	FXMMATRIX matRot = FRotToDXRotMat(actor->Rotation);
-	//FXMMATRIX matRot = XMMatrixRotationRollPitchYaw(rotConvert(actor->Rotation.Roll), rotConvert(actor->Rotation.Pitch), -rotConvert(actor->Rotation.Yaw));
 	FXMMATRIX matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
 
 	XMMATRIX mat = XMMatrixIdentity();
@@ -4602,6 +4579,7 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 		if (!(points[0].Flags & points[1].Flags & points[2].Flags)) {
 			if ((polyFlags & (PF_TwoSided | PF_Flat | PF_Invisible)) != (PF_Flat)) {
 				
+				if (!texInfos.has(texIdx)) continue;
 				FTextureInfo* texInfo = &texInfos.at(texIdx);
 				if (!texInfo->Texture) {
 					continue;
@@ -4688,36 +4666,7 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 
 	EndBuffering();
 	SetDefaultAAState();
-	SetDefaultProjectionState();
-
-	D3DMATRIX oldView;
-	m_d3dDevice->GetTransform(D3DTS_VIEW, &oldView);
-	D3DMATRIX oldProj;
-	m_d3dDevice->GetTransform(D3DTS_PROJECTION, &oldProj);
-	using namespace DirectX;
-	float aspect = (float)m_sceneNodeX / (float)m_sceneNodeY;
-	float fov = Viewport->Actor->FovAngle * PI / 180.0f;
-	fov = 2.0 * atan(tan(fov * 0.5) / aspect);
-	D3DMATRIX proj = reinterpret_cast<D3DMATRIX&>(
-		XMMatrixPerspectiveFovLH(fov, aspect, 0.5f, 65536.0f)
-	);
-
-	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &proj);
-
-	FCoords coord = FCoords(currentFrame->Coords);
-	FVector origin = coord.Origin;
-	FVector forward =  FVector(0.0f, 0.0f, 1.0f).TransformVectorBy(currentFrame->Uncoords);
-	FVector up = FVector(0.0f, -1.0f, 0.0f).TransformVectorBy(currentFrame->Uncoords);
-
-	D3DMATRIX view = reinterpret_cast<D3DMATRIX&>(
-		XMMatrixLookToLH(
-			XMVectorSet(origin.X, origin.Y, origin.Z, 0.f),
-			XMVectorSet(forward.X, forward.Y, forward.Z, 0.0f),
-			XMVectorSet(up.X, up.Y, up.Z, 0.0f)
-		)
-	);
-
-	m_d3dDevice->SetTransform(D3DTS_VIEW, &view);
+	//SetDefaultProjectionState();
 
 	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, TRUE);
 
@@ -4741,19 +4690,6 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 		}
 	}
 	//assert(lightCount <= m_d3dCaps.MaxActiveLights);
-
-	/*for (int i = 0; i < staticBspInfo.Level->Actors.Num(); i++) {
-		AActor* actor = staticBspInfo.Level->Actors(i);
-		if (!actor || actor->bHidden || actor == currentFrame->Viewport->Actor)
-			continue;
-		if (actor->DrawType == DT_Mesh)
-			renderActor(currentFrame, actor);
-	}*/
-
-	for (FDynamicSprite* sprite = currentFrame->Sprite; sprite; sprite = sprite->RenderNext) {
-		renderActor(currentFrame, sprite->Actor);
-	}
-	m_d3dDevice->SetTransform(D3DTS_WORLD, (D3DMATRIX*)&DirectX::XMMatrixIdentity());
 
 	typedef std::tuple<UTexture*, DWORD> SurfKey;
 	std::map<SurfKey, std::vector<FTransTexture>> surfaceMap{};
@@ -4794,8 +4730,6 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 		texture->Unlock(texInfo);
 	}
 
-	m_d3dDevice->SetTransform(D3DTS_VIEW, &oldView);
-	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &oldProj);
 	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, FALSE);
 
 	unguard;
@@ -4841,14 +4775,6 @@ INT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FTransTex
 
 	return Index;
 }
-
-void UD3D9RenderDevice::DrawStaticBspNode(INT iNode, FSurfaceInfo& Surface) {
-	OutputDebugStringW(L"DrawStaticBspNode()!\n");
-};
-
-void UD3D9RenderDevice::DrawStaticBspSurf(INT iSurf, FSurfaceInfo& Surface) {
-	OutputDebugStringW(L"DrawStaticBspSurf()!\n");
-};
 
 void UD3D9RenderDevice::ClearZ(FSceneNode* Frame) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
@@ -7577,7 +7503,8 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 		}
 		FTransform** pPts = &Poly->Pts[0];
 		do {
-			const FVector& Point = (*pPts++)->Point;//.TransformPointBy(currentFrame->Uncoords);
+			const FVector& Point = (*pPts++)->Point;
+			//FVector transPoint = Point.TransformPointBy(currentFrame->Uncoords);
 
 			pMapDot->u = (Facet.MapCoords.XAxis | Point) - m_csUDot;
 			pMapDot->v = (Facet.MapCoords.YAxis | Point) - m_csVDot;
@@ -7801,6 +7728,60 @@ void UD3D9RenderDevice::EndPointBufferingNoCheck(void) {
 
 	//Advance vertex buffer position
 	m_curVertexBufferPos += m_bufferedVerts;
+}
+
+static const D3DMATRIX identityMatrix = reinterpret_cast<D3DMATRIX&>(DirectX::XMMatrixIdentity());
+
+void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
+	dout << "startWorldDraw" << std::endl;
+	using namespace DirectX;
+	//D3DMATRIX oldView;
+	//m_d3dDevice->GetTransform(D3DTS_VIEW, &oldView);
+	//D3DMATRIX oldProj;
+	//m_d3dDevice->GetTransform(D3DTS_PROJECTION, &oldProj);
+
+	// Setup projection and view matrices for current frame
+	float aspect = frame->FX / frame->FY;
+	float fov = Viewport->Actor->FovAngle * PI / 180.0f;
+	fov = 2.0 * atan(tan(fov * 0.5) / aspect);
+	D3DMATRIX proj = reinterpret_cast<D3DMATRIX&>(
+		XMMatrixPerspectiveFovLH(fov, aspect, 0.5f, 65536.0f)
+		);
+
+	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &proj);
+
+	FCoords coord = FCoords(frame->Coords);
+	FVector origin = coord.Origin;
+	FVector forward = FVector(0.0f, 0.0f, 1.0f).TransformVectorBy(coord.Inverse());
+	FVector up = FVector(0.0f, -1.0f, 0.0f).TransformVectorBy(coord.Inverse());
+
+	D3DMATRIX view = reinterpret_cast<D3DMATRIX&>(
+		XMMatrixLookToLH(
+			XMVectorSet(origin.X, origin.Y, origin.Z, 0.0f),
+			XMVectorSet(forward.X, forward.Y, forward.Z, 0.0f),
+			XMVectorSet(up.X, up.Y, up.Z, 0.0f)
+		)
+		);
+
+	m_d3dDevice->SetTransform(D3DTS_VIEW, &view);
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
+	m_d3dDevice->SetRenderState(D3DRS_ZENABLE, D3DZB_TRUE);
+}
+
+
+void UD3D9RenderDevice::endWorldDraw(FSceneNode* frame) {
+	dout << "endWorldDraw" << std::endl;
+	using namespace DirectX;
+	//m_d3dDevice->SetTransform(D3DTS_VIEW, &oldView);
+	//m_d3dDevice->SetTransform(D3DTS_PROJECTION, &oldProj);
+
+	// World drawing finished, setup for ui
+	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &reinterpret_cast<D3DMATRIX&>(
+		XMMatrixOrthographicOffCenterLH(0.0f, frame->FX, frame->FY, 0.0f, 0.1f, 1.0f)
+	));
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
+	m_d3dDevice->SetTransform(D3DTS_VIEW, &identityMatrix);
+	m_d3dDevice->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
 }
 
 

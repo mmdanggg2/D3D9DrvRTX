@@ -1167,8 +1167,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FLOAT X1, FLOAT Y1, FLOAT X2, FLOAT Y2, FLOAT Z);
 	
 	void SetStaticBsp(FStaticBspInfoBase& StaticBspInfo) override;
-	void DrawStaticBspNode(INT iNode, FSurfaceInfo& Surface) override;
-	void DrawStaticBspSurf(INT iSurf, FSurfaceInfo& Surface) override;
 
 	void renderActor(FSceneNode* frame, AActor* actor);
 
@@ -1495,6 +1493,9 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void FASTCALL DrawDetailTexture(FTextureInfo &, bool);
 
 	void FASTCALL BufferAdditionalClippedVerts(FTransTexture** Pts, INT NumPts);
+
+	void startWorldDraw(FSceneNode* frame);
+	void endWorldDraw(FSceneNode* frame);
 };
 
 #if __STATIC_LINK

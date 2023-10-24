@@ -25,10 +25,17 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		FMemMark DynMark(GDynMem);
 		FMemMark VectorMark(VectorMem);
 		UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
+		d3d9Dev->startWorldDraw(frame);
 		OccludeFrame(frame);
+		//OccludeBsp(frame);
 		FStaticBspInfoBase staticBsp = FStaticBspInfoBase(frame->Level);
 		d3d9Dev->currentFrame = frame;
 		d3d9Dev->SetStaticBsp(staticBsp);
+
+		for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
+			d3d9Dev->renderActor(frame, sprite->Actor);
+		}
+		d3d9Dev->endWorldDraw(frame);
 		MemMark.Pop();
 		DynMark.Pop();
 		SceneMark.Pop();
