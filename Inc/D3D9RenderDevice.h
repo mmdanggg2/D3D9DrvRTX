@@ -1169,6 +1169,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void SetStaticBsp(FStaticBspInfoBase& StaticBspInfo) override;
 
 	void renderActor(FSceneNode* frame, AActor* actor);
+	void renderLights(FSceneNode* frame);
 
 	void ClearZ(FSceneNode* Frame);
 	void PushHit(const BYTE* Data, INT Count);

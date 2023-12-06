@@ -130,6 +130,7 @@ static const D3DVERTEXELEMENT9 g_twoColorSingleTextureStreamDef[] = {
 
 #include <unordered_map>
 #include <unordered_set>
+#include <deque>
 
 template <typename T>
 class UniqueValueArray {
@@ -2762,7 +2763,8 @@ void UD3D9RenderDevice::SetSceneNode(FSceneNode* Frame) {
 #endif
 	guard(UD3D9RenderDevice::SetSceneNode);
 
-	this->currentFrame = Frame;
+	//this->currentFrame = Frame;
+	//m_d3dDevice->SetTransform(D3DTS_VIEW, &FCoordToDXMat(Frame->Uncoords));
 
 	EndBuffering();		// Flush vertex array before changing the projection matrix!
 
@@ -2803,15 +2805,15 @@ void UD3D9RenderDevice::SetSceneNode(FSceneNode* Frame) {
 	}
 
 	// Set projection.
-	if (Frame->Viewport->IsOrtho()) {
-		//Don't use Z range hack if ortho projection
-		m_useZRangeHack = false;
+	//if (Frame->Viewport->IsOrtho()) {
+	//	//Don't use Z range hack if ortho projection
+	//	m_useZRangeHack = false;
 
-		SetOrthoProjection();
-	}
-	else {
-		SetProjectionStateNoCheck(false);
-	}
+	//	SetOrthoProjection();
+	//}
+	//else {
+	//	SetProjectionStateNoCheck(false);
+	//}
 
 	//Set clip planes if doing selection
 	if (m_HitData) {
@@ -3158,18 +3160,6 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 			drawDetailTexture = false;
 		}
 	}
-	
-	//FCoords coord = Frame->Uncoords;
-	//D3DMATRIX view = FCoordToDXMat(Frame->Uncoords);
-
-	//D3DMATRIX view = reinterpret_cast<D3DMATRIX&>(DirectX::XMMatrixLookAtRH(
-	//		DirectX::XMVectorSet(200.f, 200.f, 200.f, 0.f),
-	//		DirectX::g_XMZero,
-	//		DirectX::XMVectorSet(0, 0, 1, 0)
-	//	)
-	//);
-
-	//m_d3dDevice->SetTransform(D3DTS_VIEW, &view);
 
 	DWORD PolyFlags = Surface.PolyFlags;
 
@@ -4482,19 +4472,6 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 
 	//dout << "rendering actor " << actor->GetName() << std::endl;
 
-	D3DMATRIX actorMatrix;
-	FXMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
-	FXMMATRIX matRot = FRotToDXRotMat(actor->Rotation);
-	FXMMATRIX matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
-
-	XMMATRIX mat = XMMatrixIdentity();
-	mat *= matScale;
-	mat *= matRot;
-	mat *= matLoc;
-	actorMatrix = reinterpret_cast<D3DMATRIX&>(mat);
-
-	m_d3dDevice->SetTransform(D3DTS_WORLD, &actorMatrix);
-
 	// The old switcheroo, trick the game to not transform the mesh verts to object position
 	FVector origLoc = actor->Location;
 	FVector origPrePiv = actor->PrePivot;
@@ -4545,8 +4522,18 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 		}
 	}
 
-	typedef std::tuple<FTextureInfo*, DWORD> SurfKey;
-	std::map<SurfKey, std::vector<FTransTexture>> surfaceMap{};
+	typedef std::pair<FTextureInfo*, DWORD> SurfKey;
+	struct SK_Hash {
+		std::size_t operator () (const SurfKey& p) const {
+			auto ptr_hash = std::hash<FTextureInfo*>{}(p.first);
+			auto dword_hash = std::hash<DWORD>{}(p.second);
+
+			return ptr_hash ^ (dword_hash << 1);  // Shift dword_hash to ensure the upper bits are also involved in the final hash
+		}
+	};
+
+	std::unordered_map<SurfKey, std::vector<FTransTexture>, SK_Hash> surfaceMap;
+	surfaceMap.reserve(1000);
 
 	for (INT i = 0; i < numTris; i++) {
 		FTransTexture points[3];
@@ -4592,10 +4579,33 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 					vert.U = triUV[j].U * scaleU;
 					vert.V = triUV[j].V * scaleV;
 
-					surfaceMap[std::make_tuple(texInfo, polyFlags)].push_back(vert);
+					surfaceMap[SurfKey(texInfo, polyFlags)].push_back(vert);
 				}
 			}
 		}
+	}
+
+	FXMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
+	FXMMATRIX matRot = FRotToDXRotMat(actor->Rotation);
+	FXMMATRIX matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
+
+	XMMATRIX mat = XMMatrixIdentity();
+	mat *= matScale;
+	mat *= matRot;
+	mat *= matLoc;
+	D3DMATRIX actorMatrix = reinterpret_cast<D3DMATRIX&>(mat);
+
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &actorMatrix);
+
+	bool isViewModel = GUglyHackFlags & 0x1;
+
+	D3DVIEWPORT9 vpPrev;
+	if (isViewModel) {
+		D3DVIEWPORT9 vp;
+		m_d3dDevice->GetViewport(&vp);
+		vpPrev = vp;
+		vp.MaxZ = 0.1f;
+		m_d3dDevice->SetViewport(&vp);
 	}
 	
 	for (std::pair<SurfKey, std::vector<FTransTexture>> entry : surfaceMap) {
@@ -4616,12 +4626,119 @@ void UD3D9RenderDevice::renderActor(FSceneNode* frame, AActor* actor) {
 		RenderPasses();
 	}
 
+	if (isViewModel) {
+		m_d3dDevice->SetViewport(&vpPrev);
+	}
+
 	for (UTexture* tex : textures) {
 		if (!tex)
 			continue;
 		tex->Unlock(texInfos.at(textures.getIndex(tex)));
 	}
 
+	unguard;
+}
+
+class LightSlots {
+private:
+	std::unordered_map<AActor*, int> actorSlots;
+	std::deque<int> availableSlots;
+
+public:
+	LightSlots(int numSlots) {
+		actorSlots.reserve(numSlots);
+		for (int i = 0; i < numSlots; ++i) {
+			availableSlots.push_back(i);
+		}
+	}
+
+	// Updates which actors are in the slots, returns a set of slots that are no longer used
+	std::unordered_set<int> updateActors(const std::vector<AActor*>& actors) {
+		ods_stream dout;
+		std::unordered_set<int> unsetSlots;
+		// First, deactivate the slots of any actors that have been removed
+		for (auto it = actorSlots.begin(); it != actorSlots.end(); ) {
+			if (std::find(actors.begin(), actors.end(), it->first) == actors.end()) {
+				// This actor has been removed
+				const int slot = it->second;
+				availableSlots.push_front(slot);
+				unsetSlots.insert(slot);
+				dout << L"Slot " << slot << L" actor deleted" << std::endl;
+				it = actorSlots.erase(it);
+			} else {
+				++it;
+			}
+		}
+
+		// Now, add any new actors
+		for (AActor* actor : actors) {
+			if (actorSlots.find(actor) == actorSlots.end()) {
+				// This is a new actor
+				if (availableSlots.empty()) {
+					throw std::runtime_error("No available slots");
+				}
+				int slot = availableSlots.front();
+				availableSlots.pop_front();
+				actorSlots[actor] = slot;
+				unsetSlots.erase(slot);
+				dout << L"Slot " << slot << L" actor added " << actor->GetName() << std::endl;
+			}
+		}
+		return unsetSlots;
+	}
+
+	const std::deque<int> unusedSlots() {
+		return availableSlots;
+	}
+
+	const std::unordered_map<AActor*, int> slotMap() {
+		return actorSlots;
+	}
+};
+
+void UD3D9RenderDevice::renderLights(FSceneNode* frame) {
+	guard(UD3D9RenderDevice::renderLights);
+	static LightSlots slots(1000);
+
+	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, TRUE);
+
+	std::vector<AActor*> lightActors;
+	lightActors.reserve(1000);
+	for (int i = 0; i < frame->Level->Actors.Num(); i++) {
+		AActor* actor = frame->Level->Actors(i);
+		if (actor && actor->LightType != LT_None) {
+			lightActors.push_back(actor);
+		}
+	}
+	//assert(lightCount <= m_d3dCaps.MaxActiveLights);
+
+	std::unordered_set<int> nowEmptySlots = slots.updateActors(lightActors);
+
+	for (int slot : nowEmptySlots) {
+		dout << L"Disabling slot " << slot << std::endl;
+		D3DLIGHT9 lightInfo{ D3DLIGHT_POINT };
+		HRESULT res = m_d3dDevice->SetLight(slot, &lightInfo);
+		assert(res == D3D_OK);
+		res = m_d3dDevice->LightEnable(slot, false);
+		assert(res == D3D_OK);
+	}
+
+	for (auto pair : slots.slotMap()) {
+		AActor* actor = pair.first;
+		int slot = pair.second;
+		D3DLIGHT9 lightInfo = D3DLIGHT9();
+		lightInfo.Type = D3DLIGHT_POINT;
+		lightInfo.Position = D3DVECTOR{ actor->Location.X, actor->Location.Y, actor->Location.Z };
+		lightInfo.Diffuse = hsvToRgb(actor->LightHue, 0xFFu - actor->LightSaturation, actor->LightBrightness);
+		lightInfo.Specular = lightInfo.Diffuse;
+		lightInfo.Range = 1000;
+		HRESULT res = m_d3dDevice->SetLight(slot, &lightInfo);
+		assert(res == D3D_OK);
+		res = m_d3dDevice->LightEnable(slot, true);
+		assert(res == D3D_OK);
+	}
+
+	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, FALSE);
 	unguard;
 }
 
@@ -4640,24 +4757,6 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 	if ( GIsEditor )
 		return;
 
-	static int lightCount;
-	if (staticBspInfo.SourceGeometryChanged) {
-		dout << "StaticBspInfo changed!" << std::endl;
-		staticBspInfo.SourceGeometryChanged = 0;
-		for (int i = 0; i < lightCount; i++) {
-			D3DLIGHT9 light = D3DLIGHT9();
-			light.Type = D3DLIGHT_POINT;
-			light.Position = D3DVECTOR{ 0, 0, 0 };
-			light.Diffuse = D3DCOLORVALUE{ 0, 255, 255, 0 };
-			light.Specular = light.Diffuse;
-			light.Range = 0;
-			HRESULT res = m_d3dDevice->SetLight(i, &light);
-			assert(res == D3D_OK);
-			res = m_d3dDevice->LightEnable(i, false);
-			assert(res == D3D_OK);
-		}
-	}
-
 	staticBspInfo.ComputeStaticGeometry( EStaticBspMode::STATIC_BSP_PerSurf );
 
 	// This render device prefers precalculated light/atlas UV's
@@ -4668,30 +4767,7 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 	SetDefaultAAState();
 	//SetDefaultProjectionState();
 
-	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, TRUE);
-
-	lightCount = 0;
-
-	for (int i = 0; i < staticBspInfo.Level->Actors.Num(); i++) {
-		AActor* actor = staticBspInfo.Level->Actors(i);
-		if (actor && actor->IsA(ALight::StaticClass())) {
-			ALight* light = (ALight*)actor;
-			D3DLIGHT9 lightInfo = D3DLIGHT9();
-			lightInfo.Type = D3DLIGHT_POINT;
-			lightInfo.Position = D3DVECTOR{ light->Location.X, light->Location.Y, light->Location.Z };
-			lightInfo.Diffuse = hsvToRgb(light->LightHue, 0xFF - light->LightSaturation, light->LightBrightness);
-			lightInfo.Specular = lightInfo.Diffuse;
-			lightInfo.Range = 1000;
-			HRESULT res = m_d3dDevice->SetLight(i, &lightInfo);
-			assert(res == D3D_OK);
-			res = m_d3dDevice->LightEnable(i, true);
-			assert(res == D3D_OK);
-			lightCount++;
-		}
-	}
-	//assert(lightCount <= m_d3dCaps.MaxActiveLights);
-
-	typedef std::tuple<UTexture*, DWORD> SurfKey;
+	typedef std::pair<UTexture*, DWORD> SurfKey;
 	std::map<SurfKey, std::vector<FTransTexture>> surfaceMap{};
 	for (int i = 0; i < staticBspInfo.SurfList.Num(); i++) {
 		FStaticBspSurf surface = staticBspInfo.SurfList(i);
@@ -4703,7 +4779,7 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 			vertex.Point = bspVert.Point;
 			vertex.U = bspVert.TextureU + surface.PanU;
 			vertex.V = bspVert.TextureV + surface.PanV;
-			surfaceMap[std::make_tuple(surface.Texture, surface.PolyFlags)].push_back(vertex);
+			surfaceMap[SurfKey(surface.Texture, surface.PolyFlags)].push_back(vertex);
 		}
 	}
 
@@ -4729,8 +4805,6 @@ void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
 
 		texture->Unlock(texInfo);
 	}
-
-	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, FALSE);
 
 	unguard;
 }
@@ -6929,10 +7003,10 @@ void UD3D9RenderDevice::RenderPassesExec(void) {
 	m_rpForceSingle = true;
 
 
-	for (INT PolyNum = 0; PolyNum < m_csPolyCount; PolyNum++) {
-		assert(MultiDrawCountArray[PolyNum] == 3);
-		//m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos + MultiDrawFirstArray[PolyNum], MultiDrawCountArray[PolyNum] - 2);
-	}
+	//for (INT PolyNum = 0; PolyNum < m_csPolyCount; PolyNum++) {
+	//	assert(MultiDrawCountArray[PolyNum] == 3);
+	//	//m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos + MultiDrawFirstArray[PolyNum], MultiDrawCountArray[PolyNum] - 2);
+	//}
 	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, m_curVertexBufferPos, m_csPolyCount);
 
 #ifdef UTGLR_DEBUG_WORLD_WIREFRAME
@@ -7486,35 +7560,58 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 	FGLMapDot* pMapDot = &MapDotArray[0];
 	FGLVertex* pVertex = &m_csVertexArray[0];
 	for (FSavedPoly* Poly = Facet.Polys; Poly; Poly = Poly->Next) {
-		//Skip if no points
+		//Skip if not enough points
 		INT NumPts = Poly->NumPts;
-		if (NumPts <= 0) {
+		if (NumPts <= 2) {
 			continue;
 		}
+		INT numPolys = NumPts - 2;
 
 		DWORD csPolyCount = m_csPolyCount;
-		MultiDrawFirstArray[csPolyCount] = Index;
-		MultiDrawCountArray[csPolyCount] = NumPts;
-		m_csPolyCount = csPolyCount + 1;
+		//MultiDrawFirstArray[csPolyCount] = Index;
+		// Adjust the count to account for the conversion from fan to list
+		//MultiDrawCountArray[csPolyCount] = (NumPts - 2) * 3;
+		m_csPolyCount = csPolyCount + numPolys;
 
-		Index += NumPts;
+		Index += numPolys * 3;
 		if (Index > VERTEX_ARRAY_SIZE) {
 			return 0;
 		}
 		FTransform** pPts = &Poly->Pts[0];
+		const FVector& hubPoint = (*pPts++)->Point;
+		FVector& secondPoint = (*pPts++)->Point;
 		do {
-			const FVector& Point = (*pPts++)->Point;
-			//FVector transPoint = Point.TransformPointBy(currentFrame->Uncoords);
+			const FVector& point = (*pPts++)->Point;
 
-			pMapDot->u = (Facet.MapCoords.XAxis | Point) - m_csUDot;
-			pMapDot->v = (Facet.MapCoords.YAxis | Point) - m_csVDot;
+			pMapDot->u = (Facet.MapCoords.XAxis | hubPoint) - m_csUDot;
+			pMapDot->v = (Facet.MapCoords.YAxis | hubPoint) - m_csVDot;
 			pMapDot++;
 
-			pVertex->x = Point.X;
-			pVertex->y = Point.Y;
-			pVertex->z = Point.Z;
+			pVertex->x = hubPoint.X;
+			pVertex->y = hubPoint.Y;
+			pVertex->z = hubPoint.Z;
 			pVertex++;
-		} while (--NumPts != 0);
+
+			pMapDot->u = (Facet.MapCoords.XAxis | secondPoint) - m_csUDot;
+			pMapDot->v = (Facet.MapCoords.YAxis | secondPoint) - m_csVDot;
+			pMapDot++;
+
+			pVertex->x = secondPoint.X;
+			pVertex->y = secondPoint.Y;
+			pVertex->z = secondPoint.Z;
+			pVertex++;
+
+			pMapDot->u = (Facet.MapCoords.XAxis | point) - m_csUDot;
+			pMapDot->v = (Facet.MapCoords.YAxis | point) - m_csVDot;
+			pMapDot++;
+
+			pVertex->x = point.X;
+			pVertex->y = point.Y;
+			pVertex->z = point.Z;
+			pVertex++;
+
+			secondPoint = point;
+		} while (--numPolys != 0);
 	}
 
 	return Index;
@@ -7733,8 +7830,9 @@ void UD3D9RenderDevice::EndPointBufferingNoCheck(void) {
 static const D3DMATRIX identityMatrix = reinterpret_cast<D3DMATRIX&>(DirectX::XMMatrixIdentity());
 
 void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
-	dout << "startWorldDraw" << std::endl;
+	//dout << "startWorldDraw" << std::endl;
 	using namespace DirectX;
+	this->currentFrame = frame;
 	//D3DMATRIX oldView;
 	//m_d3dDevice->GetTransform(D3DTS_VIEW, &oldView);
 	//D3DMATRIX oldProj;
@@ -7750,10 +7848,9 @@ void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 
 	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &proj);
 
-	FCoords coord = FCoords(frame->Coords);
-	FVector origin = coord.Origin;
-	FVector forward = FVector(0.0f, 0.0f, 1.0f).TransformVectorBy(coord.Inverse());
-	FVector up = FVector(0.0f, -1.0f, 0.0f).TransformVectorBy(coord.Inverse());
+	FVector origin = frame->Coords.Origin;
+	FVector forward = FVector(0.0f, 0.0f, 1.0f).TransformVectorBy(frame->Uncoords);
+	FVector up = FVector(0.0f, -1.0f, 0.0f).TransformVectorBy(frame->Uncoords);
 
 	D3DMATRIX view = reinterpret_cast<D3DMATRIX&>(
 		XMMatrixLookToLH(
@@ -7761,7 +7858,7 @@ void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 			XMVectorSet(forward.X, forward.Y, forward.Z, 0.0f),
 			XMVectorSet(up.X, up.Y, up.Z, 0.0f)
 		)
-		);
+	);
 
 	m_d3dDevice->SetTransform(D3DTS_VIEW, &view);
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
@@ -7770,14 +7867,14 @@ void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 
 
 void UD3D9RenderDevice::endWorldDraw(FSceneNode* frame) {
-	dout << "endWorldDraw" << std::endl;
+	//dout << "endWorldDraw" << std::endl;
 	using namespace DirectX;
 	//m_d3dDevice->SetTransform(D3DTS_VIEW, &oldView);
 	//m_d3dDevice->SetTransform(D3DTS_PROJECTION, &oldProj);
 
 	// World drawing finished, setup for ui
 	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &reinterpret_cast<D3DMATRIX&>(
-		XMMatrixOrthographicOffCenterLH(0.0f, frame->FX, frame->FY, 0.0f, 0.1f, 1.0f)
+		XMMatrixOrthographicOffCenterLH(0.5f, frame->FX+0.5, frame->FY+0.5, 0.5f, 0.1f, 1.0f)
 	));
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
 	m_d3dDevice->SetTransform(D3DTS_VIEW, &identityMatrix);
