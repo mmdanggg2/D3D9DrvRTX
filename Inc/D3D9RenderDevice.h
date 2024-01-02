@@ -158,7 +158,7 @@ typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
 #define MAX_TMUNITS			4		// vogel: maximum number of texture mapping units supported
 
 //Must be at least 2000
-#define VERTEX_ARRAY_SIZE	100000	// vogel: better safe than sorry
+#define VERTEX_ARRAY_SIZE	5000	// vogel: better safe than sorry
 
 
 /*-----------------------------------------------------------------------------
@@ -1160,8 +1160,10 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2);
 	void Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FLOAT X1, FLOAT Y1, FLOAT X2, FLOAT Y2, FLOAT Z);
 
-	void renderActor(FSceneNode* frame, AActor* actor);
-	void renderLights(FSceneNode* frame);
+	void renderSprite(FSceneNode* frame, AActor* actor);
+	void renderMeshActor(FSceneNode* frame, AActor* actor);
+	void renderMover(FSceneNode* frame, AMover* mover);
+	void renderLights(std::vector<AActor*> lightActors);
 
 	void ClearZ(FSceneNode* Frame);
 	void PushHit(const BYTE* Data, INT Count);

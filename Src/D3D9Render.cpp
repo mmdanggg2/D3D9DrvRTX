@@ -1,6 +1,6 @@
 #include "D3D9Render.h"
 #include "D3D9RenderDevice.h"
-#include <unordered_set>
+#include <unordered_map>
 
 IMPLEMENT_CLASS(UD3D9Render);
 
@@ -33,33 +33,76 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		d3d9Dev->startWorldDraw(frame);
 		OccludeFrame(frame);
 		d3d9Dev->currentFrame = frame;
-		//d3d9Dev->SetStaticBsp(staticBsp);
 
-		//std::unordered_set<int> nodes;
+		std::unordered_map<int, std::vector<int>> surfacePasses[2];
+		surfacePasses[0].reserve(model->Surfs.Num());
+		surfacePasses[1].reserve(model->Surfs.Num());
 
-		for (int pass : { 1, 2 }) {
-			for (FBspDrawList* draw = frame->Draw[pass]; draw; draw = draw->Next) {
-				FBspSurf* surf = &frame->Level->Model->Surfs(draw->iSurf);
+		DWORD flagMask = (viewport->Actor->ShowFlags & SHOW_PlayerCtrl) ? ~0 : ~PF_Invisible;
+		for (int iNode = 0; iNode < model->Nodes.Num(); iNode++) {
+			FBspNode* node = &model->Nodes(iNode);
+			int iSurf = node->iSurf;
+			FBspSurf* surf = &model->Surfs(iSurf);
+			DWORD flags = surf->PolyFlags;
+			if (surf->Texture) {
+				flags |= surf->Texture->PolyFlags;
+			}
+			flags |= viewport->ExtraPolyFlags;
+			flags &= flagMask;
+			surfacePasses[flags & PF_NoOcclude != 0][iSurf].push_back(iNode);
+		}
+
+		for (int pass : { 0, 1 }) {
+			for (const std::pair<const int, std::vector<int>>& surfPair : surfacePasses[pass]) {
+				int iSurf = surfPair.first;
+				const std::vector<int>& nodes = surfPair.second;
+				FBspSurf* surf = &model->Surfs(iSurf);
+				if (surf->Nodes.Num() == 0) { // Must be a mover, skip it!
+					//dout << L"Surf " << iSurf << L" has no nodes!" << std::endl;
+					continue;
+				}
 
 				UTexture* texture = surf->Texture ? surf->Texture->Get(viewport->CurrentTime) : viewport->Actor->Level->DefaultTexture;
+
+				DWORD flags = surf->PolyFlags;
+				flags |= texture->PolyFlags;
+				flags |= viewport->ExtraPolyFlags;
+				flags &= flagMask;
 
 				FLOAT levelTime = frame->Level->GetLevelInfo()->TimeSeconds;
 				FLOAT panU = surf->PanU;
 				FLOAT panV = surf->PanV;
-				if (surf->PolyFlags & PF_AutoUPan) {
-					panU += ((INT)(levelTime * 35.f * draw->Zone->TexUPanSpeed * 256.0) & 0x3ffff) / 256.0;
+				if (flags & PF_AutoUPan || flags & PF_AutoVPan) {
+					AZoneInfo* zone = nullptr;
+					for (int iNode : nodes) {
+						FBspNode* node = &model->Nodes(iNode);
+						FZoneProperties& zoneProps = model->Zones[node->iZone[0]];
+						if (zoneProps.ZoneActor) {
+							zone = zoneProps.ZoneActor;
+							break;
+						}
+						zoneProps = model->Zones[node->iZone[1]];
+						if (zoneProps.ZoneActor) {
+							zone = zoneProps.ZoneActor;
+							break;
+						}
+
+					}
+					if (flags & PF_AutoUPan) {
+						panU += ((INT)(levelTime * 35.f * (zone ? zone->TexUPanSpeed : 1.0f) * 256.0) & 0x3ffff) / 256.0;
+					}
+					if (flags & PF_AutoVPan) {
+						panV += ((INT)(levelTime * 35.f * (zone ? zone->TexVPanSpeed : 1.0f) * 256.0) & 0x3ffff) / 256.0;
+					}
 				}
-				if (surf->PolyFlags & PF_AutoVPan) {
-					panV += ((INT)(levelTime * 35.f * draw->Zone->TexVPanSpeed * 256.0) & 0x3ffff) / 256.0;
-				}
-				if (surf->PolyFlags & PF_SmallWavy) {
+				if (flags & PF_SmallWavy) {
 					panU += 8.0 * appSin(levelTime) + 4.0 * appCos(2.3 * levelTime);
 					panV += 8.0 * appCos(levelTime) + 4.0 * appSin(2.3 * levelTime);
 				}
 
 				FSurfaceInfo surface{};
 				surface.Level = frame->Level;
-				surface.PolyFlags = draw->PolyFlags;
+				surface.PolyFlags = flags;
 
 				FTextureInfo textureMap{};
 				texture->Lock(textureMap, viewport->CurrentTime, -1, viewport->RenDev);
@@ -67,13 +110,14 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				surface.Texture = &textureMap;
 
 				FSavedPoly* polyHead = NULL;
-
-				for (int i = 0; i < surf->Nodes.Num(); i++) {
-					FBspNode* node = &frame->Level->Model->Nodes(surf->Nodes(i));
+				//dout << L"Surf " << iSurf << std::endl;
+				for (int iNode : nodes) {
+					//dout << L"\t Node " << iNode << std::endl;
+					FBspNode* node = &model->Nodes(iNode);
 					FSavedPoly* poly = (FSavedPoly*)New<BYTE>(GDynMem, sizeof(FSavedPoly) + node->NumVertices * sizeof(FTransform*));
 					poly->Next = polyHead;
 					polyHead = poly;
-					poly->iNode = draw->iNode;
+					poly->iNode = iNode;
 					poly->NumPts = node->NumVertices;
 
 					for (int j = 0; j < poly->NumPts; j++) {
@@ -86,9 +130,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 				FSurfaceFacet facet{};
 				facet.Polys = polyHead;
-				facet.Span = &draw->Span;
-				facet.MapCoords = FCoords
-				(
+				facet.MapCoords = FCoords(
 					model->Points(surf->pBase),
 					model->Vectors(surf->vTextureU),
 					model->Vectors(surf->vTextureV),
@@ -96,6 +138,8 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				);
 
 				d3d9Dev->DrawComplexSurface(frame, surface, facet);
+
+				texture->Unlock(textureMap);
 			}
 		}
 
@@ -103,8 +147,26 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
 				UBOOL bTranslucent = sprite->Actor && sprite->Actor->Style == STY_Translucent;
 				if ((pass == 2 && bTranslucent) || (pass == 1 && !bTranslucent)) {
-					//DrawActorSprite(frame, sprite);
-					d3d9Dev->renderActor(frame, sprite->Actor);
+					AActor* actor = sprite->Actor;
+					if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
+						d3d9Dev->renderSprite(frame, actor);
+					} else if (actor->DrawType == DT_Mesh) {
+						d3d9Dev->renderMeshActor(frame, actor);
+					}
+				}
+			}
+			for (int iActor = 0; iActor < frame->Level->Actors.Num(); iActor++) {
+				AActor* actor = frame->Level->Actors(iActor);
+				if (actor && actor != viewport->Actor) {
+					if (actor->IsA(AMover::StaticClass()) && pass == 1) {
+						d3d9Dev->renderMover(frame, (AMover*)actor);
+						continue;
+					}
+					//UBOOL bTranslucent = actor && actor->Style == STY_Translucent;
+					//if ((pass == 2 && bTranslucent) || (pass == 1 && !bTranslucent)) {
+					//	//DrawActorSprite(frame, sprite);
+					//	d3d9Dev->renderMeshActor(frame, actor);
+					//}
 				}
 			}
 		}
@@ -118,7 +180,15 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			GUglyHackFlags &= ~1;
 		}
 
-		d3d9Dev->renderLights(frame);
+		std::vector<AActor*> lightActors;
+		lightActors.reserve(frame->Level->Actors.Num());
+		for (int i = 0; i < frame->Level->Actors.Num(); i++) {
+			AActor* actor = frame->Level->Actors(i);
+			if (actor && actor->LightType != LT_None) {
+				lightActors.push_back(actor);
+			}
+		}
+		d3d9Dev->renderLights(lightActors);
 
 		d3d9Dev->endWorldDraw(frame);
 		memMark.Pop();
@@ -136,7 +206,7 @@ void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor) {
 	guard(UD3D9Render::DrawActor);
 	if (GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
 		UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
-		d3d9Dev->renderActor(frame, actor);
+		d3d9Dev->renderMeshActor(frame, actor);
 		//dout << "Drawing actor! " << actor->GetName() << std::endl;
 		return;
 	}
