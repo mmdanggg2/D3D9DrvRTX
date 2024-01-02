@@ -552,10 +552,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	//IsNear bits for detail texturing
 	DWORD DetailTextureIsNearArray[VERTEX_ARRAY_SIZE / 3];
 
-	//First and count arrays for glMultiDrawArrays
-	INT MultiDrawFirstArray[VERTEX_ARRAY_SIZE / 3];
-	INT MultiDrawCountArray[VERTEX_ARRAY_SIZE / 3];
-
 	DWORD m_csPolyCount;
 	INT m_csPtCount;
 
@@ -781,8 +777,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	bool m_rpMasked;
 	bool m_rpSetDepthEqual;
 	DWORD m_rpColor;
-
-	DWORD (FASTCALL UD3D9RenderDevice::*m_pBufferDetailTextureDataProc)(FLOAT);
 
 	// Hit info.
 	BYTE* m_HitData;
@@ -1165,8 +1159,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2);
 	void Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2);
 	void Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FLOAT X1, FLOAT Y1, FLOAT X2, FLOAT Y2, FLOAT Z);
-	
-	void SetStaticBsp(FStaticBspInfoBase& StaticBspInfo) override;
 
 	void renderActor(FSceneNode* frame, AActor* actor);
 	void renderLights(FSceneNode* frame);
@@ -1458,9 +1450,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 			RenderPassesExec();
 		}
 	}
-	inline void FASTCALL RenderPasses_SingleOrDualTextureAndDetailTexture(FTextureInfo &DetailTextureInfo) {
-		RenderPassesExec_SingleOrDualTextureAndDetailTexture(DetailTextureInfo);
-	}
 
 	inline void FASTCALL AddRenderPass(FTextureInfo* Info, DWORD PolyFlags, FLOAT PanBias) {
 		INT rpPassCount = m_rpPassCount;
@@ -1479,19 +1468,12 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	}
 
 	void RenderPassesExec(void);
-	void FASTCALL RenderPassesExec_SingleOrDualTextureAndDetailTexture(FTextureInfo &DetailTextureInfo);
 
 	void RenderPassesNoCheckSetup(void);
 	void FASTCALL RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture(FTextureInfo &);
 
 	INT FASTCALL BufferStaticComplexSurfaceGeometry(const FSurfaceFacet&);
 	INT FASTCALL BufferTriangleSurfaceGeometry(const std::vector<FTransTexture>& vertices);
-	DWORD FASTCALL BufferDetailTextureData(FLOAT);
-#ifdef UTGLR_INCLUDE_SSE_CODE
-	DWORD FASTCALL BufferDetailTextureData_SSE2(FLOAT);
-#endif //UTGLR_INCLUDE_SSE_CODE
-
-	void FASTCALL DrawDetailTexture(FTextureInfo &, bool);
 
 	void FASTCALL BufferAdditionalClippedVerts(FTransTexture** Pts, INT NumPts);
 

@@ -2699,15 +2699,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 
 	m_pBuffer3VertsProc = NULL;
 
-	//Initialize buffer detail texture data proc pointer
-	m_pBufferDetailTextureDataProc = &UD3D9RenderDevice::BufferDetailTextureData;
-#ifdef UTGLR_INCLUDE_SSE_CODE
-	if (UseSSE2) {
-		m_pBufferDetailTextureDataProc = &UD3D9RenderDevice::BufferDetailTextureData_SSE2;
-	}
-#endif //UTGLR_INCLUDE_SSE_CODE
-
-
 	//Precalculate the cutoff for buffering actor triangles based on config settings
 	if (!BufferActorTris) {
 		m_bufferActorTrisCutoff = 0;
@@ -3141,26 +3132,6 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	//Save number of points
 	m_csPtCount = numVerts;
 
-	//See if detail texture should be drawn
-	//FogMap and DetailTexture are mutually exclusive effects
-	bool drawDetailTexture = false;
-	if ((DetailTextures != 0) && Surface.DetailTexture && !Surface.FogMap) {
-		drawDetailTexture = true;
-	}
-
-	//Check for detail texture
-	if (drawDetailTexture == true) {
-		DWORD anyIsNearBits;
-
-		//Buffer detail texture data
-		anyIsNearBits = (this->*m_pBufferDetailTextureDataProc)(380.0f);
-
-		//Do not draw detail texture if no vertices are near
-		if (anyIsNearBits == 0) {
-			drawDetailTexture = false;
-		}
-	}
-
 	DWORD PolyFlags = Surface.PolyFlags;
 
 	//Initialize render passes state information
@@ -3190,45 +3161,7 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 		AddRenderPass(Surface.FogMap, PF_Highlighted, -0.5f);
 	}
 
-	// Draw detail texture overlaid, in a separate pass.
-	if (drawDetailTexture == true) {
-		bool singlePassDetail = false;
-
-		//Check if single pass detail mode is enabled and if can use it
-		if (SinglePassDetail) {
-			//Only attempt single pass detail if single texture rendering wasn't forced earlier
-			if (!m_rpForceSingle) {
-				//Single pass detail must be done with one or two normal passes
-				if ((m_rpPassCount == 1) || (m_rpPassCount == 2)) {
-					singlePassDetail = true;
-				}
-			}
-		}
-
-		if (singlePassDetail) {
-			RenderPasses_SingleOrDualTextureAndDetailTexture(*Surface.DetailTexture);
-		}
-		else {
-			RenderPasses();
-
-			bool clipDetailTexture = (DetailClipping != 0);
-
-			if (m_rpMasked) {
-				//Cannot use detail texture clipping with masked mode
-				//It will not work with m_d3dDevice->SetRenderState(D3DRS_ZFUNC, D3DCMP_EQUAL);
-				clipDetailTexture = false;
-
-				if (m_rpSetDepthEqual == false) {
-					m_d3dDevice->SetRenderState(D3DRS_ZFUNC, D3DCMP_EQUAL);
-					m_rpSetDepthEqual = true;
-				}
-			}
-			DrawDetailTexture(*Surface.DetailTexture, clipDetailTexture);
-		}
-	}
-	else {
-		RenderPasses();
-	}
+	RenderPasses();
 
 	// UnrealEd selection.
 	if (GIsEditor && (PolyFlags & (PF_Selected | PF_FlatShaded))) {
@@ -3817,36 +3750,10 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 		}
 	}
 
-	FLOAT PX1 = X - Frame->FX2;
-	FLOAT PX2 = PX1 + XL;
-	FLOAT PY1 = Y - Frame->FY2;
-	FLOAT PY2 = PY1 + YL;
-
 	FLOAT RPX1 = X;
 	FLOAT RPX2 = X + XL;
 	FLOAT RPY1 = Y;
 	FLOAT RPY2 = Y + YL;
-
-	//float ndcX = (2.0f * X / Frame->FX) - 1.0f;
-	//float ndcY = 1.0f - (2.0f * Y / Frame->FY);
-	//float ndcXL = 2.0f * XL / Frame->FX;
-	//float ndcYL = 2.0f * YL / Frame->FY;
-
-	//FLOAT RPX1 = ndcX;
-	//FLOAT RPX2 = ndcX + ndcXL;
-	//FLOAT RPY1 = ndcY;
-	//FLOAT RPY2 = ndcY + ndcYL;
-
-	//FLOAT RPX1 = m_RFX2 * PX1;
-	//FLOAT RPX2 = m_RFX2 * PX2;
-	//FLOAT RPY1 = m_RFY2 * PY1;
-	//FLOAT RPY2 = m_RFY2 * PY2;
-	//if (!Frame->Viewport->IsOrtho()) {
-	//	RPX1 *= Z;
-	//	RPX2 *= Z;
-	//	RPY1 *= Z;
-	//	RPY2 *= Z;
-	//}
 
 	Z = 0.5f;
 
@@ -3867,19 +3774,9 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 		triPts[2].z = Z;
 
 		m_gclip.SelectDrawTri(Frame, triPts);
-		/*
-		triPts[0].x = RPX1;
-		triPts[0].y = RPY1;
-		triPts[0].z = Z;
 
-		triPts[1].x = RPX2;*/
-		triPts[1].y = RPY2;/*
-		triPts[1].z = Z;
-		*/
-		triPts[2].x = RPX1;/*
-		triPts[2].y = RPY2;
-		triPts[2].z = Z;
-		*/
+		triPts[1].y = RPY2;
+		triPts[2].x = RPX1;
 		m_gclip.SelectDrawTri(Frame, triPts);
 
 		return;
@@ -4739,73 +4636,6 @@ void UD3D9RenderDevice::renderLights(FSceneNode* frame) {
 	}
 
 	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, FALSE);
-	unguard;
-}
-
-void UD3D9RenderDevice::SetStaticBsp(FStaticBspInfoBase& staticBspInfo) {
-#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
-	{
-		static int si;
-		dout << L"utd3d9r: SetStaticBsp = " << si++ << std::endl;
-	}
-#endif
-	guard(UD3D9RenderDevice::SetStaticBsp);
-
-	staticBspInfo.Update();
-//	StaticBspData.TimeSeconds = StaticBspInfo.Level->TimeSeconds.GetFloat();
-
-	if ( GIsEditor )
-		return;
-
-	staticBspInfo.ComputeStaticGeometry( EStaticBspMode::STATIC_BSP_PerSurf );
-
-	// This render device prefers precalculated light/atlas UV's
-	staticBspInfo.ComputeLightUV();
-
-
-	EndBuffering();
-	SetDefaultAAState();
-	//SetDefaultProjectionState();
-
-	typedef std::pair<UTexture*, DWORD> SurfKey;
-	std::map<SurfKey, std::vector<FTransTexture>> surfaceMap{};
-	for (int i = 0; i < staticBspInfo.SurfList.Num(); i++) {
-		FStaticBspSurf surface = staticBspInfo.SurfList(i);
-		if (surface.Texture == nullptr || (surface.PolyFlags & (PF_Invisible | PF_FakeBackdrop)))
-			continue;
-		for (int j = 0; j < surface.VertexCount; j++) {
-			FTransTexture vertex = FTransTexture();
-			FStaticBspVertex bspVert = staticBspInfo.VertList(surface.VertexStart + j);
-			vertex.Point = bspVert.Point;
-			vertex.U = bspVert.TextureU + surface.PanU;
-			vertex.V = bspVert.TextureV + surface.PanV;
-			surfaceMap[SurfKey(surface.Texture, surface.PolyFlags)].push_back(vertex);
-		}
-	}
-
-	for (std::pair<SurfKey, std::vector<FTransTexture>> entry : surfaceMap) {
-		UTexture* texture = std::get<0>(entry.first);
-		DWORD polyFlags = std::get<1>(entry.first);
-
-		m_csPtCount = BufferTriangleSurfaceGeometry(entry.second);
-
-		//Initialize render passes state information
-		m_rpPassCount = 0;
-		m_rpTMUnits = TMUnits;
-		m_rpForceSingle = false;
-		m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
-		m_rpColor = 0xFFFFFFFF;
-
-		FTextureInfo texInfo = FTextureInfo();
-		texture->Lock(texInfo, currentFrame->Viewport->CurrentTime, -1, this);
-
-		AddRenderPass(&texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
-
-		RenderPasses();
-
-		texture->Unlock(texInfo);
-	}
-
 	unguard;
 }
 
@@ -7035,50 +6865,6 @@ void UD3D9RenderDevice::RenderPassesExec(void) {
 	unguard;
 }
 
-void UD3D9RenderDevice::RenderPassesExec_SingleOrDualTextureAndDetailTexture(FTextureInfo &DetailTextureInfo) {
-	guard(UD3D9RenderDevice::RenderPassesExec_SingleOrDualTextureAndDetailTexture);
-
-	//Some render passes paths may use fragment program
-
-	//The dual texture and detail texture path can never be executed if single pass rendering were forced earlier
-	//The depth function will never need to be changed due to single pass rendering here
-
-	//Call the render passes no check setup dual texture and detail texture proc
-	RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture(DetailTextureInfo);
-
-	//Single texture rendering does not need to be forced here since the detail texture is always the last pass
-
-
-	for (INT PolyNum = 0; PolyNum < m_csPolyCount; PolyNum++) {
-		m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos + MultiDrawFirstArray[PolyNum], MultiDrawCountArray[PolyNum] - 2);
-	}
-
-#ifdef UTGLR_DEBUG_WORLD_WIREFRAME
-	m_d3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
-
-	SetBlend(PF_Modulated);
-
-	for (PolyNum = 0; PolyNum < m_csPolyCount; PolyNum++) {
-		m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos + MultiDrawFirstArray[PolyNum], MultiDrawCountArray[PolyNum] - 2);
-	}
-
-	m_d3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
-#endif
-
-	//Advance vertex buffer position
-	m_curVertexBufferPos += m_csPtCount;
-
-#if 0
-{
-	dout << L"utd3d9r: PassCount = " << m_rpPassCount << std::endl;
-}
-#endif
-	m_rpPassCount = 0;
-
-
-	unguard;
-}
-
 //Must be called with (m_rpPassCount > 0)
 void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 	INT i;
@@ -7267,291 +7053,6 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTex
 	return;
 }
 
-//Modified this routine to always set up detail texture state
-//It should only be called if at least one polygon will be detail textured
-void UD3D9RenderDevice::DrawDetailTexture(FTextureInfo &DetailTextureInfo, bool clipDetailTexture) {
-	//Setup detail texture state
-	SetBlend(PF_Modulated);
-
-	//Set detail alpha mode flag
-	bool detailAlphaMode = ((clipDetailTexture == false) && UseDetailAlpha) ? true : false;
-
-	if (detailAlphaMode) {
-		SetAlphaTexture(0);
-		//TexEnv 0 is PF_Modulated by default
-
-		SetTextureNoPanBias(1, DetailTextureInfo, PF_Modulated);
-		SetTexEnv(1, PF_Memorized);
-
-		//Set stream state for two textures
-		SetStreamState(m_standardNTextureVertexDecl[1]);
-
-		//Check for additional enabled texture units that should be disabled
-		DisableSubsequentTextures(2);
-	}
-	else {
-		SetTextureNoPanBias(0, DetailTextureInfo, PF_Modulated);
-		SetTexEnv(0, PF_Memorized);
-
-		if (clipDetailTexture == true) {
-			FLOAT fDepthBias = -1.0f;
-			m_d3dDevice->SetRenderState(D3DRS_SLOPESCALEDEPTHBIAS, *(DWORD *)&fDepthBias);
-		}
-
-		//Set stream state for one texture
-		SetStreamState(m_standardNTextureVertexDecl[0]);
-
-		//Check for additional enabled texture units that should be disabled
-		DisableSubsequentTextures(1);
-	}
-
-
-	//Get detail texture color
-	DWORD detailColor = m_detailTextureColor4ub;
-
-	INT detailPassNum = 0;
-	FLOAT NearZ  = 380.0f;
-	FLOAT RNearZ = 1.0f / NearZ;
-	FLOAT DetailScale = 1.0f;
-	do {
-		//Set up new NearZ and rescan points if subsequent pass
-		if (detailPassNum > 0) {
-			//Adjust NearZ and detail texture scaling
-			NearZ /= 4.223f;
-			RNearZ *= 4.223f;
-			DetailScale *= 4.223f;
-
-			//Rescan points
-			(this->*m_pBufferDetailTextureDataProc)(NearZ);
-		}
-
-		//Calculate scaled UMult and VMult for detail texture based on mode
-		FLOAT DetailUMult;
-		FLOAT DetailVMult;
-		if (detailAlphaMode) {
-			DetailUMult = TexInfo[1].UMult * DetailScale;
-			DetailVMult = TexInfo[1].VMult * DetailScale;
-		}
-		else {
-			DetailUMult = TexInfo[0].UMult * DetailScale;
-			DetailVMult = TexInfo[0].VMult * DetailScale;
-		}
-
-		INT Index = 0;
-
-		INT *pNumPts = &MultiDrawCountArray[0];
-		DWORD *pDetailTextureIsNear = DetailTextureIsNearArray;
-		for (DWORD PolyNum = 0; PolyNum < m_csPolyCount; PolyNum++, pNumPts++, pDetailTextureIsNear++) {
-			DWORD NumPts = *pNumPts;
-			DWORD isNearBits = *pDetailTextureIsNear;
-
-			//Skip the polygon if it will not be detail textured
-			if (isNearBits == 0) {
-				Index += NumPts;
-				continue;
-			}
-			INT StartIndex = Index;
-
-			DWORD allPtsBits = ~(~0U << NumPts);
-			//Detail alpha mode
-			if (detailAlphaMode) {
-				//Make sure at least NumPts entries are left in the vertex buffers
-				if ((m_curVertexBufferPos + NumPts) >= VERTEX_ARRAY_SIZE) {
-					FlushVertexBuffers();
-				}
-
-				//Lock vertexColor, texCoord0, and texCoord1 buffers
-				LockVertexColorBuffer();
-				LockTexCoordBuffer(0);
-				LockTexCoordBuffer(1);
-
-				FGLTexCoord *pTexCoord0 = m_pTexCoordArray[0];
-				FGLTexCoord *pTexCoord1 = m_pTexCoordArray[1];
-				FGLVertexColor *pVertexColorArray = m_pVertexColorArray;
-				const FGLVertex *pSrcVertexArray = &m_csVertexArray[StartIndex];
-				for (INT i = 0; i < NumPts; i++) {
-					FLOAT U = MapDotArray[Index].u;
-					FLOAT V = MapDotArray[Index].v;
-
-					FLOAT PointZ_Times_RNearZ = pSrcVertexArray[i].z * RNearZ;
-					pTexCoord0[i].u = PointZ_Times_RNearZ;
-					pTexCoord0[i].v = 0.5f;
-					pTexCoord1[i].u = (U - TexInfo[1].UPan) * DetailUMult;
-					pTexCoord1[i].v = (V - TexInfo[1].VPan) * DetailVMult;
-
-					pVertexColorArray[i].x = pSrcVertexArray[i].x;
-					pVertexColorArray[i].y = pSrcVertexArray[i].y;
-					pVertexColorArray[i].z = pSrcVertexArray[i].z;
-					pVertexColorArray[i].color = detailColor | 0xFF000000;
-
-					Index++;
-				}
-
-				//Unlock vertexColor,texCoord0, and texCoord1 buffers
-				UnlockVertexColorBuffer();
-				UnlockTexCoordBuffer(0);
-				UnlockTexCoordBuffer(1);
-
-				//Draw the triangles
-				m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos, NumPts - 2);
-
-				//Advance vertex buffer position
-				m_curVertexBufferPos += NumPts;
-			}
-			//Otherwise, no clipping required, or clipping required, but DetailClipping not enabled
-			else if ((clipDetailTexture == false) || (isNearBits == allPtsBits)) {
-				//Make sure at least NumPts entries are left in the vertex buffers
-				if ((m_curVertexBufferPos + NumPts) >= VERTEX_ARRAY_SIZE) {
-					FlushVertexBuffers();
-				}
-
-				//Lock vertexColor and texCoord0 buffers
-				LockVertexColorBuffer();
-				LockTexCoordBuffer(0);
-
-				FGLTexCoord *pTexCoord = m_pTexCoordArray[0];
-				FGLVertexColor *pVertexColorArray = m_pVertexColorArray;
-				const FGLVertex *pSrcVertexArray = &m_csVertexArray[StartIndex];
-				for (INT i = 0; i < NumPts; i++) {
-					FLOAT U = MapDotArray[Index].u;
-					FLOAT V = MapDotArray[Index].v;
-
-					pTexCoord[i].u = (U - TexInfo[0].UPan) * DetailUMult;
-					pTexCoord[i].v = (V - TexInfo[0].VPan) * DetailVMult;
-
-					pVertexColorArray[i].x = pSrcVertexArray[i].x;
-					pVertexColorArray[i].y = pSrcVertexArray[i].y;
-					pVertexColorArray[i].z = pSrcVertexArray[i].z;
-					DWORD alpha = appRound((1.0f - (Clamp(pSrcVertexArray[i].z, 0.0f, NearZ) * RNearZ)) * 255.0f);
-					pVertexColorArray[i].color = detailColor | (alpha << 24);
-
-					Index++;
-				}
-
-				//Unlock vertexColor and texCoord0 buffers
-				UnlockVertexColorBuffer();
-				UnlockTexCoordBuffer(0);
-
-				//Draw the triangles
-				m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos, NumPts - 2);
-
-				//Advance vertex buffer position
-				m_curVertexBufferPos += NumPts;
-			}
-			//Otherwise, clipping required and DetailClipping enabled
-			else {
-				//Make sure at least (NumPts * 2) entries are left in the vertex buffers
-				if ((m_curVertexBufferPos + (NumPts * 2)) >= VERTEX_ARRAY_SIZE) {
-					FlushVertexBuffers();
-				}
-
-				//Lock vertexColor and texCoord0 buffers
-				LockVertexColorBuffer();
-				LockTexCoordBuffer(0);
-
-				DWORD NextIndex = 0;
-				DWORD isNear_i_bit = 1U << (NumPts - 1);
-				DWORD isNear_j_bit = 1U;
-				FGLTexCoord *pTexCoord = m_pTexCoordArray[0];
-				for (INT i = 0, j = NumPts - 1; i < NumPts; j = i++, isNear_j_bit = isNear_i_bit, isNear_i_bit >>= 1) {
-					const FGLVertex &Point = m_csVertexArray[Index];
-					FLOAT U = MapDotArray[Index].u;
-					FLOAT V = MapDotArray[Index].v;
-
-					if (((isNear_i_bit & isNearBits) != 0) && ((isNear_j_bit & isNearBits) == 0)) {
-						const FGLVertex &PrevPoint = m_csVertexArray[StartIndex + j];
-						FLOAT PrevU = MapDotArray[StartIndex + j].u;
-						FLOAT PrevV = MapDotArray[StartIndex + j].v;
-
-						FLOAT dist = PrevPoint.z - Point.z;
-						FLOAT m = 1.0f;
-						if (dist > 0.001f) {
-							m = (NearZ - Point.z) / dist;
-						}
-						FGLVertexColor *pVertexColor = &m_pVertexColorArray[NextIndex];
-						pVertexColor->x = (m * (PrevPoint.x - Point.x)) + Point.x;
-						pVertexColor->y = (m * (PrevPoint.y - Point.y)) + Point.y;
-						pVertexColor->z = NearZ;
-						DWORD alpha = 0;
-						pVertexColor->color = detailColor | (alpha << 24);
-
-						pTexCoord[NextIndex].u = ((m * (PrevU - U)) + U - TexInfo[0].UPan) * DetailUMult;
-						pTexCoord[NextIndex].v = ((m * (PrevV - V)) + V - TexInfo[0].VPan) * DetailVMult;
-
-						NextIndex++;
-					}
-
-					if ((isNear_i_bit & isNearBits) != 0) {
-						pTexCoord[NextIndex].u = (U - TexInfo[0].UPan) * DetailUMult;
-						pTexCoord[NextIndex].v = (V - TexInfo[0].VPan) * DetailVMult;
-
-						FGLVertexColor *pVertexColor = &m_pVertexColorArray[NextIndex];
-						pVertexColor->x = Point.x;
-						pVertexColor->y = Point.y;
-						pVertexColor->z = Point.z;
-						DWORD alpha = appRound((1.0f - (Clamp(Point.z, 0.0f, NearZ) * RNearZ)) * 255.0f);
-						pVertexColor->color = detailColor | (alpha << 24);
-
-						NextIndex++;
-					}
-
-					if (((isNear_i_bit & isNearBits) == 0) && ((isNear_j_bit & isNearBits) != 0)) {
-						const FGLVertex &PrevPoint = m_csVertexArray[StartIndex + j];
-						FLOAT PrevU = MapDotArray[StartIndex + j].u;
-						FLOAT PrevV = MapDotArray[StartIndex + j].v;
-
-						FLOAT dist = Point.z - PrevPoint.z;
-						FLOAT m = 1.0f;
-						if (dist > 0.001f) {
-							m = (NearZ - PrevPoint.z) / dist;
-						}
-						FGLVertexColor *pVertexColor = &m_pVertexColorArray[NextIndex];
-						pVertexColor->x = (m * (Point.x - PrevPoint.x)) + PrevPoint.x;
-						pVertexColor->y = (m * (Point.y - PrevPoint.y)) + PrevPoint.y;
-						pVertexColor->z = NearZ;
-						DWORD alpha = 0;
-						pVertexColor->color = detailColor | (alpha << 24);
-
-						pTexCoord[NextIndex].u = ((m * (U - PrevU)) + PrevU - TexInfo[0].UPan) * DetailUMult;
-						pTexCoord[NextIndex].v = ((m * (V - PrevV)) + PrevV - TexInfo[0].VPan) * DetailVMult;
-
-						NextIndex++;
-					}
-
-					Index++;
-				}
-
-				//Unlock vertexColor and texCoord0 buffers
-				UnlockVertexColorBuffer();
-				UnlockTexCoordBuffer(0);
-
-				//Draw the triangles
-				m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos, NextIndex - 2);
-
-				//Advance vertex buffer position
-				m_curVertexBufferPos += NextIndex;
-			}
-		}
-	} while (++detailPassNum < DetailMax);
-
-
-	//Clear detail texture state
-	if (detailAlphaMode) {
-		//TexEnv 0 was left in default state of PF_Modulated
-	}
-	else {
-		SetTexEnv(0, PF_Modulated);
-
-		if (clipDetailTexture == true) {
-			FLOAT fDepthBias = 0.0f;
-			m_d3dDevice->SetRenderState(D3DRS_SLOPESCALEDEPTHBIAS, *(DWORD *)&fDepthBias);
-		}
-	}
-
-	return;
-}
-
-
 INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet) {
 	INT Index = 0;
 
@@ -7616,86 +7117,6 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 
 	return Index;
 }
-
-DWORD UD3D9RenderDevice::BufferDetailTextureData(FLOAT NearZ) {
-	DWORD *pDetailTextureIsNear = DetailTextureIsNearArray;
-	DWORD anyIsNearBits = 0;
-
-	FGLVertex *pVertex = &m_csVertexArray[0];
-	INT *pNumPts = &MultiDrawCountArray[0];
-	DWORD csPolyCount = m_csPolyCount;
-	do {
-		INT NumPts = *pNumPts++;
-		DWORD isNear = 0;
-
-		do {
-			isNear <<= 1;
-			if (pVertex->z < NearZ) {
-				isNear |= 1;
-			}
-			pVertex++;
-		} while (--NumPts != 0);
-
-		*pDetailTextureIsNear++ = isNear;
-		anyIsNearBits |= isNear;
-	} while (--csPolyCount != 0);
-
-	return anyIsNearBits;
-}
-
-#ifdef UTGLR_INCLUDE_SSE_CODE
-__declspec(naked) DWORD UD3D9RenderDevice::BufferDetailTextureData_SSE2(FLOAT NearZ) {
-	__asm {
-		movd xmm0, [esp+4]
-
-		push esi
-		push edi
-
-		lea esi, [ecx]this.m_csVertexArray
-		lea edx, [ecx]this.MultiDrawCountArray
-		lea edi, [ecx]this.DetailTextureIsNearArray
-
-		pxor xmm1, xmm1
-
-		mov ecx, [ecx]this.m_csPolyCount
-
-		poly_count_loop:
-			mov eax, [edx]
-			add edx, 4
-
-			pxor xmm2, xmm2
-
-			num_pts_loop:
-				movss xmm3, [esi+8]
-				add esi, TYPE FGLVertex
-
-				pslld xmm2, 1
-
-				cmpltss xmm3, xmm0
-				psrld xmm3, 31
-
-				por xmm2, xmm3
-
-				dec eax
-				jne num_pts_loop
-
-			movd [edi], xmm2
-			add edi, 4
-
-			por xmm1, xmm2
-
-			dec ecx
-			jne poly_count_loop
-
-		movd eax, xmm1
-
-		pop edi
-		pop esi
-
-		ret 4
-	}
-}
-#endif //UTGLR_INCLUDE_SSE_CODE
 
 void UD3D9RenderDevice::EndBufferingNoCheck(void) {
 	switch (m_bufferedVertsType) {

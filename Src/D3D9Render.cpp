@@ -32,7 +32,6 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 		d3d9Dev->startWorldDraw(frame);
 		OccludeFrame(frame);
-		FStaticBspInfoBase staticBsp = FStaticBspInfoBase(frame->Level);
 		d3d9Dev->currentFrame = frame;
 		//d3d9Dev->SetStaticBsp(staticBsp);
 
