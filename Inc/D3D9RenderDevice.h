@@ -49,7 +49,7 @@
 #include <math.h>
 #include <stdio.h>
 
-
+#include <unordered_map>
 #include <map>
 #pragma warning(disable : 4663)
 #pragma warning(disable : 4018)
@@ -363,6 +363,55 @@ struct FGLMapDot {
 	FLOAT u;
 	FLOAT v;
 };
+
+
+template<>
+struct std::hash<FVector> {
+	std::size_t operator()(const FVector& t) const {
+		std::size_t seed = 0;
+		seed ^= std::hash<FLOAT>()(t.X) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FLOAT>()(t.Y) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FLOAT>()(t.Z) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		return seed;
+	}
+};
+
+template<>
+struct std::hash<FTextureInfo> {
+	std::size_t operator()(const FTextureInfo& t) const {
+		std::size_t seed = 0;
+		seed ^= std::hash<UTexture*>()(t.Texture) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.LOD) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FMipmapBase*>()(t.Mips[0]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.NumMips) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FVector>()(t.Pan) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<QWORD>()(t.CacheID) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<QWORD>()(t.PaletteCacheID) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.UClamp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.USize) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FLOAT>()(t.UScale) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.VClamp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<INT>()(t.VSize) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		seed ^= std::hash<FLOAT>()(t.VScale) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		return seed;
+	}
+};
+
+bool inline operator==(const FTextureInfo& lhs, const FTextureInfo& rhs) {
+	return std::hash<FTextureInfo>()(lhs) == std::hash<FTextureInfo>()(rhs);
+}
+
+typedef const std::pair<FTextureInfo* const, const DWORD> SurfKey;
+struct SurfKey_Hash {
+	std::size_t operator () (const SurfKey& p) const {
+		auto ptr_hash = std::hash<FTextureInfo*>{}(p.first);
+		auto dword_hash = std::hash<DWORD>{}(p.second);
+
+		return ptr_hash ^ (dword_hash << 1);  // Shift dword_hash to ensure the upper bits are also involved in the final hash
+	}
+};
+template <typename T>
+using SurfKeyMap = std::unordered_map<SurfKey, T, SurfKey_Hash>;
 
 
 //

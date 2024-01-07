@@ -128,7 +128,6 @@ static const D3DVERTEXELEMENT9 g_twoColorSingleTextureStreamDef[] = {
 
 
 
-#include <unordered_map>
 #include <unordered_set>
 #include <deque>
 
@@ -253,42 +252,6 @@ static D3DMATRIX FCoordToDXMat(const FCoords& coord) {
 	};
 	return mat;
 }
-
-template <>
-struct std::hash<FVector> {
-	std::size_t operator()(const FVector& t) const {
-		std::size_t seed = 0;
-		seed ^= std::hash<FLOAT>()(t.X) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FLOAT>()(t.Y) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FLOAT>()(t.Z) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		return seed;
-	}
-};
-
-template <>
-struct std::hash<FTextureInfo> {
-	std::size_t operator()(const FTextureInfo& t) const {
-		std::size_t seed = 0;
-		seed ^= std::hash<UTexture*>()(t.Texture) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.LOD) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.NumMips) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FVector>()(t.Pan) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<QWORD>()(t.CacheID) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<QWORD>()(t.PaletteCacheID) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.UClamp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.USize) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FLOAT>()(t.UScale) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.VClamp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.VSize) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FLOAT>()(t.VScale) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		return seed;
-	}
-};
-
-bool operator==(const FTextureInfo& lhs, const FTextureInfo& rhs) {
-	return std::hash<FTextureInfo>()(lhs) == std::hash<FTextureInfo>()(rhs);
-}
-
 
 /*-----------------------------------------------------------------------------
 	D3D9Drv.
@@ -4366,15 +4329,17 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 }
 
 
-typedef const std::pair<FTextureInfo* const, const DWORD> SurfKey;
-struct SK_Hash {
-	std::size_t operator () (const SurfKey& p) const {
-		auto ptr_hash = std::hash<FTextureInfo*>{}(p.first);
-		auto dword_hash = std::hash<DWORD>{}(p.second);
-
-		return ptr_hash ^ (dword_hash << 1);  // Shift dword_hash to ensure the upper bits are also involved in the final hash
+static inline DWORD getBasePolyFlags(AActor* actor) {
+	DWORD basePolyFlags = 0;
+	if (actor->Style == STY_Masked) {
+		basePolyFlags |= PF_Masked;
+	} else if (actor->Style == STY_Translucent) {
+		basePolyFlags |= PF_Translucent;
+	} else if (actor->Style == STY_Modulated) {
+		basePolyFlags |= PF_Modulated;
 	}
-};
+	return basePolyFlags;
+}
 
 void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	using namespace DirectX;
@@ -4511,7 +4476,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 		}
 	}
 
-	std::unordered_map<SurfKey, std::vector<FTransTexture>, SK_Hash> surfaceMap;
+	SurfKeyMap<std::vector<FTransTexture>> surfaceMap;
 	surfaceMap.reserve(1000);
 
 	for (INT i = 0; i < numTris; i++) {
@@ -4587,14 +4552,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 		m_d3dDevice->SetViewport(&vp);
 	}
 
-	DWORD basePolyFlags = 0;
-	if (actor->Style == STY_Masked) {
-		basePolyFlags |= PF_Masked;
-	} else if (actor->Style == STY_Translucent) {
-		basePolyFlags |= PF_Translucent;
-	} else if (actor->Style == STY_Modulated) {
-		basePolyFlags |= PF_Modulated;
-	}
+	DWORD basePolyFlags = getBasePolyFlags(actor);
 	
 	for (const std::pair<const SurfKey, std::vector<FTransTexture>>& entry : surfaceMap) {
 		FTextureInfo* texInfo = entry.first.first;
@@ -4652,7 +4610,7 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 	UViewport* viewport = frame->Viewport;
 
 	std::unordered_map<UTexture*, FTextureInfo> textureInfos;
-	std::unordered_map<SurfKey, std::vector<FPoly*>, SK_Hash> polys;
+	SurfKeyMap<std::vector<FPoly*>> polys;
 	UModel* model = mover->Brush;
 	for (int i = 0; i < model->Polys->Element.Num(); i++) {
 		FPoly* poly = &model->Polys->Element(i);
