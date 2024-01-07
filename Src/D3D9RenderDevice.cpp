@@ -3114,6 +3114,18 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	m_rpSetDepthEqual = false;
 	m_rpColor = 0xFFFFFFFF;
 
+	//IDirect3DVertexBuffer9* oldVertColorBuffer = m_d3dVertexColorBuffer;
+	//INT oldPos = m_curVertexBufferPos;
+	//m_curVertexBufferPos = 0;
+	//HRESULT hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColor) * m_csPtCount, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, D3DPOOL_DEFAULT, &m_d3dVertexColorBuffer, NULL);
+	//if (FAILED(hResult)) {
+	//	appErrorf(TEXT("CreateVertexBuffer failed"));
+	//}
+	//hResult = m_d3dDevice->SetStreamSource(0, m_d3dVertexColorBuffer, 0, sizeof(FGLVertexColor));
+	//if (FAILED(hResult)) {
+	//	appErrorf(TEXT("SetStreamSource failed"));
+	//}
+
 	AddRenderPass(Surface.Texture, PolyFlags & ~PF_FlatShaded, 0.0f);
 
 	if (Surface.MacroTexture) {
@@ -3134,6 +3146,14 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	}
 
 	RenderPasses();
+
+	//m_d3dVertexColorBuffer->Release();
+	//m_d3dVertexColorBuffer = oldVertColorBuffer;
+	//hResult = m_d3dDevice->SetStreamSource(0, m_d3dVertexColorBuffer, 0, sizeof(FGLVertexColor));
+	//if (FAILED(hResult)) {
+	//	appErrorf(TEXT("SetStreamSource failed"));
+	//}
+	//m_curVertexBufferPos = oldPos;
 
 	// UnrealEd selection.
 	if (GIsEditor && (PolyFlags & (PF_Selected | PF_FlatShaded))) {
@@ -3203,6 +3223,192 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 			m_curVertexBufferPos += NumPts;
 		}
 	}
+
+	if (m_rpSetDepthEqual == true) {
+		m_d3dDevice->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+	}
+
+	unclockFast(ComplexCycles);
+	unguard;
+}
+
+void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surface, std::vector<FSurfaceFacet>& facets) {
+#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: drawLevelSurfaces = " << si++ << std::endl;
+	}
+#endif
+	guard(UD3D9RenderDevice::drawLevelSurfaces);
+
+	EndBuffering();
+
+# if UTGLR_USES_SCENENODEHACK
+	if (SceneNodeHack) {
+		if ((frame->X != m_sceneNodeX) || (frame->Y != m_sceneNodeY)) {
+#ifdef D3D9_DEBUG
+			m_sceneNodeHackCount++;
+#endif
+			SetSceneNode(frame);
+		}
+	}
+# endif
+
+	SetDefaultAAState();
+	SetDefaultProjectionState();
+	//This function uses cached stream state information
+	//This function uses cached texture state information
+
+	check(surface.Texture);
+
+	clockFast(ComplexCycles);
+
+	INT numVerts = 0;
+	for (const FSurfaceFacet& facet : facets) {
+		//Calculate UDot and VDot intermediates for complex surface
+		m_csUDot = facet.MapCoords.XAxis | facet.MapCoords.Origin;
+		m_csVDot = facet.MapCoords.YAxis | facet.MapCoords.Origin;
+
+		if (facet.Span) {
+			// Unpack our hidden treasure, shit it onto the cs UDot stuff
+			FTextureInfo* realTexInfo = (FTextureInfo*)facet.Span;
+			m_csUDot += realTexInfo->Pan.X;
+			m_csVDot += realTexInfo->Pan.Y;
+		}
+
+		//Buffer static geometry
+		//Sets m_csPolyCount
+		//m_csPtCount set later from return value
+		//Sets MultiDrawFirstArray and MultiDrawCountArray
+		numVerts = BufferStaticComplexSurfaceGeometry(facet, numVerts);
+	}
+
+	//Reject invalid surfaces early
+	if (numVerts == 0) {
+		return;
+	}
+
+	//Save number of points
+	m_csPtCount = numVerts;
+
+	DWORD PolyFlags = surface.PolyFlags;
+
+	//Initialize render passes state information
+	m_rpPassCount = 0;
+	m_rpTMUnits = TMUnits;
+	m_rpForceSingle = false;
+	m_rpMasked = ((PolyFlags & PF_Masked) == 0) ? false : true;
+	m_rpSetDepthEqual = false;
+	m_rpColor = 0xFFFFFFFF;
+
+	//IDirect3DVertexBuffer9* oldVertColorBuffer = m_d3dVertexColorBuffer;
+	//INT oldPos = m_curVertexBufferPos;
+	//m_curVertexBufferPos = 0;
+	//HRESULT hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColor) * m_csPtCount, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, D3DPOOL_DEFAULT, &m_d3dVertexColorBuffer, NULL);
+	//if (FAILED(hResult)) {
+	//	appErrorf(TEXT("CreateVertexBuffer failed"));
+	//}
+	//hResult = m_d3dDevice->SetStreamSource(0, m_d3dVertexColorBuffer, 0, sizeof(FGLVertexColor));
+	//if (FAILED(hResult)) {
+	//	appErrorf(TEXT("SetStreamSource failed"));
+	//}
+
+	AddRenderPass(surface.Texture, PolyFlags & ~PF_FlatShaded, 0.0f);
+
+	if (surface.MacroTexture) {
+		AddRenderPass(surface.MacroTexture, PF_Modulated, -0.5f);
+	}
+
+	if (surface.LightMap) {
+		AddRenderPass(surface.LightMap, PF_Modulated, -0.5f);
+	}
+
+	if (surface.FogMap) {
+		//Check for single pass fog mode
+		if (!SinglePassFog) {
+			RenderPasses();
+		}
+
+		AddRenderPass(surface.FogMap, PF_Highlighted, -0.5f);
+	}
+
+	RenderPasses();
+
+	//m_d3dVertexColorBuffer->Release();
+	//m_d3dVertexColorBuffer = oldVertColorBuffer;
+	//hResult = m_d3dDevice->SetStreamSource(0, m_d3dVertexColorBuffer, 0, sizeof(FGLVertexColor));
+	//if (FAILED(hResult)) {
+	//	appErrorf(TEXT("SetStreamSource failed"));
+	//}
+	//m_curVertexBufferPos = oldPos;
+
+	// UnrealEd selection.
+	/*if (GIsEditor && (PolyFlags & (PF_Selected | PF_FlatShaded))) {
+		DWORD polyColor;
+
+		//No need to set default AA state here as it is always set on entry to DrawComplexSurface
+		//No need to set default projection state here as it is always set on entry to DrawComplexSurface
+		SetDefaultStreamState();
+		SetDefaultTextureState();
+
+		SetNoTexture(0);
+		SetBlend(PF_Highlighted);
+
+		if (PolyFlags & PF_FlatShaded) {
+			FPlane Color;
+
+			Color.X = surface.FlatColor.R / 255.0f;
+			Color.Y = surface.FlatColor.G / 255.0f;
+			Color.Z = surface.FlatColor.B / 255.0f;
+			Color.W = 0.85f;
+			if (PolyFlags & PF_Selected) {
+				Color.X *= 1.5f;
+				Color.Y *= 1.5f;
+				Color.Z *= 1.5f;
+				Color.W = 1.0f;
+			}
+
+			polyColor = FPlaneTo_BGRAClamped(&Color);
+		} else {
+			polyColor = SurfaceSelectionColor.TrueColor() | (SurfaceSelectionColor.A << 24); //0x1F00003F;
+		}
+
+		for (FSavedPoly* Poly = Facet.Polys; Poly; Poly = Poly->Next) {
+			INT NumPts = Poly->NumPts;
+
+			//Make sure at least NumPts entries are left in the vertex buffers
+			if ((m_curVertexBufferPos + NumPts) >= VERTEX_ARRAY_SIZE) {
+				FlushVertexBuffers();
+			}
+
+			//Lock vertexColor and texCoord0 buffers
+			LockVertexColorBuffer();
+			LockTexCoordBuffer(0);
+
+			FGLTexCoord* pTexCoordArray = m_pTexCoordArray[0];
+			FGLVertexColor* pVertexColorArray = m_pVertexColorArray;
+
+			for (INT i = 0; i < Poly->NumPts; i++) {
+				pTexCoordArray[i].u = 0.5f;
+				pTexCoordArray[i].v = 0.5f;
+
+				pVertexColorArray[i].x = Poly->Pts[i]->Point.X;
+				pVertexColorArray[i].y = Poly->Pts[i]->Point.Y;
+				pVertexColorArray[i].z = Poly->Pts[i]->Point.Z;
+				pVertexColorArray[i].color = polyColor;
+			}
+
+			//Unlock vertexColor and texCoord0 buffers
+			UnlockVertexColorBuffer();
+			UnlockTexCoordBuffer(0);
+
+			//Draw the triangle fan
+			m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos, NumPts - 2);
+
+			//Advance vertex buffer position
+			m_curVertexBufferPos += NumPts;
+		}
+	}*/
 
 	if (m_rpSetDepthEqual == true) {
 		m_d3dDevice->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
@@ -4344,16 +4550,55 @@ static inline DWORD getBasePolyFlags(AActor* actor) {
 void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	using namespace DirectX;
 
+	FPlane    color = (GIsEditor && actor->bSelected) ? FPlane(.5, .9, .5, 0) : FPlane(1, 1, 1, 0);
+	UTexture* texture = actor->Texture;
+	FLOAT     DrawScale = actor->DrawScale;
+	UTexture* SavedNext = NULL;
+	UTexture* SavedCur = NULL;
+	DWORD basePolyFlags = getBasePolyFlags(actor);
+	if (actor->ScaleGlow != 1.0) {
+		color *= actor->ScaleGlow;
+		if (color.X > 1.0) color.X = 1.0;
+		if (color.Y > 1.0) color.Y = 1.0;
+		if (color.Z > 1.0) color.Z = 1.0;
+	}
+	if (actor->DrawType == DT_SpriteAnimOnce) {
+		INT Count = 1;
+		for (UTexture* Test = texture->AnimNext; Test && Test != texture; Test = Test->AnimNext)
+			Count++;
+		INT Num = Clamp(appFloor(actor->LifeFraction() * Count), 0, Count - 1);
+		while (Num-- > 0)
+			texture = texture->AnimNext;
+		SavedNext = texture->AnimNext;//sort of a hack!!
+		SavedCur = texture->AnimCur;
+		texture->AnimNext = NULL;
+		texture->AnimCur = NULL;
+	}
+	if (frame->Viewport->Actor->ShowFlags & SHOW_ActorIcons) {
+		DrawScale = 1.0;
+		if (!texture)
+			texture = GetDefault<AActor>()->Texture;
+	}
+	FLOAT XScale = DrawScale * texture->USize;
+	FLOAT YScale = DrawScale * texture->VSize;
+
+	UTexture* renderTexture = texture->Get(frame->Viewport->CurrentTime);
+	
+	if (actor->DrawType == DT_SpriteAnimOnce) {
+		texture->AnimNext = SavedNext;
+		texture->AnimCur = SavedCur;
+	}
+
 	FVector location = actor->Location + actor->PrePivot;
-	FVector camLoc = frame->Viewport->Actor->Location;
+	FVector camLoc = frame->Coords.Origin;
+	FVector camUp = FVector(0.0f, -1.0f, 0.0f).TransformVectorBy(frame->Uncoords);
 	XMVECTOR direction = XMVector3Normalize(FVecToDXVec(camLoc - location));
-	float scale = (actor->DrawScale + 10)*5;
+	float scale = (actor->DrawScale + 10) * 5;
 
 	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(location));
 	XMMATRIX matRot = XMMatrixIdentity();
 	matRot *= XMMatrixRotationY(PI / 2);// rotate card 90 on Y since LookAt expects +z to be forward.
-	matRot *= XMMatrixInverse(nullptr, XMMatrixLookAtLH(XMVectorSet(0, 0, 0, 0), direction, XMVectorSet(0, 0, 1, 0)));
-
+	matRot *= XMMatrixInverse(nullptr, XMMatrixLookAtLH(XMVectorSet(0, 0, 0, 0), direction, FVecToDXVec(camUp)));
 	XMMATRIX matScale = XMMatrixScaling(scale, scale, scale);
 
 	XMMATRIX mat = XMMatrixIdentity();
@@ -4366,38 +4611,38 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 
 	std::vector<FTransTexture> verts;
 
+	float uMax = texture->USize;
+	float vMax = texture->VSize;
 	FTransTexture point{};
 	point.Point = FVector(0, -0.5, -0.5);
 	point.U = 0;
 	point.V = 0;
 	verts.push_back(point);
 	point.Point = FVector(0, 0.5, -0.5);
-	point.U = 1;
+	point.U = uMax;
 	point.V = 0;
 	verts.push_back(point);
 	point.Point = FVector(0, -0.5, 0.5);
 	point.U = 0;
-	point.V = 1;
+	point.V = vMax;
 	verts.push_back(point);
 	point.Point = FVector(0, 0.5, 0.5);
-	point.U = 1;
-	point.V = 1;
+	point.U = uMax;
+	point.V = vMax;
 	verts.push_back(point);
 	point.Point = FVector(0, -0.5, 0.5);
 	point.U = 0;
-	point.V = 1;
+	point.V = vMax;
 	verts.push_back(point);
 	point.Point = FVector(0, 0.5, -0.5);
-	point.U = 1;
+	point.U = uMax;
 	point.V = 0;
 	verts.push_back(point);
 
-	UTexture* texture = actor->Texture;
-
 	FTextureInfo texInfo;
-	texture->Lock(texInfo, frame->Viewport->CurrentTime, -1, this);
+	renderTexture->Lock(texInfo, frame->Viewport->CurrentTime, -1, this);
 
-	DWORD flags = 0;//PF_Modulated;
+	DWORD flags = basePolyFlags | PF_TwoSided | (texture->PolyFlags & PF_Masked);//PF_Modulated;
 
 	BufferTriangleSurfaceGeometry(verts);
 	//Initialize render passes state information
@@ -4410,6 +4655,7 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	AddRenderPass(&texInfo, flags & ~PF_FlatShaded, 0.0f);
 
 	RenderPasses();
+	renderTexture->Unlock(texInfo);
 }
 
 void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
@@ -4788,10 +5034,11 @@ INT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FTransTex
 
 		Index += numPts;
 		if (Index > VERTEX_ARRAY_SIZE) {
+			dout << L"Mesh has " << Index << L" points, which is larger than vert array size of " << VERTEX_ARRAY_SIZE << L"!" << std::endl;
 			return 0;
 		}
 		for (int j = 0; j < numPts; j++) {
-			FTransTexture vert = vertices[(i * 3) + j];
+			const FTransTexture& vert = vertices[(i * 3) + j];
 
 			pMapDot->u = vert.U;
 			pMapDot->v = vert.V;
@@ -7180,13 +7427,19 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTex
 	return;
 }
 
-INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet) {
-	INT Index = 0;
+INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet, bool append) {
+	int startIndex;
+	if (append) {
+		startIndex = m_csPolyCount * 3;
+	} else {
+		m_csPolyCount = 0;
+		startIndex = 0;
+	}
+	INT Index = startIndex;
 
 	// Buffer "static" geometry.
-	m_csPolyCount = 0;
-	FGLMapDot* pMapDot = &MapDotArray[0];
-	FGLVertex* pVertex = &m_csVertexArray[0];
+	FGLMapDot* pMapDot = &MapDotArray[startIndex];
+	FGLVertex* pVertex = &m_csVertexArray[startIndex];
 	for (FSavedPoly* Poly = Facet.Polys; Poly; Poly = Poly->Next) {
 		//Skip if not enough points
 		INT NumPts = Poly->NumPts;
@@ -7199,6 +7452,7 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 
 		Index += numPolys * 3;
 		if (Index > VERTEX_ARRAY_SIZE) {
+			dout << L"Surface has " << Index << L" points, which is larger than vert array size of " << VERTEX_ARRAY_SIZE << L"!" << std::endl;
 			return 0;
 		}
 		FTransform** pPts = &Poly->Pts[0];

@@ -158,7 +158,7 @@ typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
 #define MAX_TMUNITS			4		// vogel: maximum number of texture mapping units supported
 
 //Must be at least 2000
-#define VERTEX_ARRAY_SIZE	5000	// vogel: better safe than sorry
+#define VERTEX_ARRAY_SIZE	50000	// vogel: better safe than sorry
 
 
 /*-----------------------------------------------------------------------------
@@ -1195,6 +1195,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void Flush(UBOOL AllowPrecache);
 
 	void DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet);
+	void drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surface, std::vector<FSurfaceFacet>& facets);
 #ifdef UTGLR_RUNE_BUILD
 	void PreDrawFogSurface();
 	void PostDrawFogSurface();
@@ -1523,7 +1524,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void RenderPassesNoCheckSetup(void);
 	void FASTCALL RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture(FTextureInfo &);
 
-	INT FASTCALL BufferStaticComplexSurfaceGeometry(const FSurfaceFacet&);
+	INT FASTCALL BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet, bool append = false);
 	INT FASTCALL BufferTriangleSurfaceGeometry(const std::vector<FTransTexture>& vertices);
 
 	void FASTCALL BufferAdditionalClippedVerts(FTransTexture** Pts, INT NumPts);
