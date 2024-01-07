@@ -7,11 +7,14 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "D3D9Drv", "D3D9Drv.vcxproj"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		ASAN|Win32 = ASAN|Win32
 		Debug|Win32 = Debug|Win32
 		EditContinue|Win32 = EditContinue|Win32
 		Release|Win32 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.ASAN|Win32.ActiveCfg = ASAN|Win32
+		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.ASAN|Win32.Build.0 = ASAN|Win32
 		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.Debug|Win32.ActiveCfg = Debug|Win32
 		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.Debug|Win32.Build.0 = Debug|Win32
 		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.EditContinue|Win32.ActiveCfg = EditContinue|Win32
