@@ -4516,6 +4516,13 @@ static inline DWORD getBasePolyFlags(AActor* actor) {
 }
 
 void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
+#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: renderSprite = " << si++ << std::endl;
+	}
+#endif
+	guard(UD3D9RenderDevice::renderSprite);
 	using namespace DirectX;
 
 	FPlane    color = (GIsEditor && actor->bSelected) ? FPlane(.5, .9, .5, 0) : FPlane(1, 1, 1, 0);
@@ -4547,10 +4554,11 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 		if (!texture)
 			texture = GetDefault<AActor>()->Texture;
 	}
-	FLOAT XScale = DrawScale * texture->USize;
-	FLOAT YScale = DrawScale * texture->VSize;
 
 	UTexture* renderTexture = texture->Get(frame->Viewport->CurrentTime);
+
+	FLOAT XScale = DrawScale * renderTexture->USize;
+	FLOAT YScale = DrawScale * renderTexture->VSize;
 	
 	if (actor->DrawType == DT_SpriteAnimOnce) {
 		texture->AnimNext = SavedNext;
@@ -4561,13 +4569,13 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	FVector camLoc = frame->Coords.Origin;
 	FVector camUp = FVector(0.0f, -1.0f, 0.0f).TransformVectorBy(frame->Uncoords);
 	XMVECTOR direction = XMVector3Normalize(FVecToDXVec(camLoc - location));
-	float scale = (actor->DrawScale + 10) * 5;
 
 	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(location));
 	XMMATRIX matRot = XMMatrixIdentity();
 	matRot *= XMMatrixRotationY(PI / 2);// rotate card 90 on Y since LookAt expects +z to be forward.
+	matRot *= XMMatrixRotationZ(-PI / 2);// rotate card 90 on Z because that's the way it's oriented aparently?.
 	matRot *= XMMatrixInverse(nullptr, XMMatrixLookAtLH(XMVectorSet(0, 0, 0, 0), direction, FVecToDXVec(camUp)));
-	XMMATRIX matScale = XMMatrixScaling(scale, scale, scale);
+	XMMATRIX matScale = XMMatrixScaling(actor->DrawScale, XScale, YScale);
 
 	XMMATRIX mat = XMMatrixIdentity();
 	mat *= matScale;
@@ -4579,32 +4587,34 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 
 	std::vector<FTransTexture> verts;
 
-	float uMax = texture->USize;
-	float vMax = texture->VSize;
+	float uMin = renderTexture->USize;
+	float uMax = 0;
+	float vMin = 0;
+	float vMax = renderTexture->VSize;
 	FTransTexture point{};
 	point.Point = FVector(0, -0.5, -0.5);
-	point.U = 0;
-	point.V = 0;
+	point.U = uMin;
+	point.V = vMin;
+	verts.push_back(point);
+	point.Point = FVector(0, -0.5, 0.5);
+	point.U = uMin;
+	point.V = vMax;
 	verts.push_back(point);
 	point.Point = FVector(0, 0.5, -0.5);
 	point.U = uMax;
-	point.V = 0;
-	verts.push_back(point);
-	point.Point = FVector(0, -0.5, 0.5);
-	point.U = 0;
-	point.V = vMax;
+	point.V = vMin;
 	verts.push_back(point);
 	point.Point = FVector(0, 0.5, 0.5);
 	point.U = uMax;
 	point.V = vMax;
 	verts.push_back(point);
-	point.Point = FVector(0, -0.5, 0.5);
-	point.U = 0;
-	point.V = vMax;
-	verts.push_back(point);
 	point.Point = FVector(0, 0.5, -0.5);
 	point.U = uMax;
-	point.V = 0;
+	point.V = vMin;
+	verts.push_back(point);
+	point.Point = FVector(0, -0.5, 0.5);
+	point.U = uMin;
+	point.V = vMax;
 	verts.push_back(point);
 
 	FTextureInfo texInfo;
@@ -4624,9 +4634,16 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 
 	RenderPasses();
 	renderTexture->Unlock(texInfo);
+	unguard;
 }
 
 void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
+#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: renderMeshActor = " << si++ << std::endl;
+	}
+#endif
 	using namespace DirectX;
 	guard(UD3D9RenderDevice::renderMeshActor);
 	UMesh* mesh = actor->Mesh;
@@ -4802,6 +4819,12 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 }
 
 void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
+#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: renderMover = " << si++ << std::endl;
+	}
+#endif
 	using namespace DirectX;
 	guard(UD3D9RenderDevice::renderMover);
 
@@ -5293,11 +5316,13 @@ void UD3D9RenderDevice::EndFlash() {
 		FPlane tempPlane = FPlane(FlashFog.X, FlashFog.Y, FlashFog.Z, 1.0f - Min(FlashScale.X * 2.0f, 1.0f));
 		DWORD flashColor = FPlaneTo_BGRA(&tempPlane);
 
-		FLOAT RFX2 = m_RProjZ;
-		FLOAT RFY2 = m_RProjZ * m_Aspect;
+		FLOAT RPX1 = 0;
+		FLOAT RPX2 = RPX1 + m_sceneNodeX;
+		FLOAT RPY1 = 0;
+		FLOAT RPY2 = RPY1 + m_sceneNodeY;
 
 		//Adjust Z coordinate if Z range hack is active
-		FLOAT ZCoord = 1.0f;
+		FLOAT ZCoord = 0.5f;
 		if (m_useZRangeHack) {
 			ZCoord = (((ZCoord - 0.5f) / 7.5f) * 4.0f) + 4.0f;
 		}
@@ -5326,23 +5351,23 @@ void UD3D9RenderDevice::EndFlash() {
 		pTexCoordArray[3].u = 0.0f;
 		pTexCoordArray[3].v = 1.0f;
 
-		pVertexColorArray[0].x = RFX2 * (-1.0f * ZCoord);
-		pVertexColorArray[0].y = RFY2 * (-1.0f * ZCoord);
+		pVertexColorArray[0].x = RPX1;
+		pVertexColorArray[0].y = RPY1;
 		pVertexColorArray[0].z = ZCoord;
 		pVertexColorArray[0].color = flashColor;
 
-		pVertexColorArray[1].x = RFX2 * (+1.0f * ZCoord);
-		pVertexColorArray[1].y = RFY2 * (-1.0f * ZCoord);
+		pVertexColorArray[1].x = RPX2;
+		pVertexColorArray[1].y = RPY1;
 		pVertexColorArray[1].z = ZCoord;
 		pVertexColorArray[1].color = flashColor;
 
-		pVertexColorArray[2].x = RFX2 * (+1.0f * ZCoord);
-		pVertexColorArray[2].y = RFY2 * (+1.0f * ZCoord);
+		pVertexColorArray[2].x = RPX2;
+		pVertexColorArray[2].y = RPY2;
 		pVertexColorArray[2].z = ZCoord;
 		pVertexColorArray[2].color = flashColor;
 
-		pVertexColorArray[3].x = RFX2 * (-1.0f * ZCoord);
-		pVertexColorArray[3].y = RFY2 * (+1.0f * ZCoord);
+		pVertexColorArray[3].x = RPX1;
+		pVertexColorArray[3].y = RPY2;
 		pVertexColorArray[3].z = ZCoord;
 		pVertexColorArray[3].color = flashColor;
 
@@ -7575,13 +7600,15 @@ void UD3D9RenderDevice::EndPointBufferingNoCheck(void) {
 static const D3DMATRIX identityMatrix = ToD3DMATRIX(DirectX::XMMatrixIdentity());
 
 void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
-	//dout << "startWorldDraw" << std::endl;
+#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: startWorldDraw = " << si++ << std::endl;
+	}
+#endif
+	guard(UD3D9RenderDevice::startWorldDraw);
 	using namespace DirectX;
 	this->currentFrame = frame;
-	//D3DMATRIX oldView;
-	//m_d3dDevice->GetTransform(D3DTS_VIEW, &oldView);
-	//D3DMATRIX oldProj;
-	//m_d3dDevice->GetTransform(D3DTS_PROJECTION, &oldProj);
 
 	// Setup projection and view matrices for current frame
 	float aspect = frame->FX / frame->FY;
@@ -7608,14 +7635,19 @@ void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 	m_d3dDevice->SetTransform(D3DTS_VIEW, &view);
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
 	m_d3dDevice->SetRenderState(D3DRS_ZENABLE, D3DZB_TRUE);
+	unguard;
 }
 
 
 void UD3D9RenderDevice::endWorldDraw(FSceneNode* frame) {
-	//dout << "endWorldDraw" << std::endl;
+#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: endWorldDraw = " << si++ << std::endl;
+	}
+#endif
+	guard(UD3D9RenderDevice::endWorldDraw);
 	using namespace DirectX;
-	//m_d3dDevice->SetTransform(D3DTS_VIEW, &oldView);
-	//m_d3dDevice->SetTransform(D3DTS_PROJECTION, &oldProj);
 
 	// World drawing finished, setup for ui
 	D3DMATRIX proj = ToD3DMATRIX(
@@ -7625,6 +7657,7 @@ void UD3D9RenderDevice::endWorldDraw(FSceneNode* frame) {
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
 	m_d3dDevice->SetTransform(D3DTS_VIEW, &identityMatrix);
 	m_d3dDevice->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
+	unguard;
 }
 
 
