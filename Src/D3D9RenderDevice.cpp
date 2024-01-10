@@ -253,6 +253,8 @@ static D3DMATRIX FCoordToDXMat(const FCoords& coord) {
 	return mat;
 }
 
+//#define UTGLR_DEBUG_SHOW_CALL_COUNTS
+
 /*-----------------------------------------------------------------------------
 	D3D9Drv.
 -----------------------------------------------------------------------------*/
@@ -1036,7 +1038,6 @@ v_loop:
 }
 #endif
 
-//#define UTGLR_DEBUG_SHOW_CALL_COUNTS
 //Must be called with (NumPts > 3)
 void UD3D9RenderDevice::BufferAdditionalClippedVerts(FTransTexture** Pts, INT NumPts) {
 	INT i;
@@ -2138,24 +2139,28 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	//Create vertex buffers
 	D3DPOOL vertexBufferPool = D3DPOOL_DEFAULT;
 
+	m_d3dTempVertexColorBuffer = nullptr;
+	m_vertexTempBufferSize = 0;
 	//Vertex and primary color
-	hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColor) * VERTEX_ARRAY_SIZE, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dVertexColorBuffer, NULL);
+	hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColor) * VERTEX_BUFFER_SIZE, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dVertexColorBuffer, NULL);
 	if (FAILED(hResult)) {
 		appErrorf(TEXT("CreateVertexBuffer failed"));
 	}
 
 	//Secondary color
-	hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLSecondaryColor) * VERTEX_ARRAY_SIZE, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dSecondaryColorBuffer, NULL);
-	if (FAILED(hResult)) {
-		appErrorf(TEXT("CreateVertexBuffer failed"));
-	}
+	//hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLSecondaryColor) * VERTEX_ARRAY_SIZE, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dSecondaryColorBuffer, NULL);
+	//if (FAILED(hResult)) {
+	//	appErrorf(TEXT("CreateVertexBuffer failed"));
+	//}
 
 	//TexCoord
 	for (u = 0; u < TMUnits; u++) {
-		hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLTexCoord) * VERTEX_ARRAY_SIZE, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dTexCoordBuffer[u], NULL);
+		hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLTexCoord) * VERTEX_BUFFER_SIZE, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dTexCoordBuffer[u], NULL);
 		if (FAILED(hResult)) {
 			appErrorf(TEXT("CreateVertexBuffer failed"));
 		}
+		m_d3dTempTexCoordBuffer[u] = nullptr;
+		m_texTempBufferSize[u] = 0;
 	}
 
 
@@ -2191,26 +2196,26 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	}
 
 
-	//Set stream sources
+	//Set stream sources Now set in the lock functions
 	//Vertex and primary color
-	hResult = m_d3dDevice->SetStreamSource(0, m_d3dVertexColorBuffer, 0, sizeof(FGLVertexColor));
-	if (FAILED(hResult)) {
-		appErrorf(TEXT("SetStreamSource failed"));
-	}
+	//hResult = m_d3dDevice->SetStreamSource(0, m_d3dVertexColorBuffer, 0, sizeof(FGLVertexColor));
+	//if (FAILED(hResult)) {
+	//	appErrorf(TEXT("SetStreamSource failed"));
+	//}
 
 	//Secondary Color
-	hResult = m_d3dDevice->SetStreamSource(1, m_d3dSecondaryColorBuffer, 0, sizeof(FGLSecondaryColor));
-	if (FAILED(hResult)) {
-		appErrorf(TEXT("SetStreamSource failed"));
-	}
+	//hResult = m_d3dDevice->SetStreamSource(1, m_d3dSecondaryColorBuffer, 0, sizeof(FGLSecondaryColor));
+	//if (FAILED(hResult)) {
+	//	appErrorf(TEXT("SetStreamSource failed"));
+	//}
 
 	//TexCoord
-	for (u = 0; u < TMUnits; u++) {
-		hResult = m_d3dDevice->SetStreamSource(2 + u, m_d3dTexCoordBuffer[u], 0, sizeof(FGLTexCoord));
-		if (FAILED(hResult)) {
-			appErrorf(TEXT("SetStreamSource failed"));
-		}
-	}
+	//for (u = 0; u < TMUnits; u++) {
+	//	hResult = m_d3dDevice->SetStreamSource(2 + u, m_d3dTexCoordBuffer[u], 0, sizeof(FGLTexCoord));
+	//	if (FAILED(hResult)) {
+	//		appErrorf(TEXT("SetStreamSource failed"));
+	//	}
+	//}
 
 
 	//Set default stream definition
@@ -2281,6 +2286,10 @@ void UD3D9RenderDevice::FreePermanentResources(void) {
 		m_d3dVertexColorBuffer->Release();
 		m_d3dVertexColorBuffer = NULL;
 	}
+	if (m_d3dTempVertexColorBuffer) {
+		m_d3dTempVertexColorBuffer->Release();
+		m_d3dTempVertexColorBuffer = NULL;
+	}
 	if (m_d3dSecondaryColorBuffer) {
 		m_d3dSecondaryColorBuffer->Release();
 		m_d3dSecondaryColorBuffer = NULL;
@@ -2289,6 +2298,10 @@ void UD3D9RenderDevice::FreePermanentResources(void) {
 		if (m_d3dTexCoordBuffer[u]) {
 			m_d3dTexCoordBuffer[u]->Release();
 			m_d3dTexCoordBuffer[u] = NULL;
+		}
+		if (m_d3dTempTexCoordBuffer[u]) {
+			m_d3dTempTexCoordBuffer[u]->Release();
+			m_d3dTempTexCoordBuffer[u] = NULL;
 		}
 	}
 
@@ -3114,18 +3127,6 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	m_rpSetDepthEqual = false;
 	m_rpColor = 0xFFFFFFFF;
 
-	//IDirect3DVertexBuffer9* oldVertColorBuffer = m_d3dVertexColorBuffer;
-	//INT oldPos = m_curVertexBufferPos;
-	//m_curVertexBufferPos = 0;
-	//HRESULT hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColor) * m_csPtCount, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, D3DPOOL_DEFAULT, &m_d3dVertexColorBuffer, NULL);
-	//if (FAILED(hResult)) {
-	//	appErrorf(TEXT("CreateVertexBuffer failed"));
-	//}
-	//hResult = m_d3dDevice->SetStreamSource(0, m_d3dVertexColorBuffer, 0, sizeof(FGLVertexColor));
-	//if (FAILED(hResult)) {
-	//	appErrorf(TEXT("SetStreamSource failed"));
-	//}
-
 	AddRenderPass(Surface.Texture, PolyFlags & ~PF_FlatShaded, 0.0f);
 
 	if (Surface.MacroTexture) {
@@ -3146,14 +3147,6 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	}
 
 	RenderPasses();
-
-	//m_d3dVertexColorBuffer->Release();
-	//m_d3dVertexColorBuffer = oldVertColorBuffer;
-	//hResult = m_d3dDevice->SetStreamSource(0, m_d3dVertexColorBuffer, 0, sizeof(FGLVertexColor));
-	//if (FAILED(hResult)) {
-	//	appErrorf(TEXT("SetStreamSource failed"));
-	//}
-	//m_curVertexBufferPos = oldPos;
 
 	// UnrealEd selection.
 	if (GIsEditor && (PolyFlags & (PF_Selected | PF_FlatShaded))) {
@@ -3191,13 +3184,13 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 			INT NumPts = Poly->NumPts;
 
 			//Make sure at least NumPts entries are left in the vertex buffers
-			if ((m_curVertexBufferPos + NumPts) >= VERTEX_ARRAY_SIZE) {
+			if ((m_curVertexBufferPos + NumPts) >= VERTEX_BUFFER_SIZE) {
 				FlushVertexBuffers();
 			}
 
 			//Lock vertexColor and texCoord0 buffers
-			LockVertexColorBuffer();
-			LockTexCoordBuffer(0);
+			LockVertexColorBuffer(NumPts);
+			LockTexCoordBuffer(0, NumPts);
 
 			FGLTexCoord *pTexCoordArray = m_pTexCoordArray[0];
 			FGLVertexColor *pVertexColorArray = m_pVertexColorArray;
@@ -3217,10 +3210,7 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 			UnlockTexCoordBuffer(0);
 
 			//Draw the triangle fan
-			m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos, NumPts - 2);
-
-			//Advance vertex buffer position
-			m_curVertexBufferPos += NumPts;
+			m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, getVertBufferPos(NumPts), NumPts - 2);
 		}
 	}
 
@@ -3301,18 +3291,6 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 	m_rpSetDepthEqual = false;
 	m_rpColor = 0xFFFFFFFF;
 
-	//IDirect3DVertexBuffer9* oldVertColorBuffer = m_d3dVertexColorBuffer;
-	//INT oldPos = m_curVertexBufferPos;
-	//m_curVertexBufferPos = 0;
-	//HRESULT hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColor) * m_csPtCount, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, D3DPOOL_DEFAULT, &m_d3dVertexColorBuffer, NULL);
-	//if (FAILED(hResult)) {
-	//	appErrorf(TEXT("CreateVertexBuffer failed"));
-	//}
-	//hResult = m_d3dDevice->SetStreamSource(0, m_d3dVertexColorBuffer, 0, sizeof(FGLVertexColor));
-	//if (FAILED(hResult)) {
-	//	appErrorf(TEXT("SetStreamSource failed"));
-	//}
-
 	AddRenderPass(surface.Texture, PolyFlags & ~PF_FlatShaded, 0.0f);
 
 	if (surface.MacroTexture) {
@@ -3333,14 +3311,6 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 	}
 
 	RenderPasses();
-
-	//m_d3dVertexColorBuffer->Release();
-	//m_d3dVertexColorBuffer = oldVertColorBuffer;
-	//hResult = m_d3dDevice->SetStreamSource(0, m_d3dVertexColorBuffer, 0, sizeof(FGLVertexColor));
-	//if (FAILED(hResult)) {
-	//	appErrorf(TEXT("SetStreamSource failed"));
-	//}
-	//m_curVertexBufferPos = oldPos;
 
 	// UnrealEd selection.
 	/*if (GIsEditor && (PolyFlags & (PF_Selected | PF_FlatShaded))) {
@@ -3623,17 +3593,17 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 	}
 
 	//Make sure at least NumPts entries are left in the vertex buffers
-	if ((m_curVertexBufferPos + NumPts) >= VERTEX_ARRAY_SIZE) {
+	if ((m_curVertexBufferPos + NumPts) >= VERTEX_BUFFER_SIZE) {
 		FlushVertexBuffers();
 	}
 
 	//Lock vertexColor and texCoord0 buffers
 	//Lock secondary color buffer if fog
-	LockVertexColorBuffer();
+	LockVertexColorBuffer(NumPts);
 	if (drawFog) {
-		LockSecondaryColorBuffer();
+		LockSecondaryColorBuffer(NumPts);
 	}
-	LockTexCoordBuffer(0);
+	LockTexCoordBuffer(0, NumPts);
 
 	INT Index = 0;
 	for (INT i = 0; i < NumPts; i++) {
@@ -3680,10 +3650,7 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 #endif
 
 	//Draw the triangles
-	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos, NumPts - 2);
-
-	//Advance vertex buffer position
-	m_curVertexBufferPos += NumPts;
+	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, getVertBufferPos(NumPts), NumPts - 2);
 
 #ifdef UTGLR_DEBUG_ACTOR_WIREFRAME
 	m_d3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
@@ -3788,17 +3755,18 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 	//Check if need to start new poly buffering
 	//Make sure enough entries are left in the vertex buffers
 	//based on the current position when it was locked
+	appErrorf(TEXT("DONT USE ME!!!"));
 	if ((m_curPolyFlags != PolyFlags) ||
 		(m_curPolyFlags2 != PolyFlags2) ||
 		(TexInfo[0].CurrentCacheID != CacheID) ||
-		((m_curVertexBufferPos + m_bufferedVerts + NumPts) >= (VERTEX_ARRAY_SIZE - 14)) ||
+		((m_curVertexBufferPos + m_bufferedVerts + NumPts) >= (VERTEX_BUFFER_SIZE - 14)) ||
 		(m_bufferedVerts == 0))
 	{
 		//Flush any previously buffered gouraud polys
 		EndBuffering();
 
 		//Check if vertex buffer flush is required
-		if ((m_curVertexBufferPos + m_bufferedVerts + NumPts) >= (VERTEX_ARRAY_SIZE - 14)) {
+		if ((m_bufferedVerts + NumPts) >= (VERTEX_BUFFER_SIZE - 14)) {
 			FlushVertexBuffers();
 		}
 
@@ -3845,11 +3813,11 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 
 		//Lock vertexColor and texCoord0 buffers
 		//Lock secondary color buffer if fog
-		LockVertexColorBuffer();
+		//LockVertexColorBuffer();
 		if (m_requestedColorFlags & CF_FOG_MODE) {
-			LockSecondaryColorBuffer();
+			//LockSecondaryColorBuffer();
 		}
-		LockTexCoordBuffer(0);
+		//LockTexCoordBuffer(0);
 
 		{
 			IDirect3DVertexDeclaration9 *vertexDecl = (m_requestedColorFlags & CF_FOG_MODE) ? m_twoColorSingleTextureVertexDecl : m_standardNTextureVertexDecl[0];
@@ -3981,14 +3949,14 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 		if ((m_curPolyFlags != PolyFlags) ||
 			(m_curPolyFlags2 != PolyFlags2) ||
 			(TexInfo[0].CurrentCacheID != CacheID) ||
-			((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_ARRAY_SIZE - 6)) ||
+			((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 6)) ||
 			(m_bufferedVerts == 0))
 		{
 			//Flush any previously buffered tiles
 			EndBuffering();
 
 			//Check if vertex buffer flush is required
-			if ((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_ARRAY_SIZE - 6)) {
+			if ((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 6)) {
 				FlushVertexBuffers();
 			}
 
@@ -4013,8 +3981,8 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 			}
 
 			//Lock vertexColor and texCoord0 buffers
-			LockVertexColorBuffer();
-			LockTexCoordBuffer(0);
+			LockVertexColorBuffer(6);
+			LockTexCoordBuffer(0, 6);
 
 			//Set stream state
 			SetDefaultStreamState();
@@ -4198,14 +4166,14 @@ void UD3D9RenderDevice::Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 		if ((m_curPolyFlags != PolyFlags) ||
 			(m_curPolyFlags2 != PolyFlags2) ||
 			(TexInfo[0].CurrentCacheID != TEX_CACHE_ID_NO_TEX) ||
-			((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_ARRAY_SIZE - 2)) ||
+			((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 2)) ||
 			(m_bufferedVerts == 0))
 		{
 			//Flush any previously buffered lines
 			EndBuffering();
 
 			//Check if vertex buffer flush is required
-			if ((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_ARRAY_SIZE - 2)) {
+			if ((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 2)) {
 				FlushVertexBuffers();
 			}
 
@@ -4226,8 +4194,8 @@ void UD3D9RenderDevice::Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 			SetNoTexture(0);
 
 			//Lock vertexColor and texCoord0 buffers
-			LockVertexColorBuffer();
-			LockTexCoordBuffer(0);
+			LockVertexColorBuffer(2);
+			LockTexCoordBuffer(0, 2);
 		}
 
 		//Get line color
@@ -4306,14 +4274,14 @@ void UD3D9RenderDevice::Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 	if ((m_curPolyFlags != PolyFlags) ||
 		(m_curPolyFlags2 != PolyFlags2) ||
 		(TexInfo[0].CurrentCacheID != TEX_CACHE_ID_NO_TEX) ||
-		((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_ARRAY_SIZE - 2)) ||
+		((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 2)) ||
 		(m_bufferedVerts == 0))
 	{
 		//Flush any previously buffered lines
 		EndBuffering();
 
 		//Check if vertex buffer flush is required
-		if ((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_ARRAY_SIZE - 2)) {
+		if ((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 2)) {
 			FlushVertexBuffers();
 		}
 
@@ -4334,8 +4302,8 @@ void UD3D9RenderDevice::Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 		SetNoTexture(0);
 
 		//Lock vertexColor and texCoord0 buffers
-		LockVertexColorBuffer();
-		LockTexCoordBuffer(0);
+		LockVertexColorBuffer(2);
+		LockTexCoordBuffer(0, 2);
 	}
 
 	//Get line color
@@ -4437,14 +4405,14 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 	if ((m_curPolyFlags != PolyFlags) ||
 		(m_curPolyFlags2 != PolyFlags2) ||
 		(TexInfo[0].CurrentCacheID != TEX_CACHE_ID_NO_TEX) ||
-		((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_ARRAY_SIZE - 6)) ||
+		((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 6)) ||
 		(m_bufferedVerts == 0))
 	{
 		//Flush any previously buffered points
 		EndBuffering();
 
 		//Check if vertex buffer flush is required
-		if ((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_ARRAY_SIZE - 6)) {
+		if ((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 6)) {
 			FlushVertexBuffers();
 		}
 
@@ -4465,8 +4433,8 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 		SetNoTexture(0);
 
 		//Lock vertexColor and texCoord0 buffers
-		LockVertexColorBuffer();
-		LockTexCoordBuffer(0);
+		LockVertexColorBuffer(6);
+		LockTexCoordBuffer(0, 6);
 	}
 
 	//Get point color
@@ -5335,13 +5303,13 @@ void UD3D9RenderDevice::EndFlash() {
 		}
 
 		//Make sure at least 4 entries are left in the vertex buffers
-		if ((m_curVertexBufferPos + 4) >= VERTEX_ARRAY_SIZE) {
+		if ((m_curVertexBufferPos + 4) >= VERTEX_BUFFER_SIZE) {
 			FlushVertexBuffers();
 		}
 
 		//Lock vertexColor and texCoord0 buffers
-		LockVertexColorBuffer();
-		LockTexCoordBuffer(0);
+		LockVertexColorBuffer(4);
+		LockTexCoordBuffer(0, 4);
 
 		FGLTexCoord *pTexCoordArray = m_pTexCoordArray[0];
 		FGLVertexColor *pVertexColorArray = m_pVertexColorArray;
@@ -7211,7 +7179,8 @@ void UD3D9RenderDevice::RenderPassesExec(void) {
 	//	assert(MultiDrawCountArray[PolyNum] == 3);
 	//	//m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos + MultiDrawFirstArray[PolyNum], MultiDrawCountArray[PolyNum] - 2);
 	//}
-	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, m_curVertexBufferPos, m_csPolyCount);
+	INT bufferPos = getVertBufferPos(m_csPtCount);
+	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, bufferPos, m_csPolyCount);
 
 #ifdef UTGLR_DEBUG_WORLD_WIREFRAME
 	m_d3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
@@ -7219,14 +7188,11 @@ void UD3D9RenderDevice::RenderPassesExec(void) {
 	SetBlend(PF_Modulated);
 
 	for (PolyNum = 0; PolyNum < m_csPolyCount; PolyNum++) {
-		m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos + MultiDrawFirstArray[PolyNum], MultiDrawCountArray[PolyNum] - 2);
+		m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, bufferPos + MultiDrawFirstArray[PolyNum], MultiDrawCountArray[PolyNum] - 2);
 	}
 
 	m_d3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
 #endif
-
-	//Advance vertex buffer position
-	m_curVertexBufferPos += m_csPtCount;
 
 #if 0
 {
@@ -7262,15 +7228,15 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 	DisableSubsequentTextures(m_rpPassCount);
 
 	//Make sure at least m_csPtCount entries are left in the vertex buffers
-	if ((m_curVertexBufferPos + m_csPtCount) >= VERTEX_ARRAY_SIZE) {
+	if ((m_curVertexBufferPos + m_csPtCount) >= VERTEX_BUFFER_SIZE) {
 		FlushVertexBuffers();
 	}
 
 	//Lock vertexColor and texCoord buffers
-	LockVertexColorBuffer();
+	LockVertexColorBuffer(m_csPtCount);
 	t = 0;
 	do {
-		LockTexCoordBuffer(t);
+		LockTexCoordBuffer(t, m_csPtCount);
 	} while (++t < m_rpPassCount);
 
 	//Write vertex and color
@@ -7356,15 +7322,15 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTex
 	DisableSubsequentTextures(m_rpPassCount);
 
 	//Make sure at least m_csPtCount entries are left in the vertex buffers
-	if ((m_curVertexBufferPos + m_csPtCount) >= VERTEX_ARRAY_SIZE) {
+	if ((m_curVertexBufferPos + m_csPtCount) >= VERTEX_BUFFER_SIZE) {
 		FlushVertexBuffers();
 	}
 
 	//Lock vertexColor and texCoord buffers
-	LockVertexColorBuffer();
+	LockVertexColorBuffer(m_csPtCount);
 	t = 0;
 	do {
-		LockTexCoordBuffer(t);
+		LockTexCoordBuffer(t, m_csPtCount);
 	} while (++t < m_rpPassCount);
 
 	//Write vertex and color
@@ -7546,10 +7512,7 @@ void UD3D9RenderDevice::EndGouraudPolygonBufferingNoCheck(void) {
 #endif
 
 	//Draw the triangles
-	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, m_curVertexBufferPos, m_bufferedVerts / 3);
-
-	//Advance vertex buffer position
-	m_curVertexBufferPos += m_bufferedVerts;
+	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, getVertBufferPos(m_bufferedVerts), m_bufferedVerts / 3);
 
 #ifdef UTGLR_DEBUG_ACTOR_WIREFRAME
 	m_d3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
@@ -7575,18 +7538,8 @@ void UD3D9RenderDevice::EndTileBufferingNoCheck(void) {
 	UnlockVertexColorBuffer();
 	UnlockTexCoordBuffer(0);
 
-	//Set view matrix
-	/*D3DMATRIX d3dView = { +1.0f,  0.0f,  0.0f,  0.0f,
-						   0.0f, -1.0f,  0.0f,  0.0f,
-						   0.0f,  0.0f, -1.0f,  0.0f,
-						   0.0f,  0.0f,  0.0f, +1.0f };
-	m_d3dDevice->SetTransform(D3DTS_VIEW, &d3dView);*/
-
 	//Draw the quads (stored as triangles)
-	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, m_curVertexBufferPos, m_bufferedVerts / 3);
-
-	//Advance vertex buffer position
-	m_curVertexBufferPos += m_bufferedVerts;
+	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, getVertBufferPos(m_bufferedVerts), m_bufferedVerts / 3);
 
 	unclockFast(TileCycles);
 }
@@ -7602,10 +7555,7 @@ void UD3D9RenderDevice::EndLineBufferingNoCheck(void) {
 	UnlockTexCoordBuffer(0);
 
 	//Draw the lines
-	m_d3dDevice->DrawPrimitive(D3DPT_LINELIST, m_curVertexBufferPos, m_bufferedVerts / 2);
-
-	//Advance vertex buffer position
-	m_curVertexBufferPos += m_bufferedVerts;
+	m_d3dDevice->DrawPrimitive(D3DPT_LINELIST, getVertBufferPos(m_bufferedVerts), m_bufferedVerts / 2);
 }
 
 void UD3D9RenderDevice::EndPointBufferingNoCheck(void) {
@@ -7619,10 +7569,7 @@ void UD3D9RenderDevice::EndPointBufferingNoCheck(void) {
 	UnlockTexCoordBuffer(0);
 
 	//Draw the points (stored as triangles)
-	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, m_curVertexBufferPos, m_bufferedVerts / 3);
-
-	//Advance vertex buffer position
-	m_curVertexBufferPos += m_bufferedVerts;
+	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, getVertBufferPos(m_bufferedVerts), m_bufferedVerts / 3);
 }
 
 static const D3DMATRIX identityMatrix = ToD3DMATRIX(DirectX::XMMatrixIdentity());

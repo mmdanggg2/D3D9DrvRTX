@@ -159,6 +159,7 @@ typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
 
 //Must be at least 2000
 #define VERTEX_ARRAY_SIZE	50000	// vogel: better safe than sorry
+#define VERTEX_BUFFER_SIZE	1000
 
 
 /*-----------------------------------------------------------------------------
@@ -495,6 +496,9 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	FGLVertex m_csVertexArray[VERTEX_ARRAY_SIZE];
 	IDirect3DVertexBuffer9 *m_d3dVertexColorBuffer;
 	FGLVertexColor *m_pVertexColorArray;
+	INT m_vertexTempBufferSize;
+	IDirect3DVertexBuffer9* m_d3dTempVertexColorBuffer;
+	IDirect3DVertexBuffer9* m_currentVertexColorBuffer;
 
 	//Secondary color
 	IDirect3DVertexBuffer9 *m_d3dSecondaryColorBuffer;
@@ -503,6 +507,9 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	//Tex coords
 	IDirect3DVertexBuffer9 *m_d3dTexCoordBuffer[MAX_TMUNITS];
 	FGLTexCoord *m_pTexCoordArray[MAX_TMUNITS];
+	INT m_texTempBufferSize[MAX_TMUNITS];
+	IDirect3DVertexBuffer9* m_d3dTempTexCoordBuffer[MAX_TMUNITS];
+	IDirect3DVertexBuffer9* m_currentTexCoordBuffer[MAX_TMUNITS];
 
 	FGLMapDot *MapDotArray;
 	BYTE m_MapDotArrayMem[(sizeof(FGLMapDot) * VERTEX_ARRAY_SIZE) + VERTEX_ARRAY_ALIGN + VERTEX_ARRAY_TAIL_PADDING];
@@ -514,11 +521,24 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	bool m_texCoordBufferNeedsDiscard[MAX_TMUNITS];
 
 	inline void FlushVertexBuffers(void) {
+		dout << L"Vertex buffers flushed" << std::endl;
 		m_curVertexBufferPos = 0;
 		m_vertexColorBufferNeedsDiscard = true;
+		//if (m_d3dTempVertexColorBuffer) {
+		//	dout << L"Flush releasing vert buffer of size " << m_vertexTempBufferSize << std::endl;
+		//	m_d3dTempVertexColorBuffer->Release();
+		//	m_d3dTempVertexColorBuffer = nullptr;
+		//	m_vertexTempBufferSize = 0;
+		//}
 		m_secondaryColorBufferNeedsDiscard = true;
 		for (int u = 0; u < MAX_TMUNITS; u++) {
 			m_texCoordBufferNeedsDiscard[u] = true;
+			//if (m_d3dTempTexCoordBuffer[u]) {
+			//	dout << L"Flush releasing tex buffer of size " << m_vertexTempBufferSize << std::endl;
+			//	m_d3dTempTexCoordBuffer[u]->Release();
+			//	m_d3dTempTexCoordBuffer[u] = nullptr;
+			//	m_texTempBufferSize[u] = 0;
+			//}
 		}
 
 #ifdef D3D9_DEBUG
@@ -526,47 +546,82 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 #endif
 	}
 
-	inline void LockVertexColorBuffer(void) {
-		BYTE *pData;
-		DWORD lockFlags;
+	// Gets the current vert buffer position and increments it by numPoints
+	inline INT getVertBufferPos(INT numPoints) {
+		INT bufferPos = 0;
+		if (numPoints <= VERTEX_BUFFER_SIZE) {
+			bufferPos = m_curVertexBufferPos;
 
-		lockFlags = D3DLOCK_NOSYSLOCK;
-		if (m_vertexColorBufferNeedsDiscard) {
-			m_vertexColorBufferNeedsDiscard = false;
-			lockFlags |= D3DLOCK_DISCARD;
+			//Advance vertex buffer position
+			m_curVertexBufferPos += numPoints;
 		}
-		else {
-			lockFlags |= D3DLOCK_NOOVERWRITE;
+		return bufferPos;
+	}
+
+	inline void LockVertexColorBuffer(INT numPoints) {
+		DWORD lockFlags = D3DLOCK_NOSYSLOCK;
+		HRESULT hResult;
+		INT bufferPos;
+		IDirect3DVertexBuffer9* vertBuffer;
+
+		if (numPoints > VERTEX_BUFFER_SIZE) {
+			if (m_vertexTempBufferSize != numPoints || !m_d3dTempVertexColorBuffer) {
+				if (m_d3dTempVertexColorBuffer) {
+					//dout << L"Releasing vert buffer of size " << m_vertexTempBufferSize << std::endl;
+					m_d3dTempVertexColorBuffer->Release();
+				}
+				//dout << L"Creating vert buffer of size " << numPoints << std::endl;
+				hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColor) * numPoints, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, D3DPOOL_DEFAULT, &m_d3dTempVertexColorBuffer, NULL);
+				if (FAILED(hResult)) {
+					appErrorf(TEXT("CreateVertexBuffer failed"));
+				}
+				m_vertexTempBufferSize = numPoints;
+			} else {
+				lockFlags |= D3DLOCK_DISCARD;
+			}
+			vertBuffer = m_d3dTempVertexColorBuffer;
+			bufferPos = 0;
+		} else {
+			if (m_vertexColorBufferNeedsDiscard) {
+				m_vertexColorBufferNeedsDiscard = false;
+				lockFlags |= D3DLOCK_DISCARD;
+			} else {
+				lockFlags |= D3DLOCK_NOOVERWRITE;
+			}
+			vertBuffer = m_d3dVertexColorBuffer;
+			bufferPos = m_curVertexBufferPos;
 		}
-		if (FAILED(m_d3dVertexColorBuffer->Lock(0, 0, (VOID **)&pData, lockFlags))) {
+		if (vertBuffer != m_currentVertexColorBuffer) {
+			hResult = m_d3dDevice->SetStreamSource(0, vertBuffer, 0, sizeof(FGLVertexColor));
+			if (FAILED(hResult)) {
+				appErrorf(TEXT("SetStreamSource failed"));
+			}
+			m_currentVertexColorBuffer = vertBuffer;
+		}
+
+		BYTE* pData = nullptr;
+
+		//dout << L"Locking vert buffer of size " << numPoints << std::endl;
+		if (FAILED(vertBuffer->Lock(0, 0, (VOID **)&pData, lockFlags))) {
 			appErrorf(TEXT("Vertex buffer lock failed"));
 		}
-
-		m_pVertexColorArray = (FGLVertexColor *)(pData + (m_curVertexBufferPos * sizeof(FGLVertexColor)));
+		
+		m_pVertexColorArray = (FGLVertexColor*)(pData + (bufferPos * sizeof(FGLVertexColor)));
 	}
 	inline void UnlockVertexColorBuffer(void) {
-		if (FAILED(m_d3dVertexColorBuffer->Unlock())) {
+		if (FAILED(m_currentVertexColorBuffer->Unlock())) {
 			appErrorf(TEXT("Vertex buffer unlock failed"));
 		}
 	}
 
-	inline void LockSecondaryColorBuffer(void) {
-		BYTE *pData;
-		DWORD lockFlags;
-
-		lockFlags = D3DLOCK_NOSYSLOCK;
-		if (m_secondaryColorBufferNeedsDiscard) {
-			m_secondaryColorBufferNeedsDiscard = false;
-			lockFlags |= D3DLOCK_DISCARD;
-		}
-		else {
-			lockFlags |= D3DLOCK_NOOVERWRITE;
-		}
-		if (FAILED(m_d3dSecondaryColorBuffer->Lock(0, 0, (VOID **)&pData, lockFlags))) {
+	inline void LockSecondaryColorBuffer(INT numPoints) {
+		appErrorf(TEXT("Can't be bothered, don't use LockSecondaryColorBuffer thx bye!"));
+		FGLSecondaryColor*pData = nullptr;
+		if (FAILED(m_d3dSecondaryColorBuffer->Lock(0, 0, (VOID **)&pData, D3DLOCK_NOSYSLOCK))) {
 			appErrorf(TEXT("Vertex buffer lock failed"));
 		}
 
-		m_pSecondaryColorArray = (FGLSecondaryColor *)(pData + (m_curVertexBufferPos * sizeof(FGLSecondaryColor)));
+		m_pSecondaryColorArray = pData;
 	}
 	inline void UnlockSecondaryColorBuffer(void) {
 		if (FAILED(m_d3dSecondaryColorBuffer->Unlock())) {
@@ -574,26 +629,60 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 		}
 	}
 
-	inline void FASTCALL LockTexCoordBuffer(DWORD texUnit) {
-		BYTE *pData;
-		DWORD lockFlags;
+	inline void FASTCALL LockTexCoordBuffer(DWORD texUnit, INT numPoints) {
+		DWORD lockFlags = D3DLOCK_NOSYSLOCK;
+		HRESULT hResult;
+		IDirect3DVertexBuffer9* texBuffer;
+		INT bufferPos;
 
-		lockFlags = D3DLOCK_NOSYSLOCK;
-		if (m_texCoordBufferNeedsDiscard[texUnit]) {
-			m_texCoordBufferNeedsDiscard[texUnit] = false;
-			lockFlags |= D3DLOCK_DISCARD;
+		if (numPoints > VERTEX_BUFFER_SIZE) {
+			check(m_vertexTempBufferSize == numPoints);
+			IDirect3DVertexBuffer9*& texCoordBuffer = m_d3dTempTexCoordBuffer[texUnit];
+			if (m_texTempBufferSize[texUnit] != numPoints || !texCoordBuffer) {
+				if (texCoordBuffer) {
+					//dout << L"Releasing tex buffer of size " << m_texTempBufferSize[texUnit] << std::endl;
+					texCoordBuffer->Release();
+				}
+				//dout << L"Creating tex buffer of size " << numPoints << std::endl;
+				hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLTexCoord) * numPoints, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, D3DPOOL_DEFAULT, &texCoordBuffer, NULL);
+				if (FAILED(hResult)) {
+					appErrorf(TEXT("CreateVertexBuffer failed"));
+				}
+				m_texTempBufferSize[texUnit] = numPoints;
+			} else {
+				lockFlags |= D3DLOCK_DISCARD;
+			}
+			texBuffer = texCoordBuffer;
+			bufferPos = 0;
+		} else {
+			if (m_texCoordBufferNeedsDiscard[texUnit]) {
+				m_texCoordBufferNeedsDiscard[texUnit] = false;
+				lockFlags |= D3DLOCK_DISCARD;
+			} else {
+				lockFlags |= D3DLOCK_NOOVERWRITE;
+			}
+			texBuffer = m_d3dTexCoordBuffer[texUnit];
+			bufferPos = m_curVertexBufferPos;
 		}
-		else {
-			lockFlags |= D3DLOCK_NOOVERWRITE;
+		if (m_currentTexCoordBuffer[texUnit] != texBuffer) {
+			hResult = m_d3dDevice->SetStreamSource(2 + texUnit, texBuffer, 0, sizeof(FGLTexCoord));
+			if (FAILED(hResult)) {
+				appErrorf(TEXT("SetStreamSource failed"));
+			}
+			m_currentTexCoordBuffer[texUnit] = texBuffer;
 		}
-		if (FAILED(m_d3dTexCoordBuffer[texUnit]->Lock(0, 0, (VOID **)&pData, lockFlags))) {
+
+		BYTE* pData = nullptr;
+
+		//dout << L"Locking tex buffer of size " << numPoints << std::endl;
+		if (FAILED(texBuffer->Lock(0, 0, (VOID **)&pData, lockFlags))) {
 			appErrorf(TEXT("Vertex buffer lock failed"));
 		}
-
-		m_pTexCoordArray[texUnit] = (FGLTexCoord *)(pData + (m_curVertexBufferPos * sizeof(FGLTexCoord)));
+		
+		m_pTexCoordArray[texUnit] = (FGLTexCoord*)(pData + (bufferPos * sizeof(FGLTexCoord)));
 	}
 	inline void FASTCALL UnlockTexCoordBuffer(DWORD texUnit) {
-		if (FAILED(m_d3dTexCoordBuffer[texUnit]->Unlock())) {
+		if (FAILED(m_currentTexCoordBuffer[texUnit]->Unlock())) {
 			appErrorf(TEXT("Vertex buffer unlock failed"));
 		}
 	}
