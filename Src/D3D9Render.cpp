@@ -58,6 +58,10 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			flags |= viewport->ExtraPolyFlags;
 			flags &= flagMask;
 
+			if (flags & PF_Invisible) {
+				continue;
+			}
+
 			FTextureInfo* texInfo;
 			if (lockedTextures.find(texture) == lockedTextures.end()) {
 				texInfo = &lockedTextures[texture];
