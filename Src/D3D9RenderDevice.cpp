@@ -4502,6 +4502,25 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 	unguard;
 }
 
+static UTexture* getTextureWithoutNext(UTexture* texture, FTime time, FLOAT fraction) {
+	INT count = 1;
+	for (UTexture* next = texture->AnimNext; next && next != texture; next = next->AnimNext)
+		count++;
+	INT index = Clamp(appFloor(fraction * count), 0, count - 1);
+	while (index-- > 0)
+		texture = texture->AnimNext;
+	UTexture* oldNext = texture->AnimNext;
+	UTexture* oldCur = texture->AnimCur;
+	texture->AnimNext = NULL;
+	texture->AnimCur = NULL;
+
+	UTexture* renderTexture = texture->Get(time);
+
+	texture->AnimNext = oldNext;
+	texture->AnimCur = oldCur;
+
+	return renderTexture;
+}
 
 static inline DWORD getBasePolyFlags(AActor* actor) {
 	DWORD basePolyFlags = 0;
@@ -4523,49 +4542,41 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	}
 #endif
 	guard(UD3D9RenderDevice::renderSprite);
-	using namespace DirectX;
 
-	FPlane    color = (GIsEditor && actor->bSelected) ? FPlane(.5, .9, .5, 0) : FPlane(1, 1, 1, 0);
-	UTexture* texture = actor->Texture;
-	FLOAT     DrawScale = actor->DrawScale;
-	UTexture* SavedNext = NULL;
-	UTexture* SavedCur = NULL;
-	DWORD basePolyFlags = getBasePolyFlags(actor);
+	FPlane color = (GIsEditor && actor->bSelected) ? FPlane(.5, .9, .5, 0) : FPlane(1, 1, 1, 0);
 	if (actor->ScaleGlow != 1.0) {
 		color *= actor->ScaleGlow;
-		if (color.X > 1.0) color.X = 1.0;
-		if (color.Y > 1.0) color.Y = 1.0;
-		if (color.Z > 1.0) color.Z = 1.0;
 	}
-	if (actor->DrawType == DT_SpriteAnimOnce) {
-		INT Count = 1;
-		for (UTexture* Test = texture->AnimNext; Test && Test != texture; Test = Test->AnimNext)
-			Count++;
-		INT Num = Clamp(appFloor(actor->LifeFraction() * Count), 0, Count - 1);
-		while (Num-- > 0)
-			texture = texture->AnimNext;
-		SavedNext = texture->AnimNext;//sort of a hack!!
-		SavedCur = texture->AnimCur;
-		texture->AnimNext = NULL;
-		texture->AnimCur = NULL;
-	}
+
+	UTexture* texture = actor->Texture;
+	FLOAT drawScale = actor->DrawScale;
 	if (frame->Viewport->Actor->ShowFlags & SHOW_ActorIcons) {
-		DrawScale = 1.0;
+		drawScale = 1.0;
 		if (!texture)
 			texture = GetDefault<AActor>()->Texture;
 	}
-
-	UTexture* renderTexture = texture->Get(frame->Viewport->CurrentTime);
-
-	FLOAT XScale = DrawScale * renderTexture->USize;
-	FLOAT YScale = DrawScale * renderTexture->VSize;
-	
+	FTime& currTime = frame->Viewport->CurrentTime;
+	UTexture* renderTexture;
 	if (actor->DrawType == DT_SpriteAnimOnce) {
-		texture->AnimNext = SavedNext;
-		texture->AnimCur = SavedCur;
+		renderTexture = getTextureWithoutNext(texture, currTime, actor->LifeFraction());
+	} else {
+		renderTexture = texture->Get(currTime);
 	}
 
-	FVector location = actor->Location + actor->PrePivot;
+	FTextureInfo texInfo;
+	renderTexture->Lock(texInfo, currTime, -1, this);
+	renderSpriteGeo(frame, actor->Location + actor->PrePivot, drawScale, texInfo, getBasePolyFlags(actor), color);
+	renderTexture->Unlock(texInfo);
+	unguard;
+}
+
+void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScale, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color) {
+	guard(UD3D9RenderDevice::renderSpriteGeo);
+	using namespace DirectX;
+
+	FLOAT XScale = drawScale * texInfo.USize;
+	FLOAT YScale = drawScale * texInfo.VSize;
+
 	FVector camLoc = frame->Coords.Origin;
 	FVector camUp = FVector(0.0f, -1.0f, 0.0f).TransformVectorBy(frame->Uncoords);
 	XMVECTOR direction = XMVector3Normalize(FVecToDXVec(camLoc - location));
@@ -4575,7 +4586,7 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	matRot *= XMMatrixRotationY(PI / 2);// rotate card 90 on Y since LookAt expects +z to be forward.
 	matRot *= XMMatrixRotationZ(-PI / 2);// rotate card 90 on Z because that's the way it's oriented aparently?.
 	matRot *= XMMatrixInverse(nullptr, XMMatrixLookAtLH(XMVectorSet(0, 0, 0, 0), direction, FVecToDXVec(camUp)));
-	XMMATRIX matScale = XMMatrixScaling(actor->DrawScale, XScale, YScale);
+	XMMATRIX matScale = XMMatrixScaling(drawScale, XScale, YScale);
 
 	XMMATRIX mat = XMMatrixIdentity();
 	mat *= matScale;
@@ -4585,42 +4596,49 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &actorMatrix);
 
+	if (color.X > 1.0) color.X = 1.0;
+	if (color.Y > 1.0) color.Y = 1.0;
+	if (color.Z > 1.0) color.Z = 1.0;
+
 	std::vector<FTransTexture> verts;
 
-	float uMin = renderTexture->USize;
+	float uMin = texInfo.USize;
 	float uMax = 0;
 	float vMin = 0;
-	float vMax = renderTexture->VSize;
+	float vMax = texInfo.VSize;
 	FTransTexture point{};
 	point.Point = FVector(0, -0.5, -0.5);
 	point.U = uMin;
 	point.V = vMin;
+	point.Light = color;
 	verts.push_back(point);
 	point.Point = FVector(0, -0.5, 0.5);
 	point.U = uMin;
 	point.V = vMax;
+	point.Light = color;
 	verts.push_back(point);
 	point.Point = FVector(0, 0.5, -0.5);
 	point.U = uMax;
 	point.V = vMin;
+	point.Light = color;
 	verts.push_back(point);
 	point.Point = FVector(0, 0.5, 0.5);
 	point.U = uMax;
 	point.V = vMax;
+	point.Light = color;
 	verts.push_back(point);
 	point.Point = FVector(0, 0.5, -0.5);
 	point.U = uMax;
 	point.V = vMin;
+	point.Light = color;
 	verts.push_back(point);
 	point.Point = FVector(0, -0.5, 0.5);
 	point.U = uMin;
 	point.V = vMax;
+	point.Light = color;
 	verts.push_back(point);
 
-	FTextureInfo texInfo;
-	renderTexture->Lock(texInfo, frame->Viewport->CurrentTime, -1, this);
-
-	DWORD flags = basePolyFlags | PF_TwoSided | (texture->PolyFlags & PF_Masked);//PF_Modulated;
+	DWORD flags = basePolyFlags | PF_TwoSided | (texInfo.Texture->PolyFlags & PF_Masked);//PF_Modulated;
 
 	BufferTriangleSurfaceGeometry(verts);
 	//Initialize render passes state information
@@ -4633,7 +4651,6 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	AddRenderPass(&texInfo, flags & ~PF_FlatShaded, 0.0f);
 
 	RenderPasses();
-	renderTexture->Unlock(texInfo);
 	unguard;
 }
 
@@ -4657,11 +4674,14 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 	FVector origPrePiv = actor->PrePivot;
 	FRotator origRot = actor->Rotation;
 	FLOAT origScale = actor->DrawScale;
-	actor->Location = FVector(0, 0, 0);
-	actor->PrePivot = FVector(0, 0, 0);
-	actor->Rotation = FRotator(0, 0, 0);
-	actor->DrawScale = 1.0f;
+	if (!actor->bParticles) {
+		actor->Location = FVector(0, 0, 0);
+		actor->PrePivot = FVector(0, 0, 0);
+		actor->Rotation = FRotator(0, 0, 0);
+		actor->DrawScale = 1.0f;
+	}
 
+	int numVerts;
 	int numTris;
 	FTransTexture* samples;
 	bool isLod;
@@ -4672,12 +4692,13 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 		FTransTexture* allSamples = NewZeroed<FTransTexture>(GMem, meshLod->ModelVerts + meshLod->SpecialVerts);
 		// First samples are special coordinates
 		samples = &allSamples[meshLod->SpecialVerts];
-		int lodReq = meshLod->ModelVerts;
-		meshLod->GetFrame(&allSamples->Point, sizeof(samples[0]), GMath.UnitCoords, actor, lodReq);
+		numVerts = meshLod->ModelVerts;
+		meshLod->GetFrame(&allSamples->Point, sizeof(samples[0]), GMath.UnitCoords, actor, numVerts);
 		numTris = meshLod->Faces.Num();
 	} else {
 		isLod = false;
-		samples = NewZeroed<FTransTexture>(GMem, mesh->FrameVerts);
+		numVerts = mesh->FrameVerts;
+		samples = NewZeroed<FTransTexture>(GMem, numVerts);
 		mesh->GetFrame(&samples->Point, sizeof(samples[0]), GMath.UnitCoords, actor);
 		numTris = mesh->Tris.Num();
 	}
@@ -4686,6 +4707,37 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 	actor->PrePivot = origPrePiv;
 	actor->Rotation = origRot;
 	actor->DrawScale = origScale;
+
+	FTime& currentTime = frame->Viewport->CurrentTime;
+
+	if (actor->bParticles) {
+		for (INT i = 0; i < numVerts; i++) {
+			if (!samples[i].Flags) {
+				FTransTexture& sample = samples[i];
+				UTexture* tex = actor->Texture->Get(currentTime);
+				if (actor->bRandomFrame) {
+					tex = actor->MultiSkins[appCeil((&sample - samples) / 3.f) % 8];
+					if (tex) {
+						tex = getTextureWithoutNext(tex, currentTime, actor->LifeFraction());
+					}
+				}
+				if (tex) {
+					DWORD baseFlags = getBasePolyFlags(actor);
+					FLOAT lux = Clamp(actor->ScaleGlow * 0.5f + actor->AmbientGlow / 256.f, 0.f, 1.f);
+					FPlane color = FVector(lux, lux, lux);
+					if (GIsEditor && (baseFlags & PF_Selected)) {
+						color = color * 0.4 + FVector(0.0, 0.6, 0.0);
+					}
+
+					FTextureInfo texInfo;
+					tex->Lock(texInfo, currentTime, -1, this);
+					renderSpriteGeo(frame, sample.Point, actor->DrawScale, texInfo, baseFlags, color);
+					tex->Unlock(texInfo);
+				}
+			}
+		}
+		return;
+	}
 
 	UniqueValueArray<UTexture*> textures;
 	UniqueValueArray<FTextureInfo> texInfos;
@@ -4697,10 +4749,10 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 		} else if (!tex) {
 			continue;
 		}
-		tex = tex->Get(frame->Viewport->CurrentTime);
+		tex = tex->Get(currentTime);
 		if (textures.insert(i, tex)) {
 			FTextureInfo texInfo{};
-			textures.at(i)->Lock(texInfo, frame->Viewport->CurrentTime, -1, this);
+			textures.at(i)->Lock(texInfo, currentTime, -1, this);
 			texInfos.insert(i, texInfo);
 		} else {
 			texInfos.insert(i, texInfos.at(textures.getIndex(tex)));

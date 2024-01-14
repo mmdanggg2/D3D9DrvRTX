@@ -521,7 +521,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	bool m_texCoordBufferNeedsDiscard[MAX_TMUNITS];
 
 	inline void FlushVertexBuffers(void) {
-		dout << L"Vertex buffers flushed" << std::endl;
+		//dout << L"Vertex buffers flushed" << std::endl;
 		m_curVertexBufferPos = 0;
 		m_vertexColorBufferNeedsDiscard = true;
 		//if (m_d3dTempVertexColorBuffer) {
@@ -1300,6 +1300,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FLOAT X1, FLOAT Y1, FLOAT X2, FLOAT Y2, FLOAT Z);
 
 	void renderSprite(FSceneNode* frame, AActor* actor);
+	void renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScale, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color);
 	void renderMeshActor(FSceneNode* frame, AActor* actor);
 	void renderMover(FSceneNode* frame, AMover* mover);
 	void renderLights(std::vector<AActor*> lightActors);
