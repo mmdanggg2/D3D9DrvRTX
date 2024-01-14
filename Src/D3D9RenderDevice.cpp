@@ -224,6 +224,11 @@ static inline DirectX::XMVECTOR FVecToDXVec(const FVector& vec) {
 	return DirectX::XMVectorSet(vec.X, vec.Y, vec.Z, 0.0f);
 }
 
+static inline FVector DXVecToFVec(DirectX::XMVECTOR& vec) {
+	using namespace DirectX;
+	return FVector(XMVectorGetX(vec), XMVectorGetY(vec), XMVectorGetZ(vec));
+}
+
 #define rotConvert(integer) (((float)integer) / ((float)MAXWORD) * (PI * 2))
 
 static DirectX::FXMVECTOR FRotToDXQuat(const FRotator& rot) {
@@ -4531,6 +4536,11 @@ static inline DWORD getBasePolyFlags(AActor* actor) {
 	} else if (actor->Style == STY_Modulated) {
 		basePolyFlags |= PF_Modulated;
 	}
+
+	if (actor->bNoSmooth) basePolyFlags |= PF_NoSmooth;
+	if (actor->bSelected) basePolyFlags |= PF_Selected;
+	if (actor->bMeshEnviroMap) basePolyFlags |= PF_Environment;
+
 	return basePolyFlags;
 }
 
@@ -4741,6 +4751,8 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 
 	UniqueValueArray<UTexture*> textures;
 	UniqueValueArray<FTextureInfo> texInfos;
+	UTexture* envTex = nullptr;
+	FTextureInfo envTexInfo;
 
 	for (int i = 0; i < mesh->Textures.Num(); i++) {
 		UTexture* tex = mesh->GetTexture(i, actor);
@@ -4757,13 +4769,58 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 		} else {
 			texInfos.insert(i, texInfos.at(textures.getIndex(tex)));
 		}
+		envTex = tex;
+	}
+	if (actor->Texture) {
+		envTex = actor->Texture;
+	} else if (actor->Region.Zone && actor->Region.Zone->EnvironmentMap) {
+		envTex = actor->Region.Zone->EnvironmentMap;
+	} else if (actor->Level->EnvironmentMap) {
+		envTex = actor->Level->EnvironmentMap;
+	}
+	if (!envTex) {
+		return;
+	}
+	envTex->Lock(envTexInfo, currentTime, -1, this);
+
+	bool fatten = actor->Fatness != 128;
+	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
+
+	// Calculate normals
+	for (int i = 0; i < numVerts; i++) {
+		samples[i].Normal = FPlane(0, 0, 0, 0);
+	}
+	for (int i = 0; i < numTris; i++) {
+		FTransTexture* points[3];
+		if (isLod) {
+			ULodMesh* meshLod = (ULodMesh*)mesh;
+			FMeshFace& face = meshLod->Faces(i);
+			for (int j = 0; j < 3; j++) {
+				FMeshWedge& wedge = meshLod->Wedges(face.iWedge[j]);
+				points[j] = &samples[wedge.iVertex];
+			}
+		} else {
+			FMeshTri& tri = mesh->Tris(i);
+			for (int j = 0; j < 3; j++) {
+				points[j] = &samples[tri.iVertex[j]];
+			}
+		}
+		XMVECTOR fNorm = XMVector3Cross(FVecToDXVec(points[1]->Point - points[0]->Point), FVecToDXVec(points[2]->Point - points[0]->Point));
+		for (int j = 0; j < 3; j++) {
+			points[j]->Normal += DXVecToFVec(fNorm);
+		}
+	}
+	for (int i = 0; i < numVerts; i++) {
+		XMVECTOR normal = FVecToDXVec(samples[i].Normal);
+		normal = XMVector3Normalize(normal);
+		samples[i].Normal = DXVecToFVec(normal);
 	}
 
 	SurfKeyMap<std::vector<FTransTexture>> surfaceMap;
 	surfaceMap.reserve(1000);
 
 	for (INT i = 0; i < numTris; i++) {
-		FTransTexture points[3];
+		FTransTexture* points[3];
 		DWORD polyFlags;
 		INT texIdx;
 		FMeshUV triUV[3];
@@ -4772,7 +4829,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 			FMeshFace& face = meshLod->Faces(i);
 			for (int j = 0; j < 3; j++) {
 				FMeshWedge& wedge = meshLod->Wedges(face.iWedge[j]);
-				points[j] = samples[wedge.iVertex];
+				points[j] = &samples[wedge.iVertex];
 				triUV[j] = wedge.TexUV;
 			}
 			FMeshMaterial& mat = meshLod->Materials(face.MaterialIndex);
@@ -4780,21 +4837,24 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 			polyFlags = mat.PolyFlags;
 		} else {
 			FMeshTri& tri = mesh->Tris(i);
-			points[0] = samples[tri.iVertex[0]];
-			points[1] = samples[tri.iVertex[1]];
-			points[2] = samples[tri.iVertex[2]];
-			polyFlags = tri.PolyFlags;
-			texIdx = tri.TextureIndex;
-			for (int j = 0; j < 3; j++)
+			for (int j = 0; j < 3; j++) {
+				points[j] = &samples[tri.iVertex[j]];
 				triUV[j] = tri.Tex[j];
+			}
+			texIdx = tri.TextureIndex;
+			polyFlags = tri.PolyFlags;
 		}
 
-		
-		if (!(points[0].Flags & points[1].Flags & points[2].Flags)) {
+		polyFlags |= getBasePolyFlags(actor);
+
+		if (!(points[0]->Flags & points[1]->Flags & points[2]->Flags)) {
 			if ((polyFlags & (PF_TwoSided | PF_Flat | PF_Invisible)) != (PF_Flat)) {
-				
-				if (!texInfos.has(texIdx)) continue;
-				FTextureInfo* texInfo = &texInfos.at(texIdx);
+				FTextureInfo* texInfo;
+				if (texInfos.has(texIdx) && !(polyFlags & PF_Environment)) {
+					texInfo = &texInfos.at(texIdx);
+				} else {
+					texInfo = &envTexInfo;
+				}
 				if (!texInfo->Texture) {
 					continue;
 				}
@@ -4802,9 +4862,18 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 				float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
 
 				for (INT j = 0; j < 3; j++) {
-					FTransTexture vert = points[j];
+					FTransTexture vert = *points[j];
 					vert.U = triUV[j].U * scaleU;
 					vert.V = triUV[j].V * scaleV;
+					if (fatten) {
+						vert.Point += vert.Normal * fatness;
+					}
+
+					if (polyFlags & PF_Environment) {
+						FVector envNorm = vert.Point.UnsafeNormal().MirrorByVector(vert.Normal).TransformVectorBy(frame->Uncoords);
+						vert.U = (envNorm.X + 1.0) * 0.5 * 256.0 * scaleU;
+						vert.V = (envNorm.Y + 1.0) * 0.5 * 256.0 * scaleV;
+					}
 
 					surfaceMap[SurfKey(texInfo, polyFlags)].push_back(vert);
 				}
@@ -4812,9 +4881,9 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 		}
 	}
 
-	FXMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
-	FXMMATRIX matRot = FRotToDXRotMat(actor->Rotation);
-	FXMMATRIX matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
+	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
+	XMMATRIX matRot = FRotToDXRotMat(actor->Rotation);
+	XMMATRIX matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
 
 	XMMATRIX mat = XMMatrixIdentity();
 	mat *= matScale;
@@ -4834,14 +4903,10 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 		vp.MaxZ = 0.1f;
 		m_d3dDevice->SetViewport(&vp);
 	}
-
-	DWORD basePolyFlags = getBasePolyFlags(actor);
 	
 	for (const std::pair<const SurfKey, std::vector<FTransTexture>>& entry : surfaceMap) {
 		FTextureInfo* texInfo = entry.first.first;
 		DWORD polyFlags = entry.first.second;
-
-		polyFlags |= basePolyFlags;
 
 		m_csPtCount = BufferTriangleSurfaceGeometry(entry.second);
 
@@ -4866,6 +4931,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 			continue;
 		tex->Unlock(texInfos.at(textures.getIndex(tex)));
 	}
+	envTex->Unlock(envTexInfo);
 
 	unguard;
 }
