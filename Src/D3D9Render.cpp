@@ -40,7 +40,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		surfacePasses[1].reserve(model->Surfs.Num());
 		std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
 
-		DWORD flagMask = (viewport->Actor->ShowFlags & SHOW_PlayerCtrl) ? ~0 : ~PF_Invisible;
+		DWORD flagMask = (viewport->Actor->ShowFlags & SHOW_PlayerCtrl) ? ~PF_FlatShaded : ~PF_Invisible;
 		for (INT iNode = 0; iNode < model->Nodes.Num(); iNode++) {
 			const FBspNode* node = &model->Nodes(iNode);
 			INT iSurf = node->iSurf;

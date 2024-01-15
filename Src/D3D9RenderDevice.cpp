@@ -4980,12 +4980,15 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 			texInfo = &textureInfos[tex];
 		}
 		
+		flags &= ~PF_FlatShaded;// Ignore this for poly matching, meaningless for rendering
 		polys[SurfKey(texInfo, flags)].push_back(poly);
 	}
 
 	for (std::pair<const SurfKey, std::vector<FPoly*>>& entry : polys) {
 		FTextureInfo* texInfo = entry.first.first;
 		DWORD flags = entry.first.second;
+
+		INT numVerts = 0;
 		for (FPoly* poly : entry.second) {
 			FSavedPoly* sPoly = (FSavedPoly*)New<BYTE>(GDynMem, sizeof(FSavedPoly) + poly->NumVertices * sizeof(FTransform*));
 			sPoly->NumPts = poly->NumVertices;
@@ -5000,28 +5003,29 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 			facet.Polys = sPoly;
 			facet.MapCoords = FCoords(poly->Base, poly->TextureU, poly->TextureV, poly->Normal);
 
-			FTextureInfo texInfoPan = *texInfo;
-			texInfoPan.Pan.X = -poly->PanU;
-			texInfoPan.Pan.Y = -poly->PanV;
-
 			//Calculate UDot and VDot intermediates for complex surface
 			m_csUDot = facet.MapCoords.XAxis | facet.MapCoords.Origin;
 			m_csVDot = facet.MapCoords.YAxis | facet.MapCoords.Origin;
+
+			m_csUDot += poly->PanU;
+			m_csVDot += poly->PanV;
 			
-			m_csPtCount = BufferStaticComplexSurfaceGeometry(facet);
-
-			//Initialize render passes state information
-			m_rpPassCount = 0;
-			m_rpTMUnits = TMUnits;
-			m_rpForceSingle = false;
-			m_rpMasked = ((flags & PF_Masked) == 0) ? false : true;
-			m_rpSetDepthEqual = false;
-			m_rpColor = 0xFFFFFFFF;
-
-			AddRenderPass(&texInfoPan, flags & ~PF_FlatShaded, 0.0f);
-
-			RenderPasses();
+			numVerts = BufferStaticComplexSurfaceGeometry(facet, numVerts);
 		}
+
+		m_csPtCount = numVerts;
+
+		//Initialize render passes state information
+		m_rpPassCount = 0;
+		m_rpTMUnits = TMUnits;
+		m_rpForceSingle = false;
+		m_rpMasked = ((flags & PF_Masked) == 0) ? false : true;
+		m_rpSetDepthEqual = false;
+		m_rpColor = 0xFFFFFFFF;
+
+		AddRenderPass(texInfo, flags & ~PF_FlatShaded, 0.0f);
+
+		RenderPasses();
 	}
 
 	for (std::pair<UTexture* const, FTextureInfo>& entry : textureInfos) {
