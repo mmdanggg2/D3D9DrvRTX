@@ -5007,8 +5007,8 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 			m_csUDot = facet.MapCoords.XAxis | facet.MapCoords.Origin;
 			m_csVDot = facet.MapCoords.YAxis | facet.MapCoords.Origin;
 
-			m_csUDot += poly->PanU;
-			m_csVDot += poly->PanV;
+			m_csUDot -= poly->PanU;
+			m_csVDot -= poly->PanV;
 			
 			numVerts = BufferStaticComplexSurfaceGeometry(facet, numVerts);
 		}
