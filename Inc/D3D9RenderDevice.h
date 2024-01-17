@@ -1014,8 +1014,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	D3DPRESENT_PARAMETERS m_d3dpp;
 	bool m_doSoftwareVertexInit;
 
-	FSceneNode* currentFrame;
-
 
 #ifdef BGRA_MAKE
 #undef BGRA_MAKE

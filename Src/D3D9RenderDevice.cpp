@@ -220,6 +220,8 @@ static inline D3DMATRIX ToD3DMATRIX(const DirectX::XMMATRIX& xMMatrix) {
 	return reinterpret_cast<D3DMATRIX&>(temp);
 }
 
+static const D3DMATRIX identityMatrix = ToD3DMATRIX(DirectX::XMMatrixIdentity());
+
 static inline DirectX::XMVECTOR FVecToDXVec(const FVector& vec) {
 	return DirectX::XMVectorSet(vec.X, vec.Y, vec.Z, 0.0f);
 }
@@ -2745,9 +2747,6 @@ void UD3D9RenderDevice::SetSceneNode(FSceneNode* Frame) {
 #endif
 	guard(UD3D9RenderDevice::SetSceneNode);
 
-	//this->currentFrame = Frame;
-	//m_d3dDevice->SetTransform(D3DTS_VIEW, &FCoordToDXMat(Frame->Uncoords));
-
 	EndBuffering();		// Flush vertex array before changing the projection matrix!
 
 #ifdef D3D9_DEBUG
@@ -3254,6 +3253,8 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 	//This function uses cached stream state information
 	//This function uses cached texture state information
 
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
+
 	check(surface.Texture);
 
 	clockFast(ComplexCycles);
@@ -3266,9 +3267,9 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 
 		if (facet.Span) {
 			// Unpack our hidden treasure, shit it onto the cs UDot stuff
-			FTextureInfo* realTexInfo = (FTextureInfo*)facet.Span;
-			m_csUDot += realTexInfo->Pan.X;
-			m_csVDot += realTexInfo->Pan.Y;
+			FVector* realPan= (FVector*)facet.Span;
+			m_csUDot -= realPan->X;
+			m_csVDot -= realPan->Y;
 		}
 
 		//Buffer static geometry
@@ -7719,8 +7720,6 @@ void UD3D9RenderDevice::EndPointBufferingNoCheck(void) {
 	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, getVertBufferPos(m_bufferedVerts), m_bufferedVerts / 3);
 }
 
-static const D3DMATRIX identityMatrix = ToD3DMATRIX(DirectX::XMMatrixIdentity());
-
 void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 	{
@@ -7730,7 +7729,6 @@ void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 #endif
 	guard(UD3D9RenderDevice::startWorldDraw);
 	using namespace DirectX;
-	this->currentFrame = frame;
 
 	// Setup projection and view matrices for current frame
 	float aspect = frame->FX / frame->FY;
