@@ -139,6 +139,12 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
 
 		const UViewport* viewport = frame->Viewport;
+		AActor* playerActor = NULL;
+		if (!viewport->Actor->bBehindView) {
+			playerActor = viewport->Actor->ViewTarget ? viewport->Actor->ViewTarget : viewport->Actor;
+		}
+
+		//dout << "Starting frame" << std::endl;
 
 		d3d9Dev->startWorldDraw(frame);
 		OccludeFrame(frame);
@@ -169,29 +175,44 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 				d3d9Dev->drawLevelSurfaces(frame, surface, facets);
 			}
-			for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
-				UBOOL bTranslucent = sprite->Actor && sprite->Actor->Style == STY_Translucent;
-				if ((pass == 2 && bTranslucent) || (pass == 1 && !bTranslucent)) {
-					AActor* actor = sprite->Actor;
-					if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
-						d3d9Dev->renderSprite(frame, actor);
-					} else if (actor->DrawType == DT_Mesh) {
-						d3d9Dev->renderMeshActor(frame, actor);
-					}
-				}
-			}
+			//for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
+			//	UBOOL bTranslucent = sprite->Actor && sprite->Actor->Style == STY_Translucent;
+			//	if ((pass == 2 && bTranslucent) || (pass == 1 && !bTranslucent)) {
+			//		AActor* actor = sprite->Actor;
+			//		if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
+			//			d3d9Dev->renderSprite(frame, actor);
+			//		} else if (actor->DrawType == DT_Mesh) {
+			//			d3d9Dev->renderMeshActor(frame, actor);
+			//		}
+			//	}
+			//}
 			for (int iActor = 0; iActor < frame->Level->Actors.Num(); iActor++) {
 				AActor* actor = frame->Level->Actors(iActor);
-				if (actor && actor != viewport->Actor) {
+				if (actor && actor != playerActor && (GIsEditor ? !actor->bHiddenEd : !actor->bHidden)) {
 					if (actor->IsA(AMover::StaticClass()) && pass == 1) {
 						d3d9Dev->renderMover(frame, (AMover*)actor);
 						continue;
 					}
-					//UBOOL bTranslucent = actor && actor->Style == STY_Translucent;
-					//if ((pass == 2 && bTranslucent) || (pass == 1 && !bTranslucent)) {
-					//	//DrawActorSprite(frame, sprite);
-					//	d3d9Dev->renderMeshActor(frame, actor);
-					//}
+					SpecialCoord specialCoord;
+					UBOOL bTranslucent = actor && actor->Style == STY_Translucent;
+					if ((pass == 2 && bTranslucent) || (pass == 1 && !bTranslucent)) {
+						if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
+							d3d9Dev->renderSprite(frame, actor);
+						} else if (actor->DrawType == DT_Mesh) {
+							d3d9Dev->renderMeshActor(frame, actor, &specialCoord);
+						}
+					}
+					if (specialCoord.exists && actor->IsA(APawn::StaticClass()) && ((APawn*)actor)->Weapon) {
+						AInventory* weapon = ((APawn*)actor)->Weapon;
+						if (weapon->ThirdPersonMesh) {
+							specialCoord.enabled = true;
+							Exchange(weapon->ThirdPersonMesh, weapon->Mesh);
+							Exchange(weapon->ThirdPersonScale, weapon->DrawScale);
+							d3d9Dev->renderMeshActor(frame, weapon, &specialCoord);
+							Exchange(weapon->ThirdPersonMesh, weapon->Mesh);
+							Exchange(weapon->ThirdPersonScale, weapon->DrawScale);
+						}
+					}
 				}
 			}
 		}
@@ -200,11 +221,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		}
 
 		// Render view model actor and extra HUD stuff
-		AActor* viewModelActor = frame->Viewport->Actor->bBehindView ? NULL : 
-			frame->Viewport->Actor->ViewTarget ? frame->Viewport->Actor->ViewTarget : frame->Viewport->Actor;
-		if (!GIsEditor && viewModelActor && (frame->Viewport->Actor->ShowFlags & SHOW_Actors)) {
+		if (!GIsEditor && playerActor && (frame->Viewport->Actor->ShowFlags & SHOW_Actors)) {
 			GUglyHackFlags |= 1;
-			viewModelActor->eventRenderOverlays(frame->Viewport->Canvas);
+			playerActor->eventRenderOverlays(frame->Viewport->Canvas);
 			GUglyHackFlags &= ~1;
 		}
 

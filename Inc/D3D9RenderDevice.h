@@ -342,6 +342,15 @@ struct FGLVertexColor {
 	DWORD color;
 };
 
+struct FGLVertexColorTex {
+	FLOAT x;
+	FLOAT y;
+	FLOAT z;
+	DWORD color;
+	FLOAT u;
+	FLOAT v;
+};
+
 //Normals
 struct FGLNormal {
 	FLOAT x;
@@ -414,6 +423,12 @@ struct SurfKey_Hash {
 template <typename T>
 using SurfKeyMap = std::unordered_map<SurfKey, T, SurfKey_Hash>;
 
+struct SpecialCoord {
+	FCoords coord;
+	D3DMATRIX baseMatrix;
+	bool exists = false;
+	bool enabled = false;
+};
 
 //
 // A D3D9 rendering device attached to a viewport.
@@ -487,6 +502,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 
 	//Vertex declarations
 	IDirect3DVertexDeclaration9 *m_oneColorVertexDecl;
+	IDirect3DVertexDeclaration9* m_ColorTexVertexDecl;
 	IDirect3DVertexDeclaration9 *m_standardNTextureVertexDecl[MAX_TMUNITS];
 	IDirect3DVertexDeclaration9 *m_twoColorSingleTextureVertexDecl;
 
@@ -499,6 +515,10 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	INT m_vertexTempBufferSize;
 	IDirect3DVertexBuffer9* m_d3dTempVertexColorBuffer;
 	IDirect3DVertexBuffer9* m_currentVertexColorBuffer;
+
+	//Quad buffer
+	IDirect3DVertexBuffer9* m_d3dQuadBuffer;
+	DWORD m_QuadBufferColor;
 
 	//Secondary color
 	IDirect3DVertexBuffer9 *m_d3dSecondaryColorBuffer;
@@ -686,6 +706,8 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 			appErrorf(TEXT("Vertex buffer unlock failed"));
 		}
 	}
+
+	inline void updateQuadBuffer(DWORD color);
 
 	//IsNear bits for detail texturing
 	DWORD DetailTextureIsNearArray[VERTEX_ARRAY_SIZE / 3];
@@ -1299,7 +1321,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 
 	void renderSprite(FSceneNode* frame, AActor* actor);
 	void renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScale, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color);
-	void renderMeshActor(FSceneNode* frame, AActor* actor);
+	void renderMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord = nullptr);
 	void renderMover(FSceneNode* frame, AMover* mover);
 	void renderLights(std::vector<AActor*> lightActors);
 

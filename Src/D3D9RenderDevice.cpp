@@ -77,6 +77,13 @@ static const D3DVERTEXELEMENT9 g_oneColorStreamDef[] = {
 	D3DDECL_END()
 };
 
+static const D3DVERTEXELEMENT9 g_colorTexStreamDef[] = {
+	{ 0, 0,  D3DDECLTYPE_FLOAT3,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION,	0 },
+	{ 0, 12, D3DDECLTYPE_D3DCOLOR,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR,		0 },
+	{ 0, 16,  D3DDECLTYPE_FLOAT2,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD,	0 },
+	D3DDECL_END()
+};
+
 static const D3DVERTEXELEMENT9 g_standardSingleTextureStreamDef[] = {
 	{ 0, 0,  D3DDECLTYPE_FLOAT3,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION,	0 },
 	{ 0, 12, D3DDECLTYPE_D3DCOLOR,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR,		0 },
@@ -233,7 +240,7 @@ static inline FVector DXVecToFVec(DirectX::XMVECTOR& vec) {
 
 #define rotConvert(integer) (((float)integer) / ((float)MAXWORD) * (PI * 2))
 
-static DirectX::FXMVECTOR FRotToDXQuat(const FRotator& rot) {
+static DirectX::XMVECTOR FRotToDXQuat(const FRotator& rot) {
 	return DirectX::XMQuaternionRotationRollPitchYaw(
 		rotConvert(rot.Pitch),
 		rotConvert(rot.Roll),
@@ -241,7 +248,7 @@ static DirectX::FXMVECTOR FRotToDXQuat(const FRotator& rot) {
 	);
 }
 
-static DirectX::FXMMATRIX FRotToDXRotMat(const FRotator& rot) {
+static DirectX::XMMATRIX FRotToDXRotMat(const FRotator& rot) {
 	using namespace DirectX;
 	XMMATRIX mat = XMMatrixIdentity();
 	mat *= XMMatrixRotationRollPitchYaw(-rotConvert(rot.Roll), 0, 0);
@@ -250,8 +257,9 @@ static DirectX::FXMMATRIX FRotToDXRotMat(const FRotator& rot) {
 	return mat;
 }
 
-static D3DMATRIX FCoordToDXMat(const FCoords& coord) {
-	D3DMATRIX mat = {
+static DirectX::XMMATRIX FCoordToDXMat(const FCoords& coord) {
+	using namespace DirectX;
+	XMMATRIX mat = {
 		coord.XAxis.X, coord.YAxis.X, coord.ZAxis.X, 0,
 		coord.XAxis.Y, coord.YAxis.Y, coord.ZAxis.Y, 0,
 		coord.XAxis.Z, coord.YAxis.Z, coord.ZAxis.Z, 0,
@@ -2170,6 +2178,13 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 		m_texTempBufferSize[u] = 0;
 	}
 
+	//For sprite quad
+	hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColorTex) * 4, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dQuadBuffer, NULL);
+	if (FAILED(hResult)) {
+		appErrorf(TEXT("CreateVertexBuffer failed"));
+	}
+
+	updateQuadBuffer(0xDEADBEEF);
 
 	//Create stream definitions
 
@@ -2189,6 +2204,12 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 
 	//Stream definition with vertices, two colors, and one tex coord
 	hResult = m_d3dDevice->CreateVertexDeclaration(g_twoColorSingleTextureStreamDef, &m_twoColorSingleTextureVertexDecl);
+	if (FAILED(hResult)) {
+		appErrorf(TEXT("CreateVertexDeclaration failed"));
+	}
+
+	//For sprite quad
+	hResult = m_d3dDevice->CreateVertexDeclaration(g_colorTexStreamDef, &m_ColorTexVertexDecl);
 	if (FAILED(hResult)) {
 		appErrorf(TEXT("CreateVertexDeclaration failed"));
 	}
@@ -4581,6 +4602,52 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	unguard;
 }
 
+void UD3D9RenderDevice::updateQuadBuffer(DWORD color) {
+	if (m_QuadBufferColor == color) {
+		return;
+	}
+
+	//dout << L"Updating quad buffer to color " << std::hex << color << std::endl;
+
+	FGLVertexColorTex* buffer = nullptr;
+	if (FAILED(m_d3dQuadBuffer->Lock(0, 0, (void**)&buffer, D3DLOCK_NOSYSLOCK | D3DLOCK_DISCARD))) {
+		appErrorf(TEXT("Vertex buffer lock failed"));
+	}
+
+	buffer[0].x = 0.0f;
+	buffer[0].y = -0.5f;
+	buffer[0].z = -0.5f;
+	buffer[0].color = color;
+	buffer[0].u = 0.0f;
+	buffer[0].v = 0.0f;
+
+	buffer[1].x = 0.0f;
+	buffer[1].y = 0.5f;
+	buffer[1].z = -0.5f;
+	buffer[1].color = color;
+	buffer[1].u = 1.0f;
+	buffer[1].v = 0.0f;
+
+	buffer[2].x = 0.0f;
+	buffer[2].y = 0.5f;
+	buffer[2].z = 0.5f;
+	buffer[2].color = color;
+	buffer[2].u = 1.0f;
+	buffer[2].v = 1.0f;
+
+	buffer[3].x = 0.0f;
+	buffer[3].y = -0.5f;
+	buffer[3].z = 0.5f;
+	buffer[3].color = color;
+	buffer[3].u = 0.0f;
+	buffer[3].v = 1.0f;
+
+	if (FAILED(m_d3dQuadBuffer->Unlock())) {
+		appErrorf(TEXT("Vertex buffer unlock failed"));
+	}
+	m_QuadBufferColor = color;
+}
+
 void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScale, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color) {
 	guard(UD3D9RenderDevice::renderSpriteGeo);
 	using namespace DirectX;
@@ -4594,8 +4661,8 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 
 	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(location));
 	XMMATRIX matRot = XMMatrixIdentity();
-	matRot *= XMMatrixRotationY(PI / 2);// rotate card 90 on Y since LookAt expects +z to be forward.
-	matRot *= XMMatrixRotationZ(-PI / 2);// rotate card 90 on Z because that's the way it's oriented aparently?.
+	matRot *= XMMatrixRotationY(-PI / 2);// rotate card 90 on Y since LookAt expects -z to be forward.
+	matRot *= XMMatrixRotationZ(PI / 2);// rotate card 90 on Z because that's the way it's oriented aparently?.
 	matRot *= XMMatrixInverse(nullptr, XMMatrixLookAtLH(XMVectorSet(0, 0, 0, 0), direction, FVecToDXVec(camUp)));
 	XMMATRIX matScale = XMMatrixScaling(drawScale, XScale, YScale);
 
@@ -4611,47 +4678,11 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 	if (color.Y > 1.0) color.Y = 1.0;
 	if (color.Z > 1.0) color.Z = 1.0;
 
-	std::vector<FTransTexture> verts;
-
-	float uMin = texInfo.USize;
-	float uMax = 0;
-	float vMin = 0;
-	float vMax = texInfo.VSize;
-	FTransTexture point{};
-	point.Point = FVector(0, -0.5, -0.5);
-	point.U = uMin;
-	point.V = vMin;
-	point.Light = color;
-	verts.push_back(point);
-	point.Point = FVector(0, -0.5, 0.5);
-	point.U = uMin;
-	point.V = vMax;
-	point.Light = color;
-	verts.push_back(point);
-	point.Point = FVector(0, 0.5, -0.5);
-	point.U = uMax;
-	point.V = vMin;
-	point.Light = color;
-	verts.push_back(point);
-	point.Point = FVector(0, 0.5, 0.5);
-	point.U = uMax;
-	point.V = vMax;
-	point.Light = color;
-	verts.push_back(point);
-	point.Point = FVector(0, 0.5, -0.5);
-	point.U = uMax;
-	point.V = vMin;
-	point.Light = color;
-	verts.push_back(point);
-	point.Point = FVector(0, -0.5, 0.5);
-	point.U = uMin;
-	point.V = vMax;
-	point.Light = color;
-	verts.push_back(point);
+	updateQuadBuffer(D3DCOLOR_COLORVALUE(color.X, color.Y, color.Z, 1.0f));
 
 	DWORD flags = basePolyFlags | PF_TwoSided | (texInfo.Texture->PolyFlags & PF_Masked);//PF_Modulated;
 
-	BufferTriangleSurfaceGeometry(verts);
+	//BufferTriangleSurfaceGeometry(verts);
 	//Initialize render passes state information
 	m_rpPassCount = 0;
 	m_rpTMUnits = TMUnits;
@@ -4659,13 +4690,26 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 	m_rpMasked = ((flags & PF_Masked) == 0) ? false : true;
 	m_rpColor = 0xFFFFFFFF;
 
-	AddRenderPass(&texInfo, flags & ~PF_FlatShaded, 0.0f);
+	flags &= ~PF_FlatShaded;
+	SetBlend(flags);
+	SetTexture(0, texInfo, flags, 0.0f);
+	SetStreamState(m_ColorTexVertexDecl);
+	DisableSubsequentTextures(1);
 
-	RenderPasses();
+	if (m_currentVertexColorBuffer != m_d3dQuadBuffer) {
+		HRESULT hResult = m_d3dDevice->SetStreamSource(0, m_d3dQuadBuffer, 0, sizeof(FGLVertexColorTex));
+		if (FAILED(hResult)) {
+			appErrorf(TEXT("SetStreamSource failed"));
+		}
+		m_currentVertexColorBuffer = m_d3dQuadBuffer;
+	}
+
+	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, 0, 2);
+
 	unguard;
 }
 
-void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
+void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 	{
 		static int si;
@@ -4706,6 +4750,20 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 		numVerts = meshLod->ModelVerts;
 		meshLod->GetFrame(&allSamples->Point, sizeof(samples[0]), GMath.UnitCoords, actor, numVerts);
 		numTris = meshLod->Faces.Num();
+		if (specialCoord && !specialCoord->enabled && meshLod->SpecialFaces.Num() > 0) {
+			FTransTexture& v0 = allSamples[0];
+			FTransTexture& v1 = allSamples[1];
+			FTransTexture& v2 = allSamples[2];
+			FCoords coord;
+			coord.Origin = FVector(0, 0, 0);
+			coord.XAxis = (v1.Point - v0.Point).SafeNormal();
+			coord.YAxis = (coord.XAxis ^ (v0.Point - v2.Point)).SafeNormal();
+			coord.ZAxis = coord.YAxis ^ coord.XAxis;
+			FVector mid = (v0.Point + v2.Point) * 0.5f;
+			specialCoord->coord = GMath.UnitCoords * coord;
+			specialCoord->coord.Origin = mid;
+			specialCoord->exists = true;
+		}
 	} else {
 		isLod = false;
 		numVerts = mesh->FrameVerts;
@@ -4882,16 +4940,35 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor) {
 		}
 	}
 
-	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
-	XMMATRIX matRot = FRotToDXRotMat(actor->Rotation);
-	XMMATRIX matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
+	XMMATRIX matLoc;
+	XMMATRIX matRot;
+	XMMATRIX matScale;
 
 	XMMATRIX mat = XMMatrixIdentity();
-	mat *= matScale;
-	mat *= matRot;
-	mat *= matLoc;
-	D3DMATRIX actorMatrix = reinterpret_cast<D3DMATRIX&>(mat);
 
+	if (specialCoord && specialCoord->enabled) {
+		FCoords special = specialCoord->coord;
+		matLoc = XMMatrixTranslationFromVector(FVecToDXVec(special.Origin));
+		special.Origin = FVector(0, 0, 0);
+		matRot = FCoordToDXMat(special);
+		matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
+		mat *= matScale;
+		mat *= matRot;
+		mat *= matLoc;
+		mat *= ToXMMATRIX(specialCoord->baseMatrix);
+	} else {
+		matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
+		matRot = FRotToDXRotMat(actor->Rotation);
+		matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
+		mat *= matScale;
+		mat *= matRot;
+		mat *= matLoc;
+		if (specialCoord && specialCoord->exists) {
+			specialCoord->baseMatrix = ToD3DMATRIX(mat);
+		}
+	}
+
+	D3DMATRIX actorMatrix = reinterpret_cast<D3DMATRIX&>(mat);
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &actorMatrix);
 
 	bool isViewModel = GUglyHackFlags & 0x1;
@@ -4950,8 +5027,8 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 	XMMATRIX matPrePiv = XMMatrixTranslationFromVector(FVecToDXVec(-mover->PrePivot));
 	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(mover->Location));
 	XMMATRIX matRot = FRotToDXRotMat(mover->Rotation);
-	XMMATRIX matMainScale = ToXMMATRIX(FCoordToDXMat(GMath.UnitCoords * mover->MainScale));
-	XMMATRIX matPostScale = ToXMMATRIX(FCoordToDXMat(GMath.UnitCoords * mover->PostScale));
+	XMMATRIX matMainScale = FCoordToDXMat(GMath.UnitCoords * mover->MainScale);
+	XMMATRIX matPostScale = FCoordToDXMat(GMath.UnitCoords * mover->PostScale);
 
 	XMMATRIX mat = XMMatrixIdentity();
 	mat *= matPrePiv;
@@ -7741,14 +7818,14 @@ void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &proj);
 
 	FVector origin = frame->Coords.Origin;
-	FVector forward = FVector(0.0f, 0.0f, 1.0f).TransformVectorBy(frame->Uncoords);
-	FVector up = FVector(0.0f, -1.0f, 0.0f).TransformVectorBy(frame->Uncoords);
+	FVector forward = frame->Coords.ZAxis;
+	FVector up = frame->Coords.YAxis * -1.0f; // Yeah I don't get it.
 
 	D3DMATRIX view = ToD3DMATRIX(
 		XMMatrixLookToLH(
-			XMVectorSet(origin.X, origin.Y, origin.Z, 0.0f),
-			XMVectorSet(forward.X, forward.Y, forward.Z, 0.0f),
-			XMVectorSet(up.X, up.Y, up.Z, 0.0f)
+			FVecToDXVec(origin),
+			FVecToDXVec(forward),
+			FVecToDXVec(up)
 		)
 	);
 
