@@ -240,14 +240,6 @@ static inline FVector DXVecToFVec(DirectX::XMVECTOR& vec) {
 
 #define rotConvert(integer) (((float)integer) / ((float)MAXWORD) * (PI * 2))
 
-static DirectX::XMVECTOR FRotToDXQuat(const FRotator& rot) {
-	return DirectX::XMQuaternionRotationRollPitchYaw(
-		rotConvert(rot.Pitch),
-		rotConvert(rot.Roll),
-		rotConvert(rot.Yaw)
-	);
-}
-
 static DirectX::XMMATRIX FRotToDXRotMat(const FRotator& rot) {
 	using namespace DirectX;
 	XMMATRIX mat = XMMatrixIdentity();
@@ -2118,7 +2110,7 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 #endif
 
 	m_d3dDevice->SetRenderState(D3DRS_LIGHTING, FALSE);
-	m_d3dDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+	m_d3dDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_CCW);
 
 	//Color and alpha modulation on texEnv0
 	m_d3dDevice->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
@@ -4723,18 +4715,37 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		return;
 
 	//dout << "rendering actor " << actor->GetName() << std::endl;
+	XMMATRIX matLoc;
+	XMMATRIX matRot;
+	XMMATRIX matScale;
+
+	XMMATRIX actorMatrix = XMMatrixIdentity();
+
+	if (!actor->bParticles) {
+		matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
+		actorMatrix *= matScale;
+	}
+	if (specialCoord && specialCoord->enabled) {
+		FCoords special = specialCoord->coord;
+		actorMatrix *= FCoordToDXMat(specialCoord->coord);
+		actorMatrix *= ToXMMATRIX(specialCoord->baseMatrix);
+	} else {
+		matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
+		matRot = FRotToDXRotMat(actor->Rotation);
+		matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
+		actorMatrix *= matRot;
+		actorMatrix *= matLoc;
+	}
 
 	// The old switcheroo, trick the game to not transform the mesh verts to object position
 	FVector origLoc = actor->Location;
 	FVector origPrePiv = actor->PrePivot;
 	FRotator origRot = actor->Rotation;
 	FLOAT origScale = actor->DrawScale;
-	if (!actor->bParticles) {
-		actor->Location = FVector(0, 0, 0);
-		actor->PrePivot = FVector(0, 0, 0);
-		actor->Rotation = FRotator(0, 0, 0);
-		actor->DrawScale = 1.0f;
-	}
+	actor->Location = FVector(0, 0, 0);
+	actor->PrePivot = FVector(0, 0, 0);
+	actor->Rotation = FRotator(0, 0, 0);
+	actor->DrawScale = 1.0f;
 
 	int numVerts;
 	int numTris;
@@ -4757,11 +4768,12 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 			FCoords coord;
 			coord.Origin = FVector(0, 0, 0);
 			coord.XAxis = (v1.Point - v0.Point).SafeNormal();
-			coord.YAxis = (coord.XAxis ^ (v0.Point - v2.Point)).SafeNormal();
-			coord.ZAxis = coord.YAxis ^ coord.XAxis;
+			coord.YAxis = ((v0.Point - v2.Point) ^ coord.XAxis).SafeNormal();
+			coord.ZAxis = coord.XAxis ^ coord.YAxis;
 			FVector mid = (v0.Point + v2.Point) * 0.5f;
 			specialCoord->coord = GMath.UnitCoords * coord;
 			specialCoord->coord.Origin = mid;
+			specialCoord->baseMatrix = ToD3DMATRIX(actorMatrix);
 			specialCoord->exists = true;
 		}
 	} else {
@@ -4798,9 +4810,14 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 						color = color * 0.4 + FVector(0.0, 0.6, 0.0);
 					}
 
+					FVector point = sample.Point;
+					XMVECTOR xpoint = FVecToDXVec(point);
+					xpoint = XMVector3Transform(xpoint, actorMatrix);
+					point = DXVecToFVec(xpoint);
+
 					FTextureInfo texInfo;
 					tex->Lock(texInfo, currentTime, -1, this);
-					renderSpriteGeo(frame, sample.Point, actor->DrawScale, texInfo, baseFlags, color);
+					renderSpriteGeo(frame, point, actor->DrawScale, texInfo, baseFlags, color);
 					tex->Unlock(texInfo);
 				}
 			}
@@ -4940,36 +4957,8 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		}
 	}
 
-	XMMATRIX matLoc;
-	XMMATRIX matRot;
-	XMMATRIX matScale;
-
-	XMMATRIX mat = XMMatrixIdentity();
-
-	if (specialCoord && specialCoord->enabled) {
-		FCoords special = specialCoord->coord;
-		matLoc = XMMatrixTranslationFromVector(FVecToDXVec(special.Origin));
-		special.Origin = FVector(0, 0, 0);
-		matRot = FCoordToDXMat(special);
-		matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
-		mat *= matScale;
-		mat *= matRot;
-		mat *= matLoc;
-		mat *= ToXMMATRIX(specialCoord->baseMatrix);
-	} else {
-		matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
-		matRot = FRotToDXRotMat(actor->Rotation);
-		matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
-		mat *= matScale;
-		mat *= matRot;
-		mat *= matLoc;
-		if (specialCoord && specialCoord->exists) {
-			specialCoord->baseMatrix = ToD3DMATRIX(mat);
-		}
-	}
-
-	D3DMATRIX actorMatrix = reinterpret_cast<D3DMATRIX&>(mat);
-	m_d3dDevice->SetTransform(D3DTS_WORLD, &actorMatrix);
+	D3DMATRIX d3dMatrix = reinterpret_cast<D3DMATRIX&>(actorMatrix);
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &d3dMatrix);
 
 	bool isViewModel = GUglyHackFlags & 0x1;
 
@@ -4978,7 +4967,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		D3DVIEWPORT9 vp;
 		m_d3dDevice->GetViewport(&vp);
 		vpPrev = vp;
-		vp.MaxZ = 0.1f;
+		vp.MaxZ = 0.1f;// Remix can pick this up for view model detection
 		m_d3dDevice->SetViewport(&vp);
 	}
 	
@@ -7095,6 +7084,10 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags) {
 	if (Xor & PF_RenderFog) {
 		DWORD flag = ((blendFlags & PF_RenderFog) == 0) ? FALSE : TRUE;
 		m_d3dDevice->SetRenderState(D3DRS_SPECULARENABLE, flag);
+	}
+	if (Xor & PF_TwoSided) {
+		D3DCULL flag = ((blendFlags & PF_TwoSided) == 0) ? D3DCULL_CCW : D3DCULL_NONE;
+		m_d3dDevice->SetRenderState(D3DRS_CULLMODE, flag);
 	}
 
 	unguardSlow;

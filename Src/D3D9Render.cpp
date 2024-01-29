@@ -188,7 +188,14 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			//}
 			for (int iActor = 0; iActor < frame->Level->Actors.Num(); iActor++) {
 				AActor* actor = frame->Level->Actors(iActor);
-				if (actor && actor != playerActor && (GIsEditor ? !actor->bHiddenEd : !actor->bHidden)) {
+				if (!actor) continue;
+				bool isVisible = true;
+				isVisible &= actor != playerActor;
+				isVisible &= GIsEditor ? !actor->bHiddenEd : !actor->bHidden;
+				bool isOwned = actor->IsOwnedBy(frame->Viewport->Actor);
+				isVisible &= !actor->bOnlyOwnerSee || (isOwned && !frame->Viewport->Actor->bBehindView);
+				isVisible &= !isOwned || !actor->bOwnerNoSee || (isOwned && frame->Viewport->Actor->bBehindView);
+				if (isVisible) {
 					if (actor->IsA(AMover::StaticClass()) && pass == 1) {
 						d3d9Dev->renderMover(frame, (AMover*)actor);
 						continue;
@@ -202,15 +209,58 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 							d3d9Dev->renderMeshActor(frame, actor, &specialCoord);
 						}
 					}
-					if (specialCoord.exists && actor->IsA(APawn::StaticClass()) && ((APawn*)actor)->Weapon) {
-						AInventory* weapon = ((APawn*)actor)->Weapon;
-						if (weapon->ThirdPersonMesh) {
+					if (actor->IsA(APawn::StaticClass())) {
+						APawn* pawn = (APawn*)actor;
+						AInventory* weapon = pawn->Weapon;
+						if (specialCoord.exists && weapon && weapon->ThirdPersonMesh) {
 							specialCoord.enabled = true;
-							Exchange(weapon->ThirdPersonMesh, weapon->Mesh);
-							Exchange(weapon->ThirdPersonScale, weapon->DrawScale);
+							Exchange(weapon->Mesh, weapon->ThirdPersonMesh);
+							Exchange(weapon->DrawScale, weapon->ThirdPersonScale);
 							d3d9Dev->renderMeshActor(frame, weapon, &specialCoord);
-							Exchange(weapon->ThirdPersonMesh, weapon->Mesh);
-							Exchange(weapon->ThirdPersonScale, weapon->DrawScale);
+							Exchange(weapon->Mesh, weapon->ThirdPersonMesh);
+							Exchange(weapon->DrawScale, weapon->ThirdPersonScale);
+							if (weapon->bSteadyFlash3rd) {
+								weapon->bSteadyToggle = !weapon->bSteadyToggle;
+							}
+							if (weapon->MuzzleFlashMesh && 
+								(weapon->bSteadyFlash3rd && (!weapon->bToggleSteadyFlash || weapon->bSteadyToggle)) ||
+								(!weapon->bFirstFrame && (weapon->FlashCount != weapon->OldFlashCount))) {
+								Exchange(weapon->Mesh, weapon->MuzzleFlashMesh);
+								Exchange(weapon->DrawScale, weapon->MuzzleFlashScale);
+								Exchange(weapon->Style, weapon->MuzzleFlashStyle);
+								Exchange(weapon->Texture, weapon->MuzzleFlashTexture);
+								bool origParticles = weapon->bParticles;
+								FName origAnim = weapon->AnimSequence;
+								FLOAT origFrame = weapon->AnimFrame;
+								INT origLit = weapon->bUnlit;
+								weapon->bParticles = weapon->bMuzzleFlashParticles;
+								weapon->AnimSequence = NAME_All;
+								weapon->AnimFrame = appFrand();
+								weapon->bUnlit = true;
+								d3d9Dev->renderMeshActor(frame, weapon, &specialCoord);
+								weapon->bParticles = origParticles;
+								weapon->AnimSequence = origAnim;
+								weapon->AnimFrame = origFrame;
+								weapon->bUnlit = origLit;
+								Exchange(weapon->Mesh, weapon->MuzzleFlashMesh);
+								Exchange(weapon->DrawScale, weapon->MuzzleFlashScale);
+								Exchange(weapon->Style, weapon->MuzzleFlashStyle);
+								Exchange(weapon->Texture, weapon->MuzzleFlashTexture);
+							}
+							weapon->OldFlashCount = weapon->FlashCount;
+							weapon->bFirstFrame = 0;
+						}
+						if (pawn->PlayerReplicationInfo && pawn->PlayerReplicationInfo->HasFlag) {
+							AActor* flag = pawn->PlayerReplicationInfo->HasFlag;
+
+							FVector origLoc = flag->Location;
+							FRotator origRot = flag->Rotation;
+							float dist = Clamp(2.0f + 20.0f * GMath.SinTab(flag->Rotation.Pitch), 2.0f, 3.0f);
+							flag->Location = pawn->Location - dist * pawn->CollisionRadius * pawn->Rotation.Vector() + FVector(0, 0, 0.7 * pawn->BaseEyeHeight);
+							flag->Rotation = pawn->Rotation;
+							d3d9Dev->renderMeshActor(frame, flag);
+							flag->Location = origLoc;
+							flag->Rotation = origRot;
 						}
 					}
 				}
