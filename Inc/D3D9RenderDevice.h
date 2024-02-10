@@ -1485,7 +1485,18 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 		}
 
 		//Only check relevant blend flags
-		DWORD blendFlags = PolyFlags & (PF_Translucent | PF_Modulated | PF_Invisible | PF_Occlude | PF_Masked | PF_Highlighted | PF_RenderFog | PF_AlphaBlend | PF_TwoSided);
+		DWORD blendFlags = PolyFlags & (
+			PF_Translucent | 
+			PF_Modulated | 
+			PF_Invisible | 
+			PF_Occlude | 
+			PF_Masked | 
+			PF_Highlighted | 
+			PF_RenderFog | 
+			PF_AlphaBlend | 
+			PF_TwoSided | 
+			PF_NotSolid
+			);
 		if (m_curBlendFlags != blendFlags) {
 			SetBlendNoCheck(blendFlags);
 		}

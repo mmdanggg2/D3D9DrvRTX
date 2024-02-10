@@ -7007,7 +7007,7 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags) {
 	//Update main copy of current blend flags early
 	m_curBlendFlags = blendFlags;
 
-	const DWORD GL_BLEND_FLAG_BITS = PF_Translucent | PF_Modulated | PF_Highlighted | PF_AlphaBlend;
+	const DWORD GL_BLEND_FLAG_BITS = PF_Translucent | PF_Modulated | PF_Highlighted | PF_AlphaBlend | PF_NotSolid;
 	DWORD relevantBlendFlagBits = GL_BLEND_FLAG_BITS | m_smoothMaskedTexturesBit;
 
 	if (Xor & (relevantBlendFlagBits)) {
@@ -7035,6 +7035,10 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags) {
 			else if (blendFlags & (PF_Masked|PF_AlphaBlend)) {
 				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
 				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+			}
+			else if (blendFlags & PF_NotSolid) {
+				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
+				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
 			}
 		}
 	}
