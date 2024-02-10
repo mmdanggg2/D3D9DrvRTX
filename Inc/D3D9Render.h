@@ -2,6 +2,7 @@
 
 #include <Render.h>
 #include "D3D9DebugUtils.h"
+#include "D3D9RenderDevice.h"
 
 #include <vector>
 #include <unordered_map>
@@ -37,4 +38,5 @@ private:
 		TexFlagKeyMap<std::vector<FSurfaceFacet>> facetPairs[2];
 	};
 	void getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets);
+	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord);
 };

@@ -1,5 +1,4 @@
 #include "D3D9Render.h"
-#include "D3D9RenderDevice.h"
 
 IMPLEMENT_CLASS(UD3D9Render);
 
@@ -147,7 +146,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		//dout << "Starting frame" << std::endl;
 
 		d3d9Dev->startWorldDraw(frame);
-		OccludeFrame(frame);
+		//OccludeFrame(frame);
 
 		ModelFacets modelFacets;
 		getLevelModelFacets(frame, modelFacets);
@@ -200,67 +199,16 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 						d3d9Dev->renderMover(frame, (AMover*)actor);
 						continue;
 					}
-					SpecialCoord specialCoord;
-					UBOOL bTranslucent = actor && actor->Style == STY_Translucent;
+					UBOOL bTranslucent = actor->Style == STY_Translucent;
 					if ((pass == 2 && bTranslucent) || (pass == 1 && !bTranslucent)) {
+						SpecialCoord specialCoord;
 						if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
 							d3d9Dev->renderSprite(frame, actor);
 						} else if (actor->DrawType == DT_Mesh) {
 							d3d9Dev->renderMeshActor(frame, actor, &specialCoord);
 						}
-					}
-					if (actor->IsA(APawn::StaticClass())) {
-						APawn* pawn = (APawn*)actor;
-						AInventory* weapon = pawn->Weapon;
-						if (specialCoord.exists && weapon && weapon->ThirdPersonMesh) {
-							specialCoord.enabled = true;
-							Exchange(weapon->Mesh, weapon->ThirdPersonMesh);
-							Exchange(weapon->DrawScale, weapon->ThirdPersonScale);
-							d3d9Dev->renderMeshActor(frame, weapon, &specialCoord);
-							Exchange(weapon->Mesh, weapon->ThirdPersonMesh);
-							Exchange(weapon->DrawScale, weapon->ThirdPersonScale);
-							if (weapon->bSteadyFlash3rd) {
-								weapon->bSteadyToggle = !weapon->bSteadyToggle;
-							}
-							if (weapon->MuzzleFlashMesh && 
-								(weapon->bSteadyFlash3rd && (!weapon->bToggleSteadyFlash || weapon->bSteadyToggle)) ||
-								(!weapon->bFirstFrame && (weapon->FlashCount != weapon->OldFlashCount))) {
-								Exchange(weapon->Mesh, weapon->MuzzleFlashMesh);
-								Exchange(weapon->DrawScale, weapon->MuzzleFlashScale);
-								Exchange(weapon->Style, weapon->MuzzleFlashStyle);
-								Exchange(weapon->Texture, weapon->MuzzleFlashTexture);
-								bool origParticles = weapon->bParticles;
-								FName origAnim = weapon->AnimSequence;
-								FLOAT origFrame = weapon->AnimFrame;
-								INT origLit = weapon->bUnlit;
-								weapon->bParticles = weapon->bMuzzleFlashParticles;
-								weapon->AnimSequence = NAME_All;
-								weapon->AnimFrame = appFrand();
-								weapon->bUnlit = true;
-								d3d9Dev->renderMeshActor(frame, weapon, &specialCoord);
-								weapon->bParticles = origParticles;
-								weapon->AnimSequence = origAnim;
-								weapon->AnimFrame = origFrame;
-								weapon->bUnlit = origLit;
-								Exchange(weapon->Mesh, weapon->MuzzleFlashMesh);
-								Exchange(weapon->DrawScale, weapon->MuzzleFlashScale);
-								Exchange(weapon->Style, weapon->MuzzleFlashStyle);
-								Exchange(weapon->Texture, weapon->MuzzleFlashTexture);
-							}
-							weapon->OldFlashCount = weapon->FlashCount;
-							weapon->bFirstFrame = 0;
-						}
-						if (pawn->PlayerReplicationInfo && pawn->PlayerReplicationInfo->HasFlag) {
-							AActor* flag = pawn->PlayerReplicationInfo->HasFlag;
-
-							FVector origLoc = flag->Location;
-							FRotator origRot = flag->Rotation;
-							float dist = Clamp(2.0f + 20.0f * GMath.SinTab(flag->Rotation.Pitch), 2.0f, 3.0f);
-							flag->Location = pawn->Location - dist * pawn->CollisionRadius * pawn->Rotation.Vector() + FVector(0, 0, 0.7 * pawn->BaseEyeHeight);
-							flag->Rotation = pawn->Rotation;
-							d3d9Dev->renderMeshActor(frame, flag);
-							flag->Location = origLoc;
-							flag->Rotation = origRot;
+						if (actor->IsA(APawn::StaticClass())) {
+							drawPawnExtras(frame, d3d9Dev, (APawn*)actor, specialCoord);
 						}
 					}
 				}
@@ -298,6 +246,59 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	unguard;
 }
 
+void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord) {
+	AInventory* weapon = pawn->Weapon;
+	if (specialCoord.exists && weapon && weapon->ThirdPersonMesh) {
+		specialCoord.enabled = true;
+		Exchange(weapon->Mesh, weapon->ThirdPersonMesh);
+		Exchange(weapon->DrawScale, weapon->ThirdPersonScale);
+		d3d9Dev->renderMeshActor(frame, weapon, &specialCoord);
+		Exchange(weapon->Mesh, weapon->ThirdPersonMesh);
+		Exchange(weapon->DrawScale, weapon->ThirdPersonScale);
+		if (weapon->bSteadyFlash3rd) {
+			weapon->bSteadyToggle = !weapon->bSteadyToggle;
+		}
+		if (weapon->MuzzleFlashMesh &&
+			(weapon->bSteadyFlash3rd && (!weapon->bToggleSteadyFlash || weapon->bSteadyToggle)) ||
+			(!weapon->bFirstFrame && (weapon->FlashCount != weapon->OldFlashCount))) {
+			Exchange(weapon->Mesh, weapon->MuzzleFlashMesh);
+			Exchange(weapon->DrawScale, weapon->MuzzleFlashScale);
+			Exchange(weapon->Style, weapon->MuzzleFlashStyle);
+			Exchange(weapon->Texture, weapon->MuzzleFlashTexture);
+			bool origParticles = weapon->bParticles;
+			FName origAnim = weapon->AnimSequence;
+			FLOAT origFrame = weapon->AnimFrame;
+			INT origLit = weapon->bUnlit;
+			weapon->bParticles = weapon->bMuzzleFlashParticles;
+			weapon->AnimSequence = NAME_All;
+			weapon->AnimFrame = appFrand();
+			weapon->bUnlit = true;
+			d3d9Dev->renderMeshActor(frame, weapon, &specialCoord);
+			weapon->bParticles = origParticles;
+			weapon->AnimSequence = origAnim;
+			weapon->AnimFrame = origFrame;
+			weapon->bUnlit = origLit;
+			Exchange(weapon->Mesh, weapon->MuzzleFlashMesh);
+			Exchange(weapon->DrawScale, weapon->MuzzleFlashScale);
+			Exchange(weapon->Style, weapon->MuzzleFlashStyle);
+			Exchange(weapon->Texture, weapon->MuzzleFlashTexture);
+		}
+		weapon->OldFlashCount = weapon->FlashCount;
+		weapon->bFirstFrame = 0;
+	}
+	if (pawn->PlayerReplicationInfo && pawn->PlayerReplicationInfo->HasFlag) {
+		AActor* flag = pawn->PlayerReplicationInfo->HasFlag;
+
+		FVector origLoc = flag->Location;
+		FRotator origRot = flag->Rotation;
+		float dist = Clamp(2.0f + 20.0f * GMath.SinTab(flag->Rotation.Pitch), 2.0f, 3.0f);
+		flag->Location = pawn->Location - dist * pawn->CollisionRadius * pawn->Rotation.Vector() + FVector(0, 0, 0.7 * pawn->BaseEyeHeight);
+		flag->Rotation = pawn->Rotation;
+		d3d9Dev->renderMeshActor(frame, flag);
+		flag->Location = origLoc;
+		flag->Rotation = origRot;
+	}
+}
 
 void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor) {
 	guard(UD3D9Render::DrawActor);

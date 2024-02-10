@@ -877,7 +877,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 		BV_TYPE_GOURAUD_POLYS	= 0x01,
 		BV_TYPE_TILES			= 0x02,
 		BV_TYPE_LINES			= 0x03,
-		BV_TYPE_POINTS			= 0x04
+		BV_TYPE_POINTS			= 0x04,
 	};
 	BYTE m_bufferedVertsType;
 	DWORD m_bufferedVerts;
