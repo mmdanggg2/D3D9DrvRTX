@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <UNREAL_SDK_DIR>E:\programming\UnrealTournament\sdk</UNREAL_SDK_DIR>
+    <UNREAL_SYSTEM_DIR>E:\programming\UnrealTournament\Install\System</UNREAL_SYSTEM_DIR>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemDefinitionGroup />
+  <ItemGroup>
+    <BuildMacro Include="UNREAL_SDK_DIR">
+      <Value>$(UNREAL_SDK_DIR)</Value>
+    </BuildMacro>
+    <BuildMacro Include="UNREAL_SYSTEM_DIR">
+      <Value>$(UNREAL_SYSTEM_DIR)</Value>
+    </BuildMacro>
+  </ItemGroup>
+</Project>
