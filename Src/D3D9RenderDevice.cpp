@@ -3249,6 +3249,7 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 	guard(UD3D9RenderDevice::drawLevelSurfaces);
 
 	EndBuffering();
+	StartBuffering(BV_TYPE_NONE);
 
 # if UTGLR_USES_SCENENODEHACK
 	if (SceneNodeHack) {
@@ -3774,7 +3775,6 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 	//Check if need to start new poly buffering
 	//Make sure enough entries are left in the vertex buffers
 	//based on the current position when it was locked
-	appErrorf(TEXT("DONT USE ME!!!"));
 	if ((m_curPolyFlags != PolyFlags) ||
 		(m_curPolyFlags2 != PolyFlags2) ||
 		(TexInfo[0].CurrentCacheID != CacheID) ||
@@ -3785,7 +3785,7 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 		EndBuffering();
 
 		//Check if vertex buffer flush is required
-		if ((m_bufferedVerts + NumPts) >= (VERTEX_BUFFER_SIZE - 14)) {
+		if ((m_curVertexBufferPos + m_bufferedVerts + NumPts) >= (VERTEX_BUFFER_SIZE - 14)) {
 			FlushVertexBuffers();
 		}
 
@@ -3832,11 +3832,11 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 
 		//Lock vertexColor and texCoord0 buffers
 		//Lock secondary color buffer if fog
-		//LockVertexColorBuffer();
+		LockVertexColorBuffer(NumPts);
 		if (m_requestedColorFlags & CF_FOG_MODE) {
-			//LockSecondaryColorBuffer();
+			LockSecondaryColorBuffer(NumPts);
 		}
-		//LockTexCoordBuffer(0);
+		LockTexCoordBuffer(0, NumPts);
 
 		{
 			IDirect3DVertexDeclaration9 *vertexDecl = (m_requestedColorFlags & CF_FOG_MODE) ? m_twoColorSingleTextureVertexDecl : m_standardNTextureVertexDecl[0];
@@ -4566,6 +4566,7 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	}
 #endif
 	guard(UD3D9RenderDevice::renderSprite);
+	EndBuffering();
 
 	FPlane color = (GIsEditor && actor->bSelected) ? FPlane(.5, .9, .5, 0) : FPlane(1, 1, 1, 0);
 	if (actor->ScaleGlow != 1.0) {
@@ -4710,6 +4711,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 #endif
 	using namespace DirectX;
 	guard(UD3D9RenderDevice::renderMeshActor);
+	EndBuffering();
 	UMesh* mesh = actor->Mesh;
 	if (!mesh)
 		return;
@@ -5012,6 +5014,7 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 #endif
 	using namespace DirectX;
 	guard(UD3D9RenderDevice::renderMover);
+	EndBuffering();
 
 	XMMATRIX matPrePiv = XMMatrixTranslationFromVector(FVecToDXVec(-mover->PrePivot));
 	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(mover->Location));
@@ -7644,36 +7647,36 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 			return 0;
 		}
 		FTransform** pPts = &Poly->Pts[0];
-		const FVector& hubPoint = (*pPts++)->Point;
-		FVector& secondPoint = (*pPts++)->Point;
+		const FVector* hubPoint = &(*pPts++)->Point;
+		const FVector* secondPoint = &(*pPts++)->Point;
 		do {
-			const FVector& point = (*pPts++)->Point;
+			const FVector* point = &(*pPts++)->Point;
 
-			pMapDot->u = (Facet.MapCoords.XAxis | hubPoint) - m_csUDot;
-			pMapDot->v = (Facet.MapCoords.YAxis | hubPoint) - m_csVDot;
+			pMapDot->u = (Facet.MapCoords.XAxis | *hubPoint) - m_csUDot;
+			pMapDot->v = (Facet.MapCoords.YAxis | *hubPoint) - m_csVDot;
 			pMapDot++;
 
-			pVertex->x = hubPoint.X;
-			pVertex->y = hubPoint.Y;
-			pVertex->z = hubPoint.Z;
+			pVertex->x = hubPoint->X;
+			pVertex->y = hubPoint->Y;
+			pVertex->z = hubPoint->Z;
 			pVertex++;
 
-			pMapDot->u = (Facet.MapCoords.XAxis | secondPoint) - m_csUDot;
-			pMapDot->v = (Facet.MapCoords.YAxis | secondPoint) - m_csVDot;
+			pMapDot->u = (Facet.MapCoords.XAxis | *secondPoint) - m_csUDot;
+			pMapDot->v = (Facet.MapCoords.YAxis | *secondPoint) - m_csVDot;
 			pMapDot++;
 
-			pVertex->x = secondPoint.X;
-			pVertex->y = secondPoint.Y;
-			pVertex->z = secondPoint.Z;
+			pVertex->x = secondPoint->X;
+			pVertex->y = secondPoint->Y;
+			pVertex->z = secondPoint->Z;
 			pVertex++;
 
-			pMapDot->u = (Facet.MapCoords.XAxis | point) - m_csUDot;
-			pMapDot->v = (Facet.MapCoords.YAxis | point) - m_csVDot;
+			pMapDot->u = (Facet.MapCoords.XAxis | *point) - m_csUDot;
+			pMapDot->v = (Facet.MapCoords.YAxis | *point) - m_csVDot;
 			pMapDot++;
 
-			pVertex->x = point.X;
-			pVertex->y = point.Y;
-			pVertex->z = point.Z;
+			pVertex->x = point->X;
+			pVertex->y = point->Y;
+			pVertex->z = point->Z;
 			pVertex++;
 
 			secondPoint = point;

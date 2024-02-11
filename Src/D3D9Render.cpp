@@ -16,7 +16,7 @@ void UD3D9Render::StaticConstructor() {
 }
 
 void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets) {
-	const UModel* model = frame->Level->Model;
+	UModel* model = frame->Level->Model;
 	const FLOAT levelTime = frame->Level->GetLevelInfo()->TimeSeconds;
 	const UViewport* viewport = frame->Viewport;
 
@@ -53,9 +53,10 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		std::unordered_map<INT, FSurfaceFacet> surfaceMap;
 		for (INT iNode : texNodePair.second) {
 			const FBspNode& node = model->Nodes(iNode);
-			const FBspSurf* surf = &model->Surfs(node.iSurf);
+			FBspSurf* surf = &model->Surfs(node.iSurf);
 			FSurfaceFacet* facet;
 			if (surfaceMap.find(node.iSurf) == surfaceMap.end()) {
+				// New surface, setup...
 				facet = &surfaceMap[node.iSurf];
 				facet->Polys = NULL;
 				facet->Span = NULL;
@@ -173,6 +174,8 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				surface.Texture = texInfo;
 
 				d3d9Dev->drawLevelSurfaces(frame, surface, facets);
+				for (FSurfaceFacet facet : facets) {
+					drawFacetDecals(frame, d3d9Dev, facet, lockedTextures);
 			}
 			//for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
 			//	UBOOL bTranslucent = sprite->Actor && sprite->Actor->Style == STY_Translucent;
@@ -244,6 +247,118 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	}
 	Super::DrawWorld(frame);
 	unguard;
+}
+
+void UD3D9Render::drawFacetDecals(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, FSurfaceFacet& facet, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures) {
+	const UViewport* viewport = frame->Viewport;
+	UModel* model = frame->Level->Model;
+	FBspSurf& surf = model->Surfs(model->Nodes(facet.Polys->iNode).iSurf);
+	for (int i = 0; i < surf.Decals.Num(); i++) {
+		FDecal* decal = &surf.Decals(i);
+		UTexture* texture;
+		if (decal->Actor->Texture) {
+			texture = decal->Actor->Texture->Get(viewport->CurrentTime);
+		} else {
+			texture = viewport->Actor->Level->DefaultTexture;
+		}
+		FTextureInfo* texInfo;
+		if (lockedTextures.find(texture) == lockedTextures.end()) {
+			texInfo = &lockedTextures[texture];
+			texture->Lock(*texInfo, viewport->CurrentTime, -1, viewport->RenDev);
+		} else {
+			texInfo = &lockedTextures[texture];
+		}
+
+		for (FSavedPoly* poly = facet.Polys; poly; poly = poly->Next) {
+			INT Found;
+			if (decal->Nodes.Num() > 0 && !decal->Nodes.FindItem(poly->iNode, Found))
+				continue;
+			std::vector<FTransTexture> points;
+			ClipDecal(frame, decal, &surf, poly, points);
+
+			int numPts = points.size();
+			if (numPts < 3) continue;
+
+			// Calculate the vectors between the first two points and the second and third points
+			FVector v1 = points[1].Point - points[0].Point;
+			FVector v2 = points[2].Point - points[0].Point;
+			FVector normal = v1 ^ v2;
+			normal.Normalize();
+			if ((normal | model->Vectors(surf.vNormal)) < 0) {
+				std::reverse(points.begin(), points.end()); // Reverse the face so it points the correct way
+			}
+
+			FTransTexture** pointsPtrs = new FTransTexture*[numPts];
+			for (int i = 0; i < numPts; i++) {
+				pointsPtrs[i] = &points[i];
+			}
+
+			decal->Actor->LastRenderedTime = decal->Actor->Level->TimeSeconds;
+			d3d9Dev->DrawGouraudPolygon(frame, *texInfo, pointsPtrs, numPts, PF_Modulated, NULL);
+			delete[] pointsPtrs;
+		}
+	}
+}
+
+void UD3D9Render::ClipDecal(FSceneNode* frame, FDecal* decal, FBspSurf* surf, FSavedPoly* poly, std::vector<FTransTexture>& decalPts) {
+	UModel* const& model = frame->Level->Model;
+	FVector& surfNormal = model->Vectors(surf->vNormal);
+	FVector& surfBase = model->Points(surf->pBase);
+
+	FVector decalOffset = surfNormal;
+	decalOffset.Normalize();
+	decalOffset = decalOffset * 0.1; // offset from wall
+	decalOffset += surfBase;
+	for (int i = 0; i < 4; i++) {
+		// Add the 4 decal points to start
+		FTransTexture pt{};
+		pt.Point = decal->Vertices[i] + decalOffset;
+		decalPts.push_back(std::move(pt));
+	}
+
+	int polyPrevIdx = poly->NumPts - 1;
+	for (int polyIdx = 0; polyIdx < poly->NumPts; polyIdx++) {
+		FVector edgeVector = poly->Pts[polyPrevIdx]->Point - poly->Pts[polyIdx]->Point;
+		FVector clipNorm = edgeVector ^ surfNormal;
+		FPlane clipPlane = FPlane(poly->Pts[polyIdx]->Point, clipNorm);
+
+		std::vector<bool> isInside;
+		// Calculate if the point is isInside or outside the clip plane
+		for (FTransTexture& point : decalPts) {
+			isInside.push_back(clipPlane.PlaneDot(point.Point) >= 0);
+		}
+		for (int decalIdx = 0; decalIdx < decalPts.size(); decalIdx++) {
+			int decalNextIdx = (decalIdx + 1) % decalPts.size();
+			if ((isInside[decalIdx] && !isInside[decalNextIdx]) || (!isInside[decalIdx] && isInside[decalNextIdx])) {
+				FTransTexture newPt{};
+				newPt.Point = FLinePlaneIntersection(decalPts[decalIdx].Point, decalPts[decalNextIdx].Point, clipPlane);
+				decalPts.insert(decalPts.begin() + decalIdx + 1, newPt);
+				isInside.insert(isInside.begin() + decalIdx + 1, true);
+				decalIdx++;
+			}
+		}
+		// Remove outside points
+		for (int i = 0; i < decalPts.size(); i++) {
+			if (!isInside[i]) {
+				decalPts.erase(decalPts.begin() + i);
+				isInside.erase(isInside.begin() + i);
+				i--;
+			}
+		}
+		if (decalPts.empty()) return;
+		polyPrevIdx = polyIdx;
+	}
+	FLOAT vertColor = Clamp(decal->Actor->ScaleGlow * 0.5f + decal->Actor->AmbientGlow / 256.f, 0.f, 1.f);
+	FVector edgeU = decal->Vertices[1] - decal->Vertices[0];
+	FVector edgeV = decal->Vertices[3] - decal->Vertices[0];
+	for (FTransTexture& point : decalPts) {
+		// Calculate point UVs, assumes square
+		FVector relativePoint = point.Point - surfBase - decal->Vertices[0];
+		point.U = ((relativePoint | edgeU) / edgeU.Size()) / decal->Actor->DrawScale;
+		point.V = ((relativePoint | edgeV) / edgeV.Size()) / decal->Actor->DrawScale;
+
+		point.Light = FVector(vertColor, vertColor, vertColor);
+	}
 }
 
 void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord) {

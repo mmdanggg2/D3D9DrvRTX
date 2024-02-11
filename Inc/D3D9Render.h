@@ -32,6 +32,8 @@ class UD3D9Render : public URender {
 	void DrawWorld(FSceneNode* Frame) override;
 	void DrawActor(FSceneNode* Frame, AActor* Actor) override;
 
+	void ClipDecal(FSceneNode* frame, FDecal* decal, FBspSurf* surf, FSavedPoly* poly, std::vector<FTransTexture>& decalPoints);
+
 
 private:
 	struct ModelFacets {
@@ -39,4 +41,5 @@ private:
 	};
 	void getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets);
 	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord);
+	void drawFacetDecals(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, FSurfaceFacet& facet, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures);
 };
