@@ -42,6 +42,8 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 
 		if (flags & PF_Invisible) {
 			continue;
+		} else if (flags & (PF_Mirrored | PF_NoOcclude)) {
+			flags &= ~PF_NoOcclude;
 		}
 
 		texNodes[TexFlagKey(texture, flags)].push_back(iNode);
@@ -176,9 +178,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 				d3d9Dev->drawLevelSurfaces(frame, surface, facets);
 				if (viewport->GetOuterUClient()->Decals) {
-				for (FSurfaceFacet facet : facets) {
-					drawFacetDecals(frame, d3d9Dev, facet, lockedTextures);
-			}
+					for (FSurfaceFacet facet : facets) {
+						drawFacetDecals(frame, d3d9Dev, facet, lockedTextures);
+					}
 				}
 			}
 			//for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
