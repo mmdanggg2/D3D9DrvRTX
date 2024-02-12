@@ -147,7 +147,8 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		//dout << "Starting frame" << std::endl;
 
 		d3d9Dev->startWorldDraw(frame);
-		//OccludeFrame(frame);
+		// Seems to update mover bsp nodes for decal calculations
+		SetupDynamics(frame, playerActor);
 
 		ModelFacets modelFacets;
 		getLevelModelFacets(frame, modelFacets);
@@ -174,8 +175,11 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				surface.Texture = texInfo;
 
 				d3d9Dev->drawLevelSurfaces(frame, surface, facets);
+				if (viewport->GetOuterUClient()->Decals) {
 				for (FSurfaceFacet facet : facets) {
 					drawFacetDecals(frame, d3d9Dev, facet, lockedTextures);
+			}
+				}
 			}
 			//for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
 			//	UBOOL bTranslucent = sprite->Actor && sprite->Actor->Style == STY_Translucent;
@@ -251,10 +255,10 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 void UD3D9Render::drawFacetDecals(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, FSurfaceFacet& facet, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures) {
 	const UViewport* viewport = frame->Viewport;
-	UModel* model = frame->Level->Model;
-	FBspSurf& surf = model->Surfs(model->Nodes(facet.Polys->iNode).iSurf);
+	const UModel* model = frame->Level->Model;
+	const FBspSurf& surf = model->Surfs(model->Nodes(facet.Polys->iNode).iSurf);
 	for (int i = 0; i < surf.Decals.Num(); i++) {
-		FDecal* decal = &surf.Decals(i);
+		const FDecal* decal = &surf.Decals(i);
 		UTexture* texture;
 		if (decal->Actor->Texture) {
 			texture = decal->Actor->Texture->Get(viewport->CurrentTime);
@@ -270,16 +274,17 @@ void UD3D9Render::drawFacetDecals(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 		}
 
 		for (FSavedPoly* poly = facet.Polys; poly; poly = poly->Next) {
-			INT Found;
-			if (decal->Nodes.Num() > 0 && !decal->Nodes.FindItem(poly->iNode, Found))
+			INT findIndex;
+			if (!decal->Nodes.FindItem(poly->iNode, findIndex)) {
 				continue;
+			}
 			std::vector<FTransTexture> points;
 			ClipDecal(frame, decal, &surf, poly, points);
 
 			int numPts = points.size();
 			if (numPts < 3) continue;
 
-			// Calculate the vectors between the first two points and the second and third points
+			// Calculate the normal from the cross of first point and the second and third points
 			FVector v1 = points[1].Point - points[0].Point;
 			FVector v2 = points[2].Point - points[0].Point;
 			FVector normal = v1 ^ v2;
@@ -300,7 +305,7 @@ void UD3D9Render::drawFacetDecals(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 	}
 }
 
-void UD3D9Render::ClipDecal(FSceneNode* frame, FDecal* decal, FBspSurf* surf, FSavedPoly* poly, std::vector<FTransTexture>& decalPts) {
+void UD3D9Render::ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSurf* surf, FSavedPoly* poly, std::vector<FTransTexture>& decalPts) {
 	UModel* const& model = frame->Level->Model;
 	FVector& surfNormal = model->Vectors(surf->vNormal);
 	FVector& surfBase = model->Points(surf->pBase);

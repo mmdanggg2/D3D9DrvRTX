@@ -32,7 +32,7 @@ class UD3D9Render : public URender {
 	void DrawWorld(FSceneNode* Frame) override;
 	void DrawActor(FSceneNode* Frame, AActor* Actor) override;
 
-	void ClipDecal(FSceneNode* frame, FDecal* decal, FBspSurf* surf, FSavedPoly* poly, std::vector<FTransTexture>& decalPoints);
+	void ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSurf* surf, FSavedPoly* poly, std::vector<FTransTexture>& decalPoints);
 
 
 private:
