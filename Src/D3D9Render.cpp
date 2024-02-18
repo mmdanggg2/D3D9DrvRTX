@@ -42,7 +42,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 
 		if (flags & PF_Invisible) {
 			continue;
-		} else if (flags & (PF_Mirrored | PF_NoOcclude)) {
+		} else if (flags & PF_Mirrored) {
 			flags &= ~PF_NoOcclude;
 		}
 
@@ -126,7 +126,8 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		}
 
 		for (const std::pair<const INT, FSurfaceFacet>& facetPair : surfaceMap) {
-			modelFacets.facetPairs[(flags & PF_NoOcclude) != 0][texNodePair.first].push_back(facetPair.second);
+			RPASS pass = (flags & PF_NoOcclude) ? RPASS::NONSOLID : RPASS::SOLID;
+			modelFacets.facetPairs[pass][texNodePair.first].push_back(facetPair.second);
 		}
 	}
 }
@@ -155,10 +156,30 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		ModelFacets modelFacets;
 		getLevelModelFacets(frame, modelFacets);
 
-		std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
+		std::vector<AActor*> visibleActors;
+		std::vector<AMover*> visibleMovers;
 
-		for (int pass : {1, 2}) {
-			for (std::pair<const TexFlagKey, std::vector<FSurfaceFacet>>& facetPair : modelFacets.facetPairs[pass-1]) {
+		for (int iActor = 0; iActor < frame->Level->Actors.Num(); iActor++) {
+			AActor* actor = frame->Level->Actors(iActor);
+			if (!actor) continue;
+			if (actor->IsA(AMover::StaticClass())) {
+				visibleMovers.push_back((AMover*)actor);
+				continue;
+			}
+			bool isVisible = true;
+			isVisible &= actor != playerActor;
+			isVisible &= GIsEditor ? !actor->bHiddenEd : !actor->bHidden;
+			bool isOwned = actor->IsOwnedBy(frame->Viewport->Actor);
+			isVisible &= !actor->bOnlyOwnerSee || (isOwned && !frame->Viewport->Actor->bBehindView);
+			isVisible &= !isOwned || !actor->bOwnerNoSee || (isOwned && frame->Viewport->Actor->bBehindView);
+			if (isVisible) {
+				visibleActors.push_back(actor);
+			}
+		}
+
+		std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
+		for (RPASS pass : {SOLID, NONSOLID}) {
+			for (std::pair<const TexFlagKey, std::vector<FSurfaceFacet>>& facetPair : modelFacets.facetPairs[pass]) {
 				UTexture* texture = facetPair.first.first;
 				DWORD flags = facetPair.first.second;
 				std::vector<FSurfaceFacet>& facets = facetPair.second;
@@ -183,6 +204,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 					}
 				}
 			}
+			for (AMover* mover : visibleMovers) {
+				d3d9Dev->renderMover(frame, mover);
+			}
 			//for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
 			//	UBOOL bTranslucent = sprite->Actor && sprite->Actor->Style == STY_Translucent;
 			//	if ((pass == 2 && bTranslucent) || (pass == 1 && !bTranslucent)) {
@@ -194,22 +218,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			//		}
 			//	}
 			//}
-			for (int iActor = 0; iActor < frame->Level->Actors.Num(); iActor++) {
-				AActor* actor = frame->Level->Actors(iActor);
-				if (!actor) continue;
-				bool isVisible = true;
-				isVisible &= actor != playerActor;
-				isVisible &= GIsEditor ? !actor->bHiddenEd : !actor->bHidden;
-				bool isOwned = actor->IsOwnedBy(frame->Viewport->Actor);
-				isVisible &= !actor->bOnlyOwnerSee || (isOwned && !frame->Viewport->Actor->bBehindView);
-				isVisible &= !isOwned || !actor->bOwnerNoSee || (isOwned && frame->Viewport->Actor->bBehindView);
-				if (isVisible) {
-					if (actor->IsA(AMover::StaticClass()) && pass == 1) {
-						d3d9Dev->renderMover(frame, (AMover*)actor);
-						continue;
-					}
+			for (AActor* actor : visibleActors) {
 					UBOOL bTranslucent = actor->Style == STY_Translucent;
-					if ((pass == 2 && bTranslucent) || (pass == 1 && !bTranslucent)) {
+				if ((pass == RPASS::NONSOLID && bTranslucent) || (pass == RPASS::SOLID && !bTranslucent)) {
 						SpecialCoord specialCoord;
 						if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
 							d3d9Dev->renderSprite(frame, actor);
@@ -222,16 +233,8 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 					}
 				}
 			}
-		}
 		for (std::pair<UTexture* const, FTextureInfo>& entry : lockedTextures) {
 			entry.first->Unlock(entry.second);
-		}
-
-		// Render view model actor and extra HUD stuff
-		if (!GIsEditor && playerActor && (frame->Viewport->Actor->ShowFlags & SHOW_Actors)) {
-			GUglyHackFlags |= 1;
-			playerActor->eventRenderOverlays(frame->Viewport->Canvas);
-			GUglyHackFlags &= ~1;
 		}
 
 		std::vector<AActor*> lightActors;
@@ -245,6 +248,14 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		d3d9Dev->renderLights(lightActors);
 
 		d3d9Dev->endWorldDraw(frame);
+
+		// Render view model actor and extra HUD stuff
+		if (!GIsEditor && playerActor && (frame->Viewport->Actor->ShowFlags & SHOW_Actors)) {
+			GUglyHackFlags |= 1;
+			playerActor->eventRenderOverlays(frame->Viewport->Canvas);
+			GUglyHackFlags &= ~1;
+		}
+
 		memMark.Pop();
 		dynMark.Pop();
 		sceneMark.Pop();
@@ -314,7 +325,7 @@ void UD3D9Render::ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSu
 
 	FVector decalOffset = surfNormal;
 	decalOffset.Normalize();
-	decalOffset = decalOffset * 0.1; // offset from wall
+	decalOffset = decalOffset * 0.4; // offset from wall
 	decalOffset += surfBase;
 	for (int i = 0; i < 4; i++) {
 		// Add the 4 decal points to start
@@ -426,8 +437,11 @@ void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor) {
 	guard(UD3D9Render::DrawActor);
 	if (GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
 		UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
+		d3d9Dev->EndBuffering(); // muzzle flash is drawing before weapon
+		d3d9Dev->startWorldDraw(frame);
 		d3d9Dev->renderMeshActor(frame, actor);
 		//dout << "Drawing actor! " << actor->GetName() << std::endl;
+		d3d9Dev->endWorldDraw(frame);
 		return;
 	}
 	Super::DrawActor(frame, actor);

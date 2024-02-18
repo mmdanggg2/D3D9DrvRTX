@@ -36,8 +36,11 @@ class UD3D9Render : public URender {
 
 
 private:
+	enum RPASS {
+		SOLID, NONSOLID, RPASS_MAX
+	};
 	struct ModelFacets {
-		TexFlagKeyMap<std::vector<FSurfaceFacet>> facetPairs[2];
+		TexFlagKeyMap<std::vector<FSurfaceFacet>> facetPairs[RPASS_MAX];
 	};
 	void getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets);
 	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord);

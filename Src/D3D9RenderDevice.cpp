@@ -4993,6 +4993,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 	if (isViewModel) {
 		m_d3dDevice->SetViewport(&vpPrev);
+		m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
 	}
 
 	for (UTexture* tex : textures) {
