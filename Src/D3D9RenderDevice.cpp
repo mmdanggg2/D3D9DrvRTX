@@ -4928,9 +4928,11 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		if (!(points[0]->Flags & points[1]->Flags & points[2]->Flags)) {
 			if ((polyFlags & (PF_TwoSided | PF_Flat | PF_Invisible)) != (PF_Flat)) {
 				FTextureInfo* texInfo;
-				if (texInfos.has(texIdx) && !(polyFlags & PF_Environment)) {
+				try {
+					if (!(polyFlags & PF_Environment)) {
 					texInfo = &texInfos.at(texIdx);
-				} else {
+					}
+				} catch (const std::out_of_range&) {
 					texInfo = &envTexInfo;
 				}
 				if (!texInfo->Texture) {
@@ -4939,6 +4941,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 				float scaleU = texInfo->UScale * texInfo->USize / 256.0;
 				float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
 
+				std::vector<FTransTexture>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
 				for (INT j = 0; j < 3; j++) {
 					FTransTexture vert = *points[j];
 					vert.U = triUV[j].U * scaleU;
@@ -4953,7 +4956,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 						vert.V = (envNorm.Y + 1.0) * 0.5 * 256.0 * scaleV;
 					}
 
-					surfaceMap[SurfKey(texInfo, polyFlags)].push_back(vert);
+					pointsVec.push_back(vert);
 				}
 			}
 		}
