@@ -23,6 +23,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 	TexFlagKeyMap<std::vector<INT>> texNodes;
 
 	DWORD flagMask = (viewport->Actor->ShowFlags & SHOW_PlayerCtrl) ? ~PF_FlatShaded : ~PF_Invisible;
+	flagMask &= ~PF_Highlighted;
 	for (INT iNode = 0; iNode < model->Nodes.Num(); iNode++) {
 		const FBspNode* node = &model->Nodes(iNode);
 		INT iSurf = node->iSurf;
@@ -42,7 +43,8 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 
 		if (flags & PF_Invisible) {
 			continue;
-		} else if (flags & PF_Mirrored) {
+		}
+		if (flags & PF_Mirrored) {
 			flags &= ~PF_NoOcclude;
 		}
 
