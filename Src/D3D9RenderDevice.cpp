@@ -4929,10 +4929,10 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 			if ((polyFlags & (PF_TwoSided | PF_Flat | PF_Invisible)) != (PF_Flat)) {
 				FTextureInfo* texInfo = &envTexInfo;
 				if (!(polyFlags & PF_Environment)) {
-				try {
-					texInfo = &texInfos.at(texIdx);
+					try {
+						texInfo = &texInfos.at(texIdx);
 					} catch (const std::out_of_range&) {}
-					}
+				}
 				if (!texInfo->Texture) {
 					continue;
 				}

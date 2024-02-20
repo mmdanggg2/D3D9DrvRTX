@@ -130,7 +130,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 			}
 		}
 
-		for (const std::pair<const INT, FSurfaceFacet>& facetPair : surfaceMap) {
+		for (std::pair<const INT, FSurfaceFacet>& facetPair : surfaceMap) {
 			RPASS pass = (flags & PF_NoOcclude) ? RPASS::NONSOLID : RPASS::SOLID;
 			modelFacets.facetPairs[pass][texNodePair.first].push_back(std::move(facetPair.second));
 		}
@@ -235,20 +235,20 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				d3d9Dev->renderMover(frame, mover);
 			}
 			for (AActor* actor : visibleActors) {
-					UBOOL bTranslucent = actor->Style == STY_Translucent;
+				UBOOL bTranslucent = actor->Style == STY_Translucent;
 				if ((pass == RPASS::NONSOLID && bTranslucent) || (pass == RPASS::SOLID && !bTranslucent)) {
-						SpecialCoord specialCoord;
-						if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
-							d3d9Dev->renderSprite(frame, actor);
-						} else if (actor->DrawType == DT_Mesh) {
-							d3d9Dev->renderMeshActor(frame, actor, &specialCoord);
-						}
-						if (actor->IsA(APawn::StaticClass())) {
-							drawPawnExtras(frame, d3d9Dev, (APawn*)actor, specialCoord);
-						}
+					SpecialCoord specialCoord;
+					if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
+						d3d9Dev->renderSprite(frame, actor);
+					} else if (actor->DrawType == DT_Mesh) {
+						d3d9Dev->renderMeshActor(frame, actor, &specialCoord);
+					}
+					if (actor->IsA(APawn::StaticClass())) {
+						drawPawnExtras(frame, d3d9Dev, (APawn*)actor, specialCoord);
 					}
 				}
 			}
+		}
 		for (std::pair<UTexture* const, FTextureInfo>& entry : lockedTextures) {
 			entry.first->Unlock(entry.second);
 		}
