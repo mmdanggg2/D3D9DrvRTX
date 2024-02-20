@@ -153,7 +153,28 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 		d3d9Dev->startWorldDraw(frame);
 		// Seems to update mover bsp nodes for decal calculations
-		SetupDynamics(frame, playerActor);
+		//OccludeBsp(frame);
+		//SetupDynamics(frame, playerActor);
+
+		std::unordered_set<INT> visibleZones;
+		std::unordered_set<INT> visibleSurfs;
+		{
+			TArray<INT> visibleSurfsTArr;
+			auto savedRotation = viewport->Actor->ViewRotation;
+			GetVisibleSurfs(const_cast<UViewport*>(viewport), visibleSurfsTArr);
+			viewport->Actor->ViewRotation = savedRotation;
+			for (int i = 0; i < visibleSurfsTArr.Num(); i++) {
+				visibleSurfs.insert(visibleSurfsTArr(i));// std lib is more efficient
+			}
+
+			for (int i = 0; i < frame->Level->Model->Nodes.Num(); i++) {
+				FBspNode& node = frame->Level->Model->Nodes(i);
+				if (visibleSurfs.count(node.iSurf)) {
+					visibleZones.insert(node.iZone[0]);
+					visibleZones.insert(node.iZone[1]);
+				}
+			}
+		}
 
 		ModelFacets modelFacets;
 		getLevelModelFacets(frame, modelFacets);
@@ -168,6 +189,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				visibleMovers.push_back((AMover*)actor);
 				continue;
 			}
+			if (!visibleZones.count(actor->Region.ZoneNumber)) continue;
 			bool isVisible = true;
 			isVisible &= actor != playerActor;
 			isVisible &= GIsEditor ? !actor->bHiddenEd : !actor->bHidden;
@@ -209,17 +231,6 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			for (AMover* mover : visibleMovers) {
 				d3d9Dev->renderMover(frame, mover);
 			}
-			//for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
-			//	UBOOL bTranslucent = sprite->Actor && sprite->Actor->Style == STY_Translucent;
-			//	if ((pass == 2 && bTranslucent) || (pass == 1 && !bTranslucent)) {
-			//		AActor* actor = sprite->Actor;
-			//		if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
-			//			d3d9Dev->renderSprite(frame, actor);
-			//		} else if (actor->DrawType == DT_Mesh) {
-			//			d3d9Dev->renderMeshActor(frame, actor);
-			//		}
-			//	}
-			//}
 			for (AActor* actor : visibleActors) {
 					UBOOL bTranslucent = actor->Style == STY_Translucent;
 				if ((pass == RPASS::NONSOLID && bTranslucent) || (pass == RPASS::SOLID && !bTranslucent)) {
