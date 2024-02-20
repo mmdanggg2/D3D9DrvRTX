@@ -4940,6 +4940,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 				float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
 
 				std::vector<FTransTexture>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
+				pointsVec.reserve(numVerts);
 				for (INT j = 0; j < 3; j++) {
 					FTransTexture vert = *points[j];
 					vert.U = triUV[j].U * scaleU;
@@ -4954,7 +4955,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 						vert.V = (envNorm.Y + 1.0) * 0.5 * 256.0 * scaleV;
 					}
 
-					pointsVec.push_back(vert);
+					pointsVec.push_back(std::move(vert));
 				}
 			}
 		}
@@ -5037,15 +5038,16 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 	UViewport* viewport = frame->Viewport;
 
 	std::unordered_map<UTexture*, FTextureInfo> textureInfos;
+	textureInfos.reserve(model->Polys->Element.Num());
 	SurfKeyMap<std::vector<FPoly*>> polys;
-	UModel* model = mover->Brush;
+	polys.reserve(model->Polys->Element.Num());
 	for (int i = 0; i < model->Polys->Element.Num(); i++) {
 		FPoly* poly = &model->Polys->Element(i);
 		UTexture* tex = poly->Texture ? poly->Texture->Get(viewport->CurrentTime) : viewport->Actor->Level->DefaultTexture;
 		if (!tex) continue;
 		DWORD flags = poly->PolyFlags;
 		FTextureInfo* texInfo;
-		if (textureInfos.find(tex) == textureInfos.end()) {
+		if (!textureInfos.count(tex)) {
 			texInfo = &textureInfos[tex];
 			tex->Lock(*texInfo, frame->Viewport->CurrentTime, -1, this);
 		} else {
@@ -5125,7 +5127,7 @@ public:
 		std::unordered_set<int> unsetSlots;
 		// First, deactivate the slots of any actors that have been removed
 		for (auto it = actorSlots.begin(); it != actorSlots.end(); ) {
-			if (std::find(actors.begin(), actors.end(), it->first) == actors.end()) {
+			if (!std::count(actors.begin(), actors.end(), it->first)) {
 				// This actor has been removed
 				const int slot = it->second;
 				availableSlots.push_front(slot);
@@ -5139,7 +5141,7 @@ public:
 
 		// Now, add any new actors
 		for (AActor* actor : actors) {
-			if (actorSlots.find(actor) == actorSlots.end()) {
+			if (!actorSlots.count(actor)) {
 				// This is a new actor
 				if (availableSlots.empty()) {
 					throw std::runtime_error("No available slots");

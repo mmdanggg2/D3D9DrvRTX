@@ -1,5 +1,7 @@
 #include "D3D9Render.h"
 
+#include <unordered_set>
+
 IMPLEMENT_CLASS(UD3D9Render);
 
 UD3D9Render::UD3D9Render() : URender() {
@@ -55,11 +57,12 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		DWORD flags = texNodePair.first.second;
 
 		std::unordered_map<INT, FSurfaceFacet> surfaceMap;
+		surfaceMap.reserve(texNodePair.second.size());
 		for (INT iNode : texNodePair.second) {
 			const FBspNode& node = model->Nodes(iNode);
 			FBspSurf* surf = &model->Surfs(node.iSurf);
 			FSurfaceFacet* facet;
-			if (surfaceMap.find(node.iSurf) == surfaceMap.end()) {
+			if (!surfaceMap.count(node.iSurf)) {
 				// New surface, setup...
 				facet = &surfaceMap[node.iSurf];
 				facet->Polys = NULL;
@@ -129,7 +132,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 
 		for (const std::pair<const INT, FSurfaceFacet>& facetPair : surfaceMap) {
 			RPASS pass = (flags & PF_NoOcclude) ? RPASS::NONSOLID : RPASS::SOLID;
-			modelFacets.facetPairs[pass][texNodePair.first].push_back(facetPair.second);
+			modelFacets.facetPairs[pass][texNodePair.first].push_back(std::move(facetPair.second));
 		}
 	}
 }
@@ -209,7 +212,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				std::vector<FSurfaceFacet>& facets = facetPair.second;
 
 				FTextureInfo* texInfo;
-				if (lockedTextures.find(texture) == lockedTextures.end()) {
+				if (!lockedTextures.count(texture)) {
 					texInfo = &lockedTextures[texture];
 					texture->Lock(*texInfo, viewport->CurrentTime, -1, viewport->RenDev);
 				} else {
@@ -292,7 +295,7 @@ void UD3D9Render::drawFacetDecals(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 			texture = viewport->Actor->Level->DefaultTexture;
 		}
 		FTextureInfo* texInfo;
-		if (lockedTextures.find(texture) == lockedTextures.end()) {
+		if (!lockedTextures.count(texture)) {
 			texInfo = &lockedTextures[texture];
 			texture->Lock(*texInfo, viewport->CurrentTime, -1, viewport->RenDev);
 		} else {

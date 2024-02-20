@@ -9,7 +9,7 @@
 
 typedef const std::pair<UTexture* const, const DWORD> TexFlagKey;
 struct TexFlagKey_Hash {
-	std::size_t operator () (const TexFlagKey& p) const {
+	inline std::size_t operator () (const TexFlagKey& p) const {
 		auto ptr_hash = std::hash<UTexture*>{}(p.first);
 		auto dword_hash = std::hash<DWORD>{}(p.second);
 
