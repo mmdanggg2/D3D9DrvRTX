@@ -5035,7 +5035,15 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &actorMatrix);
 
+	// Calculate if the mover has been inversely scaled and needs the normals correcting.
+	XMVECTOR overallScaleDX, _unused;
+	XMMatrixDecompose(&overallScaleDX, &_unused, &_unused, mat);
+	FVector overallScale = DXVecToFVec(overallScaleDX);
+	int numNeg = (overallScale.X < 0) + (overallScale.Y < 0) + (overallScale.Z < 0);
+	bool invertFaces = (numNeg == 1) || (numNeg == 3);
+
 	UViewport* viewport = frame->Viewport;
+	UModel* model = mover->Brush;
 
 	std::unordered_map<UTexture*, FTextureInfo> textureInfos;
 	textureInfos.reserve(model->Polys->Element.Num());
@@ -5068,9 +5076,10 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 			sPoly->NumPts = poly->NumVertices;
 			sPoly->Next = NULL;
 			for (int i = 0; i < sPoly->NumPts; i++) {
+				int iDest = invertFaces ? (sPoly->NumPts - 1) - i : i;
 				FTransform* trans = new(GDynMem)FTransform;
 				trans->Point = poly->Vertex[i];
-				sPoly->Pts[i] = trans;
+				sPoly->Pts[iDest] = trans;
 			}
 
 			FSurfaceFacet facet{};
