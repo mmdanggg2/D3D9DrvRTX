@@ -4895,7 +4895,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	}
 
 	SurfKeyMap<std::vector<FTransTexture>> surfaceMap;
-	surfaceMap.reserve(1000);
+	surfaceMap.reserve(numTris);
 
 	for (INT i = 0; i < numTris; i++) {
 		FTransTexture* points[3];
@@ -4940,9 +4940,9 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 				float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
 
 				std::vector<FTransTexture>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
-				pointsVec.reserve(numVerts);
+				pointsVec.reserve(numTris*3);
 				for (INT j = 0; j < 3; j++) {
-					FTransTexture vert = *points[j];
+					FTransTexture& vert = pointsVec.emplace_back(*points[j]);
 					vert.U = triUV[j].U * scaleU;
 					vert.V = triUV[j].V * scaleV;
 					if (fatten) {
@@ -4954,8 +4954,6 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 						vert.U = (envNorm.X + 1.0) * 0.5 * 256.0 * scaleU;
 						vert.V = (envNorm.Y + 1.0) * 0.5 * 256.0 * scaleV;
 					}
-
-					pointsVec.push_back(std::move(vert));
 				}
 			}
 		}

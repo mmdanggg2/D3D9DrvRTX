@@ -53,18 +53,18 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		texNodes[TexFlagKey(texture, flags)].push_back(iNode);
 	}
 
+	std::unordered_map<INT, FSurfaceFacet*> surfaceMap;
 	for (const std::pair<const TexFlagKey, std::vector<INT>>& texNodePair : texNodes) {
 		DWORD flags = texNodePair.first.second;
 
-		std::unordered_map<INT, FSurfaceFacet> surfaceMap;
 		surfaceMap.reserve(texNodePair.second.size());
 		for (INT iNode : texNodePair.second) {
 			const FBspNode& node = model->Nodes(iNode);
 			FBspSurf* surf = &model->Surfs(node.iSurf);
-			FSurfaceFacet* facet;
-			if (!surfaceMap.count(node.iSurf)) {
+			FSurfaceFacet*& facet = surfaceMap[node.iSurf];
+			if (!facet) {
 				// New surface, setup...
-				facet = &surfaceMap[node.iSurf];
+				facet = New<FSurfaceFacet>(GDynMem);
 				facet->Polys = NULL;
 				facet->Span = NULL;
 				facet->MapCoords = FCoords(
@@ -111,8 +111,6 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 					// Hide this away in the span coz we're not using it
 					facet->Span = (FSpanBuffer*)pan;
 				}
-			} else {
-				facet = &surfaceMap[node.iSurf];
 			}
 
 			//dout << L"\t Node " << iNode << std::endl;
@@ -124,16 +122,17 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 
 			for (int i = 0; i < poly->NumPts; i++) {
 				FVert vert = model->Verts(node.iVertPool + i);
-				FTransform* trans = new(VectorMem)FTransform;
+				FTransform* trans = New<FTransform>(VectorMem);
 				trans->Point = model->Points(vert.pVertex);
 				poly->Pts[i] = trans;
 			}
 		}
 
-		for (std::pair<const INT, FSurfaceFacet>& facetPair : surfaceMap) {
+		for (std::pair<const INT, FSurfaceFacet*>& facetPair : surfaceMap) {
 			RPASS pass = (flags & PF_NoOcclude) ? RPASS::NONSOLID : RPASS::SOLID;
-			modelFacets.facetPairs[pass][texNodePair.first].push_back(std::move(facetPair.second));
+			modelFacets.facetPairs[pass][texNodePair.first].push_back(*facetPair.second);
 		}
+		surfaceMap.clear();
 	}
 }
 
