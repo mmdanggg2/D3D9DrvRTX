@@ -60,9 +60,9 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		surfaceMap.reserve(texNodePair.second.size());
 		for (INT iNode : texNodePair.second) {
 			const FBspNode& node = model->Nodes(iNode);
-			FBspSurf* surf = &model->Surfs(node.iSurf);
 			FSurfaceFacet*& facet = surfaceMap[node.iSurf];
 			if (!facet) {
+				const FBspSurf* surf = &model->Surfs(node.iSurf);
 				// New surface, setup...
 				facet = New<FSurfaceFacet>(GDynMem);
 				facet->Polys = NULL;
@@ -130,7 +130,9 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 
 		for (std::pair<const INT, FSurfaceFacet*>& facetPair : surfaceMap) {
 			RPASS pass = (flags & PF_NoOcclude) ? RPASS::NONSOLID : RPASS::SOLID;
-			modelFacets.facetPairs[pass][texNodePair.first].push_back(*facetPair.second);
+			std::vector<FSurfaceFacet>& facets = modelFacets.facetPairs[pass][texNodePair.first];
+			facets.reserve(surfaceMap.size());
+			facets.push_back(*facetPair.second);
 		}
 		surfaceMap.clear();
 	}
@@ -159,8 +161,8 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		//SetupDynamics(frame, playerActor);
 
 		std::unordered_set<INT> visibleZones;
-		std::unordered_set<INT> visibleSurfs;
 		{
+			std::unordered_set<INT> visibleSurfs;
 			TArray<INT> visibleSurfsTArr;
 			auto savedRotation = viewport->Actor->ViewRotation;
 			GetVisibleSurfs(const_cast<UViewport*>(viewport), visibleSurfsTArr);
@@ -177,6 +179,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				}
 			}
 		}
+
 
 		ModelFacets modelFacets;
 		getLevelModelFacets(frame, modelFacets);
