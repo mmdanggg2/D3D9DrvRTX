@@ -145,6 +145,10 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		FMemMark memMark(GMem);
 		FMemMark dynMark(GDynMem);
 		FMemMark vectorMark(VectorMem);
+
+		if (Engine->Audio && !GIsEditor)
+			Engine->Audio->RenderAudioGeometry(frame);
+
 		UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
 
 		const UViewport* viewport = frame->Viewport;
@@ -156,6 +160,31 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		//dout << "Starting frame" << std::endl;
 
 		d3d9Dev->startWorldDraw(frame);
+
+		std::vector<AActor*> visibleActors;
+		std::vector<AMover*> visibleMovers;
+
+		for (int iActor = 0; iActor < frame->Level->Actors.Num(); iActor++) {
+			AActor* actor = frame->Level->Actors(iActor);
+			if (!actor) continue;
+			bool isVisible = true;
+			isVisible &= actor != playerActor;
+			isVisible &= GIsEditor ? !actor->bHiddenEd : !actor->bHidden;
+			bool isOwned = actor->IsOwnedBy(frame->Viewport->Actor);
+			isVisible &= !actor->bOnlyOwnerSee || (isOwned && !frame->Viewport->Actor->bBehindView);
+			isVisible &= !isOwned || !actor->bOwnerNoSee || (isOwned && frame->Viewport->Actor->bBehindView);
+			if (isVisible) {
+				if (actor->IsA(AMover::StaticClass())) {
+					if (frame->Level->BrushTracker) {
+						frame->Level->BrushTracker->Update(actor);
+					}
+					visibleMovers.push_back((AMover*)actor);
+					continue;
+				}
+				visibleActors.push_back(actor);
+			}
+		}
+
 		// Seems to update mover bsp nodes for decal calculations
 		//OccludeBsp(frame);
 		//SetupDynamics(frame, playerActor);
@@ -183,28 +212,6 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 		ModelFacets modelFacets;
 		getLevelModelFacets(frame, modelFacets);
-
-		std::vector<AActor*> visibleActors;
-		std::vector<AMover*> visibleMovers;
-
-		for (int iActor = 0; iActor < frame->Level->Actors.Num(); iActor++) {
-			AActor* actor = frame->Level->Actors(iActor);
-			if (!actor) continue;
-			if (actor->IsA(AMover::StaticClass())) {
-				visibleMovers.push_back((AMover*)actor);
-				continue;
-			}
-			if (!visibleZones.count(actor->Region.ZoneNumber)) continue;
-			bool isVisible = true;
-			isVisible &= actor != playerActor;
-			isVisible &= GIsEditor ? !actor->bHiddenEd : !actor->bHidden;
-			bool isOwned = actor->IsOwnedBy(frame->Viewport->Actor);
-			isVisible &= !actor->bOnlyOwnerSee || (isOwned && !frame->Viewport->Actor->bBehindView);
-			isVisible &= !isOwned || !actor->bOwnerNoSee || (isOwned && frame->Viewport->Actor->bBehindView);
-			if (isVisible) {
-				visibleActors.push_back(actor);
-			}
-		}
 
 		std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
 		for (RPASS pass : {SOLID, NONSOLID}) {
