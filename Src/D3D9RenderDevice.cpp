@@ -133,11 +133,6 @@ static const D3DVERTEXELEMENT9 g_twoColorSingleTextureStreamDef[] = {
 	D3DDECL_END()
 };
 
-
-
-#include <unordered_set>
-#include <deque>
-
 template <typename T>
 class UniqueValueArray {
 public:
@@ -2268,12 +2263,16 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	m_nearZRangeHackProjectionActive = false;
 	m_requestNearZRangeHackProjection = false;
 
+	lightSlots = new LightSlots(m_d3dCaps.MaxActiveLights);
 
 	unguard;
 }
 
 void UD3D9RenderDevice::FreePermanentResources(void) {
 	guard(FreePermanentResources);
+
+	delete lightSlots;
+	lightSlots = nullptr;
 
 	unsigned int u;
 	HRESULT hResult;
@@ -5113,71 +5112,49 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 	unguard;
 }
 
-class LightSlots {
-private:
-	std::unordered_map<AActor*, int> actorSlots;
-	std::deque<int> availableSlots;
-
-public:
-	LightSlots(int numSlots) {
-		actorSlots.reserve(numSlots);
-		for (int i = 0; i < numSlots; ++i) {
-			availableSlots.push_back(i);
+// Updates which actors are in the slots, returns a set of slots that are no longer used
+std::unordered_set<int> UD3D9RenderDevice::LightSlots::updateActors(const std::vector<AActor*>& actors) {
+	std::unordered_set<int> unsetSlots;
+	// First, deactivate the slots of any actors that have been removed
+	for (auto it = actorSlots.begin(); it != actorSlots.end(); ) {
+		if (!std::count(actors.begin(), actors.end(), it->first)) {
+			// This actor has been removed
+			const int slot = it->second;
+			availableSlots.push_front(slot);
+			unsetSlots.insert(slot);
+			//dout << L"Slot " << slot << L" actor deleted" << std::endl;
+			it = actorSlots.erase(it);
+		} else {
+			++it;
 		}
 	}
 
-	// Updates which actors are in the slots, returns a set of slots that are no longer used
-	std::unordered_set<int> updateActors(const std::vector<AActor*>& actors) {
-		ods_stream dout;
-		std::unordered_set<int> unsetSlots;
-		// First, deactivate the slots of any actors that have been removed
-		for (auto it = actorSlots.begin(); it != actorSlots.end(); ) {
-			if (!std::count(actors.begin(), actors.end(), it->first)) {
-				// This actor has been removed
-				const int slot = it->second;
-				availableSlots.push_front(slot);
-				unsetSlots.insert(slot);
-				//dout << L"Slot " << slot << L" actor deleted" << std::endl;
-				it = actorSlots.erase(it);
-			} else {
-				++it;
+	// Now, add any new actors
+	for (AActor* actor : actors) {
+		if (!actorSlots.count(actor)) {
+			// This is a new actor
+			if (availableSlots.empty()) {
+				dout << "No light slots left! Needed " << actors.size() << " lights" << std::endl;
+				break;
+				//throw std::runtime_error("No available slots");
 			}
+			int slot = availableSlots.front();
+			availableSlots.pop_front();
+			actorSlots[actor] = slot;
+			unsetSlots.erase(slot);
+			//dout << L"Slot " << slot << L" actor added " << actor->GetName() << std::endl;
 		}
-
-		// Now, add any new actors
-		for (AActor* actor : actors) {
-			if (!actorSlots.count(actor)) {
-				// This is a new actor
-				if (availableSlots.empty()) {
-					throw std::runtime_error("No available slots");
-				}
-				int slot = availableSlots.front();
-				availableSlots.pop_front();
-				actorSlots[actor] = slot;
-				unsetSlots.erase(slot);
-				//dout << L"Slot " << slot << L" actor added " << actor->GetName() << std::endl;
-			}
-		}
-		return unsetSlots;
 	}
-
-	const std::deque<int> unusedSlots() {
-		return availableSlots;
-	}
-
-	const std::unordered_map<AActor*, int> slotMap() {
-		return actorSlots;
-	}
-};
+	return unsetSlots;
+}
 
 void UD3D9RenderDevice::renderLights(std::vector<AActor*> lightActors) {
 	guard(UD3D9RenderDevice::renderLights);
-	static LightSlots slots(1000);
 
 	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, TRUE);
 	//assert(lightCount <= m_d3dCaps.MaxActiveLights);
 
-	std::unordered_set<int> nowEmptySlots = slots.updateActors(lightActors);
+	std::unordered_set<int> nowEmptySlots = lightSlots->updateActors(lightActors);
 
 	for (int slot : nowEmptySlots) {
 		//dout << L"Disabling slot " << slot << std::endl;
@@ -5188,7 +5165,7 @@ void UD3D9RenderDevice::renderLights(std::vector<AActor*> lightActors) {
 		assert(res == D3D_OK);
 	}
 
-	for (auto pair : slots.slotMap()) {
+	for (auto pair : lightSlots->slotMap()) {
 		AActor* actor = pair.first;
 		int slot = pair.second;
 		D3DLIGHT9 lightInfo = D3DLIGHT9();

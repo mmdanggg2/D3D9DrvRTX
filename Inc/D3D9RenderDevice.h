@@ -49,7 +49,9 @@
 #include <stdio.h>
 
 #include <unordered_map>
+#include <unordered_set>
 #include <map>
+#include <deque>
 #pragma warning(disable : 4663)
 #pragma warning(disable : 4018)
 #include <vector>
@@ -496,6 +498,34 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	}
 	enum { VERTEX_ARRAY_ALIGN = 64 };	//Must be even multiple of 16B for SSE
 	enum { VERTEX_ARRAY_TAIL_PADDING = 72 };	//Must include 8B for half SSE tail
+
+	class LightSlots {
+	private:
+		std::unordered_map<AActor*, int> actorSlots;
+		std::deque<int> availableSlots;
+		ods_stream dout;
+
+	public:
+		LightSlots(int numSlots) {
+			actorSlots.reserve(numSlots);
+			for (int i = 0; i < numSlots; ++i) {
+				availableSlots.push_back(i);
+			}
+		}
+
+		// Updates which actors are in the slots, returns a set of slots that are no longer used
+		std::unordered_set<int> updateActors(const std::vector<AActor*>& actors);
+
+		const std::deque<int> unusedSlots() {
+			return availableSlots;
+		}
+
+		const std::unordered_map<AActor*, int> slotMap() {
+			return actorSlots;
+		}
+	};
+
+	LightSlots* lightSlots;
 
 	//Vertex declarations
 	IDirect3DVertexDeclaration9 *m_oneColorVertexDecl;
