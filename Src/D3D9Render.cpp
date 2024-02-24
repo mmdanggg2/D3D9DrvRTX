@@ -215,6 +215,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 		std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
 		for (RPASS pass : {SOLID, NONSOLID}) {
+			DecalMap decalMap;
 			for (std::pair<const TexFlagKey, std::vector<FSurfaceFacet>>& facetPair : modelFacets.facetPairs[pass]) {
 				UTexture* texture = facetPair.first.first;
 				DWORD flags = facetPair.first.second;
@@ -235,15 +236,29 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 				d3d9Dev->drawLevelSurfaces(frame, surface, facets);
 				if (viewport->GetOuterUClient()->Decals) {
-					for (FSurfaceFacet facet : facets) {
-						drawFacetDecals(frame, d3d9Dev, facet, lockedTextures);
+					for (FSurfaceFacet& facet : facets) {
+						gatherFacetDecals(frame, facet, decalMap, lockedTextures);
 					}
+				}
+			}
+			for (const auto& decalsPair : decalMap) {
+				FTextureInfo *const& texInfo = decalsPair.first;
+				const std::vector<std::vector<FTransTexture>>& decals = decalsPair.second;
+				for (std::vector<FTransTexture> decal : decals) {
+					int numPts = decal.size();
+					FTransTexture** pointsPtrs = new FTransTexture * [numPts];
+					for (int i = 0; i < numPts; i++) {
+						pointsPtrs[i] = &decal[i];
+					}
+					d3d9Dev->DrawGouraudPolygon(frame, *texInfo, pointsPtrs, numPts, PF_Modulated, NULL);
+					delete[] pointsPtrs;
 				}
 			}
 			for (AMover* mover : visibleMovers) {
 				d3d9Dev->renderMover(frame, mover);
 			}
 			for (AActor* actor : visibleActors) {
+				if (!visibleZones.count(actor->Region.ZoneNumber)) continue;
 				UBOOL bTranslucent = actor->Style == STY_Translucent;
 				if ((pass == RPASS::NONSOLID && bTranslucent) || (pass == RPASS::SOLID && !bTranslucent)) {
 					SpecialCoord specialCoord;
@@ -291,7 +306,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	unguard;
 }
 
-void UD3D9Render::drawFacetDecals(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, FSurfaceFacet& facet, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures) {
+void UD3D9Render::gatherFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures) {
 	const UViewport* viewport = frame->Viewport;
 	const UModel* model = frame->Level->Model;
 	const FBspSurf& surf = model->Surfs(model->Nodes(facet.Polys->iNode).iSurf);
@@ -311,12 +326,15 @@ void UD3D9Render::drawFacetDecals(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 			texInfo = &lockedTextures[texture];
 		}
 
+		std::vector<std::vector<FTransTexture>>& decalPoints = decals[texInfo];
+
 		for (FSavedPoly* poly = facet.Polys; poly; poly = poly->Next) {
 			INT findIndex;
 			if (!decal->Nodes.FindItem(poly->iNode, findIndex)) {
 				continue;
 			}
-			std::vector<FTransTexture> points;
+			std::vector<FTransTexture>& points = decalPoints.emplace_back();
+
 			ClipDecal(frame, decal, &surf, poly, points);
 
 			int numPts = points.size();
@@ -330,15 +348,6 @@ void UD3D9Render::drawFacetDecals(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 			if ((normal | model->Vectors(surf.vNormal)) < 0) {
 				std::reverse(points.begin(), points.end()); // Reverse the face so it points the correct way
 			}
-
-			FTransTexture** pointsPtrs = new FTransTexture*[numPts];
-			for (int i = 0; i < numPts; i++) {
-				pointsPtrs[i] = &points[i];
-			}
-
-			decal->Actor->LastRenderedTime = decal->Actor->Level->TimeSeconds;
-			d3d9Dev->DrawGouraudPolygon(frame, *texInfo, pointsPtrs, numPts, PF_Modulated, NULL);
-			delete[] pointsPtrs;
 		}
 	}
 }
