@@ -471,6 +471,7 @@ void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor) {
 	guard(UD3D9Render::DrawActor);
 	if (GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
 		UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
+		// TODO: fix this muzzle flash schtuff
 		d3d9Dev->EndBuffering(); // muzzle flash is drawing before weapon
 		d3d9Dev->startWorldDraw(frame);
 		d3d9Dev->renderMeshActor(frame, actor);

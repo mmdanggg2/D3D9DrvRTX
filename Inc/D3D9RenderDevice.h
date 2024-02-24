@@ -157,8 +157,8 @@ typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
 #define MAX_TMUNITS			4		// vogel: maximum number of texture mapping units supported
 
 //Must be at least 2000
-#define VERTEX_ARRAY_SIZE	50000	// vogel: better safe than sorry
-#define VERTEX_BUFFER_SIZE	1000
+#define VERTEX_ARRAY_SIZE	75000	// big buffer for loading up larger meshes
+#define VERTEX_BUFFER_SIZE	1000	// permanent small draw call buffer
 
 
 /*-----------------------------------------------------------------------------
@@ -413,10 +413,8 @@ bool inline operator==(const FTextureInfo& lhs, const FTextureInfo& rhs) {
 typedef const std::pair<FTextureInfo* const, const DWORD> SurfKey;
 struct SurfKey_Hash {
 	std::size_t operator () (const SurfKey& p) const {
-		auto ptr_hash = std::hash<FTextureInfo*>{}(p.first);
-		auto dword_hash = std::hash<DWORD>{}(p.second);
-
-		return ptr_hash ^ (dword_hash << 1);  // Shift dword_hash to ensure the upper bits are also involved in the final hash
+		uint64_t combined = (reinterpret_cast<uint64_t>(p.first) << 32) | p.second;
+		return std::hash<uint64_t>{}(combined);
 	}
 };
 template <typename T>

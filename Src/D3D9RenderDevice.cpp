@@ -157,7 +157,7 @@ public:
 	}
 
 	bool has(int index) {
-		return value_map.find(index) != value_map.end();
+		return value_map.count(index) > 0;
 	}
 
 	int getIndex(T value) {
