@@ -5112,7 +5112,6 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 	unguard;
 }
 
-// Updates which actors are in the slots, returns a set of slots that are no longer used
 std::unordered_set<int> UD3D9RenderDevice::LightSlots::updateActors(const std::vector<AActor*>& actors) {
 	std::unordered_set<int> unsetSlots;
 	// First, deactivate the slots of any actors that have been removed
