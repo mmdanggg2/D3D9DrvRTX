@@ -10,7 +10,6 @@
 #define DIRECT3D_VERSION 0x0900
 #include <d3d9.h>
 
-#define UTGLR_NO_APP_MALLOC
 #include <stdlib.h>
 
 #include "Render.h"

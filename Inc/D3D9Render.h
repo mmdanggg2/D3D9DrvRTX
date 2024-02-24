@@ -1,8 +1,9 @@
 #pragma once
 
-#include <Render.h>
 #include "D3D9DebugUtils.h"
 #include "D3D9RenderDevice.h"
+
+#include <Render.h>
 
 #include <vector>
 #include <unordered_map>
