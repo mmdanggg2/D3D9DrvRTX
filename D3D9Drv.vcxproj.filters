@@ -13,8 +13,12 @@
     <ClInclude Include="Inc\D3D9RenderDevice.h" />
     <ClInclude Include="Inc\D3D9DebugUtils.h" />
     <ClInclude Include="Inc\c_gclip.h" />
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="D3D9DrvRTX.rc" />
   </ItemGroup>
 </Project>
