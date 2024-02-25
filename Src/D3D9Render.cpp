@@ -415,39 +415,41 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 	AInventory* weapon = pawn->Weapon;
 	if (specialCoord.exists && weapon && weapon->ThirdPersonMesh) {
 		specialCoord.enabled = true;
-		Exchange(weapon->Mesh, weapon->ThirdPersonMesh);
-		Exchange(weapon->DrawScale, weapon->ThirdPersonScale);
+		UMesh* origMesh = weapon->Mesh;
+		FLOAT origDrawScale = weapon->DrawScale;
+		weapon->Mesh = weapon->ThirdPersonMesh;
+		weapon->DrawScale = weapon->ThirdPersonScale;
 		d3d9Dev->renderMeshActor(frame, weapon, &specialCoord);
-		Exchange(weapon->Mesh, weapon->ThirdPersonMesh);
-		Exchange(weapon->DrawScale, weapon->ThirdPersonScale);
 		if (weapon->bSteadyFlash3rd) {
 			weapon->bSteadyToggle = !weapon->bSteadyToggle;
 		}
 		if (weapon->MuzzleFlashMesh &&
 			(weapon->bSteadyFlash3rd && (!weapon->bToggleSteadyFlash || weapon->bSteadyToggle)) ||
 			(!weapon->bFirstFrame && (weapon->FlashCount != weapon->OldFlashCount))) {
-			Exchange(weapon->Mesh, weapon->MuzzleFlashMesh);
-			Exchange(weapon->DrawScale, weapon->MuzzleFlashScale);
-			Exchange(weapon->Style, weapon->MuzzleFlashStyle);
-			Exchange(weapon->Texture, weapon->MuzzleFlashTexture);
+			BYTE origStyle = weapon->Style;
+			UTexture* origTexture = weapon->Texture;
 			bool origParticles = weapon->bParticles;
 			FName origAnim = weapon->AnimSequence;
 			FLOAT origFrame = weapon->AnimFrame;
 			INT origLit = weapon->bUnlit;
+			weapon->Mesh = weapon->MuzzleFlashMesh;
+			weapon->DrawScale = weapon->MuzzleFlashScale;
+			weapon->Style = weapon->MuzzleFlashStyle;
+			weapon->Texture = weapon->MuzzleFlashTexture;
 			weapon->bParticles = weapon->bMuzzleFlashParticles;
 			weapon->AnimSequence = NAME_All;
 			weapon->AnimFrame = appFrand();
 			weapon->bUnlit = true;
 			d3d9Dev->renderMeshActor(frame, weapon, &specialCoord);
+			weapon->Style = origStyle;
+			weapon->Texture = origTexture;
 			weapon->bParticles = origParticles;
 			weapon->AnimSequence = origAnim;
 			weapon->AnimFrame = origFrame;
 			weapon->bUnlit = origLit;
-			Exchange(weapon->Mesh, weapon->MuzzleFlashMesh);
-			Exchange(weapon->DrawScale, weapon->MuzzleFlashScale);
-			Exchange(weapon->Style, weapon->MuzzleFlashStyle);
-			Exchange(weapon->Texture, weapon->MuzzleFlashTexture);
 		}
+		weapon->Mesh = origMesh;
+		weapon->DrawScale = origDrawScale;
 		weapon->OldFlashCount = weapon->FlashCount;
 		weapon->bFirstFrame = 0;
 	}
