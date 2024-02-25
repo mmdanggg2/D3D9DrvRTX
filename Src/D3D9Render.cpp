@@ -161,12 +161,18 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 		d3d9Dev->startWorldDraw(frame);
 
+		std::vector<AActor*> lightActors;
+		lightActors.reserve(frame->Level->Actors.Num());
 		std::vector<AActor*> visibleActors;
+		visibleActors.reserve(frame->Level->Actors.Num());
 		std::vector<AMover*> visibleMovers;
 
 		for (int iActor = 0; iActor < frame->Level->Actors.Num(); iActor++) {
 			AActor* actor = frame->Level->Actors(iActor);
 			if (!actor) continue;
+			if (actor->LightType != LT_None) {
+				lightActors.push_back(actor);
+			}
 			bool isVisible = true;
 			isVisible &= actor != playerActor;
 			isVisible &= GIsEditor ? !actor->bHiddenEd : !actor->bHidden;
@@ -277,14 +283,6 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			entry.first->Unlock(entry.second);
 		}
 
-		std::vector<AActor*> lightActors;
-		lightActors.reserve(frame->Level->Actors.Num());
-		for (int i = 0; i < frame->Level->Actors.Num(); i++) {
-			AActor* actor = frame->Level->Actors(i);
-			if (actor && actor->LightType != LT_None) {
-				lightActors.push_back(actor);
-			}
-		}
 		d3d9Dev->renderLights(lightActors);
 
 		d3d9Dev->endWorldDraw(frame);
