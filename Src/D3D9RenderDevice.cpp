@@ -284,7 +284,7 @@ void UD3D9RenderDevice::StaticConstructor() {
 #if defined UTGLR_DX_BUILD || defined UTGLR_RUNE_BUILD
 	const UBOOL UTGLR_DEFAULT_ZRangeHack = 0;
 #else
-	const UBOOL UTGLR_DEFAULT_ZRangeHack = 1;
+	const UBOOL UTGLR_DEFAULT_ZRangeHack = 0;
 #endif
 
 #define CPP_PROPERTY_LOCAL(_name) _name, CPP_PROPERTY(_name)
@@ -5500,9 +5500,6 @@ void UD3D9RenderDevice::EndFlash() {
 
 		//Adjust Z coordinate if Z range hack is active
 		FLOAT ZCoord = 0.5f;
-		if (m_useZRangeHack) {
-			ZCoord = (((ZCoord - 0.5f) / 7.5f) * 4.0f) + 4.0f;
-		}
 
 		//Make sure at least 4 entries are left in the vertex buffers
 		if ((m_curVertexBufferPos + 4) >= VERTEX_BUFFER_SIZE) {
