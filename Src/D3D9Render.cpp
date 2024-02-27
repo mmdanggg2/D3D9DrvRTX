@@ -163,8 +163,8 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 		std::vector<AActor*> lightActors;
 		lightActors.reserve(frame->Level->Actors.Num());
-		std::vector<AActor*> visibleActors;
-		visibleActors.reserve(frame->Level->Actors.Num());
+		std::vector<AActor*> viableActors;
+		viableActors.reserve(frame->Level->Actors.Num());
 		std::vector<AMover*> visibleMovers;
 
 		for (int iActor = 0; iActor < frame->Level->Actors.Num(); iActor++) {
@@ -181,40 +181,32 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			isVisible &= !isOwned || !actor->bOwnerNoSee || (isOwned && frame->Viewport->Actor->bBehindView);
 			if (isVisible) {
 				if (actor->IsA(AMover::StaticClass())) {
-					if (frame->Level->BrushTracker) {
-						frame->Level->BrushTracker->Update(actor);
-					}
 					visibleMovers.push_back((AMover*)actor);
 					continue;
 				}
-				visibleActors.push_back(actor);
+				viableActors.push_back(actor);
 			}
 		}
 
 		// Seems to update mover bsp nodes for decal calculations
-		//OccludeBsp(frame);
-		//SetupDynamics(frame, playerActor);
+		OccludeFrame(frame);
 
+		std::unordered_set<AActor*> visibleActors;
 		std::unordered_set<INT> visibleZones;
-		{
-			std::unordered_set<INT> visibleSurfs;
-			TArray<INT> visibleSurfsTArr;
-			auto savedRotation = viewport->Actor->ViewRotation;
-			GetVisibleSurfs(const_cast<UViewport*>(viewport), visibleSurfsTArr);
-			viewport->Actor->ViewRotation = savedRotation;
-			for (int i = 0; i < visibleSurfsTArr.Num(); i++) {
-				visibleSurfs.insert(visibleSurfsTArr(i));// std lib is more efficient
-			}
-
-			for (int i = 0; i < frame->Level->Model->Nodes.Num(); i++) {
-				FBspNode& node = frame->Level->Model->Nodes(i);
-				if (visibleSurfs.count(node.iSurf)) {
-					visibleZones.insert(node.iZone[0]);
-					visibleZones.insert(node.iZone[1]);
-				}
+		for (int pass : {0, 1, 2}) {
+			for (FBspDrawList* drawList = frame->Draw[pass]; drawList; drawList = drawList->Next) {
+				visibleZones.insert(drawList->iZone);
 			}
 		}
-
+		for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
+			visibleZones.insert(sprite->Actor->Region.ZoneNumber);
+			visibleActors.insert(sprite->Actor);
+		}
+		for (AActor* actor : viableActors) {
+			if (visibleZones.count(actor->Region.ZoneNumber)) {
+				visibleActors.insert(actor);
+			}
+		}
 
 		ModelFacets modelFacets;
 		getLevelModelFacets(frame, modelFacets);
@@ -264,7 +256,6 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				d3d9Dev->renderMover(frame, mover);
 			}
 			for (AActor* actor : visibleActors) {
-				if (!visibleZones.count(actor->Region.ZoneNumber)) continue;
 				UBOOL bTranslucent = actor->Style == STY_Translucent;
 				if ((pass == RPASS::NONSOLID && bTranslucent) || (pass == RPASS::SOLID && !bTranslucent)) {
 					SpecialCoord specialCoord;
