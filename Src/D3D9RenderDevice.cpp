@@ -133,6 +133,7 @@ static const D3DVERTEXELEMENT9 g_twoColorSingleTextureStreamDef[] = {
 	D3DDECL_END()
 };
 
+// Class to hold multiple unique T objects, accessable by multiple indices
 template <typename T>
 class UniqueValueArray {
 public:
@@ -233,6 +234,7 @@ static inline FVector DXVecToFVec(DirectX::XMVECTOR& vec) {
 	return FVector(XMVectorGetX(vec), XMVectorGetY(vec), XMVectorGetZ(vec));
 }
 
+// Converts from unreal's wacky rotation values to radians
 #define rotConvert(integer) (((float)integer) / ((float)MAXWORD) * (PI * 2))
 
 static DirectX::XMMATRIX FRotToDXRotMat(const FRotator& rot) {
@@ -391,9 +393,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	m_frameRateLimitTimerInitialized = false;
 
 	DescFlags |= RDDESCF_Certified;
-
-	SupportsStaticBsp = false;
-	UseAmbientlessLightmaps = false;
 
 	unguard;
 }
@@ -3331,74 +3330,6 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 
 	RenderPasses();
 
-	// UnrealEd selection.
-	/*if (GIsEditor && (PolyFlags & (PF_Selected | PF_FlatShaded))) {
-		DWORD polyColor;
-
-		//No need to set default AA state here as it is always set on entry to DrawComplexSurface
-		//No need to set default projection state here as it is always set on entry to DrawComplexSurface
-		SetDefaultStreamState();
-		SetDefaultTextureState();
-
-		SetNoTexture(0);
-		SetBlend(PF_Highlighted);
-
-		if (PolyFlags & PF_FlatShaded) {
-			FPlane Color;
-
-			Color.X = surface.FlatColor.R / 255.0f;
-			Color.Y = surface.FlatColor.G / 255.0f;
-			Color.Z = surface.FlatColor.B / 255.0f;
-			Color.W = 0.85f;
-			if (PolyFlags & PF_Selected) {
-				Color.X *= 1.5f;
-				Color.Y *= 1.5f;
-				Color.Z *= 1.5f;
-				Color.W = 1.0f;
-			}
-
-			polyColor = FPlaneTo_BGRAClamped(&Color);
-		} else {
-			polyColor = SurfaceSelectionColor.TrueColor() | (SurfaceSelectionColor.A << 24); //0x1F00003F;
-		}
-
-		for (FSavedPoly* Poly = Facet.Polys; Poly; Poly = Poly->Next) {
-			INT NumPts = Poly->NumPts;
-
-			//Make sure at least NumPts entries are left in the vertex buffers
-			if ((m_curVertexBufferPos + NumPts) >= VERTEX_ARRAY_SIZE) {
-				FlushVertexBuffers();
-			}
-
-			//Lock vertexColor and texCoord0 buffers
-			LockVertexColorBuffer();
-			LockTexCoordBuffer(0);
-
-			FGLTexCoord* pTexCoordArray = m_pTexCoordArray[0];
-			FGLVertexColor* pVertexColorArray = m_pVertexColorArray;
-
-			for (INT i = 0; i < Poly->NumPts; i++) {
-				pTexCoordArray[i].u = 0.5f;
-				pTexCoordArray[i].v = 0.5f;
-
-				pVertexColorArray[i].x = Poly->Pts[i]->Point.X;
-				pVertexColorArray[i].y = Poly->Pts[i]->Point.Y;
-				pVertexColorArray[i].z = Poly->Pts[i]->Point.Z;
-				pVertexColorArray[i].color = polyColor;
-			}
-
-			//Unlock vertexColor and texCoord0 buffers
-			UnlockVertexColorBuffer();
-			UnlockTexCoordBuffer(0);
-
-			//Draw the triangle fan
-			m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos, NumPts - 2);
-
-			//Advance vertex buffer position
-			m_curVertexBufferPos += NumPts;
-		}
-	}*/
-
 	if (m_rpSetDepthEqual == true) {
 		m_d3dDevice->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
 	}
@@ -4674,7 +4605,6 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 
 	DWORD flags = basePolyFlags | PF_TwoSided | (texInfo.Texture->PolyFlags & PF_Masked);//PF_Modulated;
 
-	//BufferTriangleSurfaceGeometry(verts);
 	//Initialize render passes state information
 	m_rpPassCount = 0;
 	m_rpTMUnits = TMUnits;
@@ -4763,6 +4693,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		meshLod->GetFrame(&allSamples->Point, sizeof(samples[0]), GMath.UnitCoords, actor, numVerts);
 		numTris = meshLod->Faces.Num();
 		if (specialCoord && !specialCoord->enabled && meshLod->SpecialFaces.Num() > 0) {
+			// Setup special coordinate (attachment point)
 			FTransTexture& v0 = allSamples[0];
 			FTransTexture& v1 = allSamples[1];
 			FTransTexture& v2 = allSamples[2];
@@ -4811,6 +4742,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 						color = color * 0.4 + FVector(0.0, 0.6, 0.0);
 					}
 
+					// Transform the local-space point into world-space
 					FVector point = sample.Point;
 					XMVECTOR xpoint = FVecToDXVec(point);
 					xpoint = XMVector3Transform(xpoint, actorMatrix);
@@ -4831,6 +4763,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	UTexture* envTex = nullptr;
 	FTextureInfo envTexInfo;
 
+	// Lock all mesh textures
 	for (int i = 0; i < mesh->Textures.Num(); i++) {
 		UTexture* tex = mesh->GetTexture(i, actor);
 		if (!tex && actor->Texture) {
@@ -4882,9 +4815,9 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 				points[j] = &samples[tri.iVertex[j]];
 			}
 		}
-		XMVECTOR fNorm = XMVector3Cross(FVecToDXVec(points[1]->Point - points[0]->Point), FVecToDXVec(points[2]->Point - points[0]->Point));
+		FVector fNorm = (points[1]->Point - points[0]->Point) ^ (points[2]->Point - points[0]->Point);
 		for (int j = 0; j < 3; j++) {
-			points[j]->Normal += DXVecToFVec(fNorm);
+			points[j]->Normal += fNorm;
 		}
 	}
 	for (int i = 0; i < numVerts; i++) {
@@ -4896,6 +4829,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	SurfKeyMap<std::vector<FTransTexture>> surfaceMap;
 	surfaceMap.reserve(numTris);
 
+	// Process all triangles on the mesh
 	for (INT i = 0; i < numTris; i++) {
 		FTransTexture* points[3];
 		DWORD polyFlags;
@@ -4926,8 +4860,9 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 		if (!(points[0]->Flags & points[1]->Flags & points[2]->Flags)) {
 			if ((polyFlags & (PF_TwoSided | PF_Flat | PF_Invisible)) != (PF_Flat)) {
+				bool environMapped = polyFlags & PF_Environment;
 				FTextureInfo* texInfo = &envTexInfo;
-				if (!(polyFlags & PF_Environment) && texInfos.has(texIdx)) {
+				if (!environMapped && texInfos.has(texIdx)) {
 					texInfo = &texInfos.at(texIdx);
 				}
 				if (!texInfo->Texture) {
@@ -4936,6 +4871,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 				float scaleU = texInfo->UScale * texInfo->USize / 256.0;
 				float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
 
+				// Sort triangles into surface/flag groups
 				std::vector<FTransTexture>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
 				pointsVec.reserve(numTris*3);
 				for (INT j = 0; j < 3; j++) {
@@ -4946,7 +4882,8 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 						vert.Point += vert.Normal * fatness;
 					}
 
-					if (polyFlags & PF_Environment) {
+					// Calculate the environment UV mapping
+					if (environMapped) {
 						FVector envNorm = vert.Point.UnsafeNormal().MirrorByVector(vert.Normal).TransformVectorBy(frame->Uncoords);
 						vert.U = (envNorm.X + 1.0) * 0.5 * 256.0 * scaleU;
 						vert.V = (envNorm.Y + 1.0) * 0.5 * 256.0 * scaleV;
@@ -4960,7 +4897,6 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &d3dMatrix);
 
 	bool isViewModel = GUglyHackFlags & 0x1;
-
 	D3DVIEWPORT9 vpPrev;
 	if (isViewModel) {
 		D3DVIEWPORT9 vp;
@@ -4970,6 +4906,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		m_d3dDevice->SetViewport(&vp);
 	}
 	
+	// Batch render each group of tris
 	for (const std::pair<const SurfKey, std::vector<FTransTexture>>& entry : surfaceMap) {
 		FTextureInfo* texInfo = entry.first.first;
 		DWORD polyFlags = entry.first.second;
@@ -5035,7 +4972,7 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 	XMMatrixDecompose(&overallScaleDX, &_unused, &_unused, mat);
 	FVector overallScale = DXVecToFVec(overallScaleDX);
 	int numNeg = (overallScale.X < 0) + (overallScale.Y < 0) + (overallScale.Z < 0);
-	bool invertFaces = (numNeg == 1) || (numNeg == 3);
+	bool invertFaces = (numNeg == 1) || (numNeg == 3); // Only if inverted once or thrice
 
 	UViewport* viewport = frame->Viewport;
 	UModel* model = mover->Brush;
@@ -5044,6 +4981,7 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 	textureInfos.reserve(model->Polys->Element.Num());
 	SurfKeyMap<std::vector<FPoly*>> polys;
 	polys.reserve(model->Polys->Element.Num());
+	// Sort faces into surface/flag groups
 	for (int i = 0; i < model->Polys->Element.Num(); i++) {
 		FPoly* poly = &model->Polys->Element(i);
 		UTexture* tex = poly->Texture ? poly->Texture->Get(viewport->CurrentTime) : viewport->Actor->Level->DefaultTexture;
@@ -5061,6 +4999,7 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 		polys[SurfKey(texInfo, flags)].push_back(poly);
 	}
 
+	// Batch draw each group of faces
 	for (std::pair<const SurfKey, std::vector<FPoly*>>& entry : polys) {
 		FTextureInfo* texInfo = entry.first.first;
 		DWORD flags = entry.first.second;
@@ -5155,6 +5094,7 @@ void UD3D9RenderDevice::renderLights(std::vector<AActor*> lightActors) {
 
 	std::unordered_set<int> nowEmptySlots = lightSlots->updateActors(lightActors);
 
+	// Disable lights that no longer exist
 	for (int slot : nowEmptySlots) {
 		//dout << L"Disabling slot " << slot << std::endl;
 		D3DLIGHT9 lightInfo{ D3DLIGHT_POINT };

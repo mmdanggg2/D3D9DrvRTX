@@ -26,6 +26,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 
 	DWORD flagMask = (viewport->Actor->ShowFlags & SHOW_PlayerCtrl) ? ~PF_FlatShaded : ~PF_Invisible;
 	flagMask &= ~PF_Highlighted;
+	// Prepass to sort all nodes into texture/flag groups
 	for (INT iNode = 0; iNode < model->Nodes.Num(); iNode++) {
 		const FBspNode* node = &model->Nodes(iNode);
 		INT iSurf = node->iSurf;
@@ -82,12 +83,12 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 					for (int i = 0; i < surf->Nodes.Num(); i++) {
 						// Search for a zone actor on any part of the surface since this node may not have it linked.
 						const FBspNode& surfNode = model->Nodes(surf->Nodes(i));
-						const FZoneProperties* zoneProps = &model->Zones[surfNode.iZone[0]];
+						const FZoneProperties* zoneProps = &model->Zones[surfNode.iZone[1]];
 						if (zoneProps->ZoneActor) {
 							zone = zoneProps->ZoneActor;
 							break;
 						}
-						zoneProps = &model->Zones[surfNode.iZone[1]];
+						zoneProps = &model->Zones[surfNode.iZone[0]];
 						if (!zone && zoneProps->ZoneActor) {
 							zone = zoneProps->ZoneActor;
 							break;
@@ -113,13 +114,13 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 				}
 			}
 
-			//dout << L"\t Node " << iNode << std::endl;
 			FSavedPoly* poly = (FSavedPoly*)New<BYTE>(GDynMem, sizeof(FSavedPoly) + node.NumVertices * sizeof(FTransform*));
 			poly->Next = facet->Polys;
 			facet->Polys = poly;
 			poly->iNode = iNode;
 			poly->NumPts = node.NumVertices;
 
+			// Allocate and store each point
 			for (int i = 0; i < poly->NumPts; i++) {
 				FVert vert = model->Verts(node.iVertPool + i);
 				FTransform* trans = New<FTransform>(VectorMem);
@@ -129,6 +130,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		}
 
 		for (std::pair<const INT, FSurfaceFacet*>& facetPair : surfaceMap) {
+			// Sort into opaque and non passes
 			RPASS pass = (flags & PF_NoOcclude) ? RPASS::NONSOLID : RPASS::SOLID;
 			std::vector<FSurfaceFacet>& facets = modelFacets.facetPairs[pass][texNodePair.first];
 			facets.reserve(surfaceMap.size());
@@ -167,6 +169,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		viableActors.reserve(frame->Level->Actors.Num());
 		std::vector<AMover*> visibleMovers;
 
+		// Sort through all actors and put them in the appropriate pile
 		for (int iActor = 0; iActor < frame->Level->Actors.Num(); iActor++) {
 			AActor* actor = frame->Level->Actors(iActor);
 			if (!actor) continue;
@@ -188,9 +191,10 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			}
 		}
 
-		// Seems to update mover bsp nodes for decal calculations
+		// Seems to also update mover bsp nodes for decal calculations
 		OccludeFrame(frame);
 
+		// Add all actors in view and also any in zones that are visible
 		std::unordered_set<AActor*> visibleActors;
 		std::unordered_set<INT> visibleZones;
 		for (int pass : {0, 1, 2}) {
@@ -235,10 +239,11 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				d3d9Dev->drawLevelSurfaces(frame, surface, facets);
 				if (viewport->GetOuterUClient()->Decals) {
 					for (FSurfaceFacet& facet : facets) {
-						gatherFacetDecals(frame, facet, decalMap, lockedTextures);
+						getFacetDecals(frame, facet, decalMap, lockedTextures);
 					}
 				}
 			}
+			// Render all the decals
 			for (const auto& decalsPair : decalMap) {
 				FTextureInfo *const& texInfo = decalsPair.first;
 				const std::vector<std::vector<FTransTexture>>& decals = decalsPair.second;
@@ -295,7 +300,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	unguard;
 }
 
-void UD3D9Render::gatherFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures) {
+void UD3D9Render::getFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures) {
 	const UViewport* viewport = frame->Viewport;
 	const UModel* model = frame->Level->Model;
 	const FBspSurf& surf = model->Surfs(model->Nodes(facet.Polys->iNode).iSurf);

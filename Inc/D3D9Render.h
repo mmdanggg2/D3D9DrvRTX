@@ -44,5 +44,5 @@ private:
 	typedef std::unordered_map<FTextureInfo*, std::vector<std::vector<FTransTexture>>> DecalMap;
 	void getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets);
 	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord);
-	void gatherFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures);
+	void getFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures);
 };

@@ -159,7 +159,7 @@ typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
 #define MAX_TMUNITS			4		// vogel: maximum number of texture mapping units supported
 
 //Must be at least 2000
-#define VERTEX_ARRAY_SIZE	75000	// big buffer for loading up larger meshes
+#define VERTEX_ARRAY_SIZE	75000	// big internal buffer for loading up larger meshes
 #define VERTEX_BUFFER_SIZE	1000	// permanent small draw call buffer
 
 
@@ -605,12 +605,14 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 		return bufferPos;
 	}
 
+	// Locks/Creates a vertex buffer appropriate for the given number of points
 	inline void LockVertexColorBuffer(INT numPoints) {
 		DWORD lockFlags = D3DLOCK_NOSYSLOCK;
 		HRESULT hResult;
 		INT bufferPos;
 		IDirect3DVertexBuffer9* vertBuffer;
 
+		// Bigger than our main buffer, allocate new one of the appropriate size
 		if (numPoints > VERTEX_BUFFER_SIZE) {
 			if (m_vertexTempBufferSize != numPoints || !m_d3dTempVertexColorBuffer) {
 				if (m_d3dTempVertexColorBuffer) {
@@ -638,6 +640,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 			vertBuffer = m_d3dVertexColorBuffer;
 			bufferPos = m_curVertexBufferPos;
 		}
+		// Set the stream if the buffer changed
 		if (vertBuffer != m_currentVertexColorBuffer) {
 			hResult = m_d3dDevice->SetStreamSource(0, vertBuffer, 0, sizeof(FGLVertexColor));
 			if (FAILED(hResult)) {
@@ -676,6 +679,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 		}
 	}
 
+	// Locks/Creates a UV buffer appropriate for the given number of points
 	inline void FASTCALL LockTexCoordBuffer(DWORD texUnit, INT numPoints) {
 		DWORD lockFlags = D3DLOCK_NOSYSLOCK;
 		HRESULT hResult;
@@ -734,6 +738,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 		}
 	}
 
+	// Updates the vertex colour of the quad buffer
 	inline void updateQuadBuffer(DWORD color);
 
 	//IsNear bits for detail texturing
@@ -1331,6 +1336,7 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void Flush(UBOOL AllowPrecache);
 
 	void DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet);
+	// Takes a list of faces and draws them in batches
 	void drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surface, std::vector<FSurfaceFacet>& facets);
 #ifdef UTGLR_RUNE_BUILD
 	void PreDrawFogSurface();
@@ -1346,10 +1352,15 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2);
 	void Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FLOAT X1, FLOAT Y1, FLOAT X2, FLOAT Y2, FLOAT Z);
 
+	// Render a sprite actor
 	void renderSprite(FSceneNode* frame, AActor* actor);
+	// Renders a sprite at the given location
 	void renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScale, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color);
+	// Renders a mesh actor
 	void renderMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord = nullptr);
+	// Renders a mover brush
 	void renderMover(FSceneNode* frame, AMover* mover);
+	// Updates and sends the given lights to dx
 	void renderLights(std::vector<AActor*> lightActors);
 
 	void ClearZ(FSceneNode* Frame);
@@ -1677,7 +1688,9 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 
 	void FASTCALL BufferAdditionalClippedVerts(FTransTexture** Pts, INT NumPts);
 
+	// Sets up the projections ready for drawing in the world
 	void startWorldDraw(FSceneNode* frame);
+	// Sets up the projections ready for drawing UI elements
 	void endWorldDraw(FSceneNode* frame);
 };
 
