@@ -4858,37 +4858,33 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 		polyFlags |= getBasePolyFlags(actor);
 
-		if (!(points[0]->Flags & points[1]->Flags & points[2]->Flags)) {
-			if ((polyFlags & (PF_TwoSided | PF_Flat | PF_Invisible)) != (PF_Flat)) {
-				bool environMapped = polyFlags & PF_Environment;
-				FTextureInfo* texInfo = &envTexInfo;
-				if (!environMapped && texInfos.has(texIdx)) {
-					texInfo = &texInfos.at(texIdx);
-				}
-				if (!texInfo->Texture) {
-					continue;
-				}
-				float scaleU = texInfo->UScale * texInfo->USize / 256.0;
-				float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
+		bool environMapped = polyFlags & PF_Environment;
+		FTextureInfo* texInfo = &envTexInfo;
+		if (!environMapped && texInfos.has(texIdx)) {
+			texInfo = &texInfos.at(texIdx);
+		}
+		if (!texInfo->Texture) {
+			continue;
+		}
+		float scaleU = texInfo->UScale * texInfo->USize / 256.0;
+		float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
 
-				// Sort triangles into surface/flag groups
-				std::vector<FTransTexture>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
-				pointsVec.reserve(numTris*3);
-				for (INT j = 0; j < 3; j++) {
-					FTransTexture& vert = pointsVec.emplace_back(*points[j]);
-					vert.U = triUV[j].U * scaleU;
-					vert.V = triUV[j].V * scaleV;
-					if (fatten) {
-						vert.Point += vert.Normal * fatness;
-					}
+		// Sort triangles into surface/flag groups
+		std::vector<FTransTexture>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
+		pointsVec.reserve(numTris*3);
+		for (INT j = 0; j < 3; j++) {
+			FTransTexture& vert = pointsVec.emplace_back(*points[j]);
+			vert.U = triUV[j].U * scaleU;
+			vert.V = triUV[j].V * scaleV;
+			if (fatten) {
+				vert.Point += vert.Normal * fatness;
+			}
 
-					// Calculate the environment UV mapping
-					if (environMapped) {
-						FVector envNorm = vert.Point.UnsafeNormal().MirrorByVector(vert.Normal).TransformVectorBy(frame->Uncoords);
-						vert.U = (envNorm.X + 1.0) * 0.5 * 256.0 * scaleU;
-						vert.V = (envNorm.Y + 1.0) * 0.5 * 256.0 * scaleV;
-					}
-				}
+			// Calculate the environment UV mapping
+			if (environMapped) {
+				FVector envNorm = vert.Point.UnsafeNormal().MirrorByVector(vert.Normal).TransformVectorBy(frame->Uncoords);
+				vert.U = (envNorm.X + 1.0) * 0.5 * 256.0 * scaleU;
+				vert.V = (envNorm.Y + 1.0) * 0.5 * 256.0 * scaleV;
 			}
 		}
 	}
@@ -5090,7 +5086,6 @@ void UD3D9RenderDevice::renderLights(std::vector<AActor*> lightActors) {
 	guard(UD3D9RenderDevice::renderLights);
 
 	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, TRUE);
-	//assert(lightCount <= m_d3dCaps.MaxActiveLights);
 
 	std::unordered_set<int> nowEmptySlots = lightSlots->updateActors(lightActors);
 
