@@ -7021,7 +7021,8 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags) {
 				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
 				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
 			}
-			else if (blendFlags & PF_NotSolid) {
+			else if ((blendFlags & PF_NotSolid) && !(blendFlags & PF_TwoSided)) {
+				// Make non solid surfaces translucent so that light can shine through them
 				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
 				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
 			}
