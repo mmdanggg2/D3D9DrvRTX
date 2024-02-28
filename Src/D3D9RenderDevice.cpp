@@ -3301,6 +3301,11 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 
 	DWORD PolyFlags = surface.PolyFlags;
 
+	// Make mirrored surfaces opaque to stop peering into the void
+	if (PolyFlags & PF_Mirrored) {
+		PolyFlags &= ~PF_NoOcclude;
+	}
+
 	//Initialize render passes state information
 	m_rpPassCount = 0;
 	m_rpTMUnits = TMUnits;

@@ -47,16 +47,14 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		if (flags & PF_Invisible) {
 			continue;
 		}
-		if (flags & PF_Mirrored) {
-			flags &= ~PF_NoOcclude;
-		}
 
 		texNodes[TexFlagKey(texture, flags)].push_back(iNode);
 	}
 
 	std::unordered_map<INT, FSurfaceFacet*> surfaceMap;
 	for (const std::pair<const TexFlagKey, std::vector<INT>>& texNodePair : texNodes) {
-		DWORD flags = texNodePair.first.second;
+		const TexFlagKey& tfKey = texNodePair.first;
+		DWORD flags = tfKey.second;
 
 		surfaceMap.reserve(texNodePair.second.size());
 		for (INT iNode : texNodePair.second) {
@@ -132,7 +130,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		for (std::pair<const INT, FSurfaceFacet*>& facetPair : surfaceMap) {
 			// Sort into opaque and non passes
 			RPASS pass = (flags & PF_NoOcclude) ? RPASS::NONSOLID : RPASS::SOLID;
-			std::vector<FSurfaceFacet>& facets = modelFacets.facetPairs[pass][texNodePair.first];
+			std::vector<FSurfaceFacet>& facets = modelFacets.facetPairs[pass][tfKey];
 			facets.reserve(surfaceMap.size());
 			facets.push_back(*facetPair.second);
 		}
