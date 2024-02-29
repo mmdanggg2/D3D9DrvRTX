@@ -4885,9 +4885,12 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 			// Calculate the environment UV mapping
 			if (environMapped) {
-				FVector envNorm = vert.Point.UnsafeNormal().MirrorByVector(vert.Normal).TransformVectorBy(frame->Uncoords);
-				vert.U = (envNorm.X + 1.0) * 0.5 * 256.0 * scaleU;
-				vert.V = (envNorm.Y + 1.0) * 0.5 * 256.0 * scaleV;
+				XMVECTOR ptNorm = XMVector3TransformNormal(FVecToDXVec(vert.Normal), actorMatrix);
+				XMVECTOR envNorm = XMVector3TransformNormal(FVecToDXVec(vert.Point), actorMatrix);
+				envNorm = XMVector3Normalize(envNorm);
+				envNorm = XMVector3Reflect(envNorm, ptNorm);
+				vert.U = (XMVectorGetX(envNorm) + 1.0) * 0.5 * 256.0 * scaleU;
+				vert.V = (XMVectorGetY(envNorm) + 1.0) * 0.5 * 256.0 * scaleV;
 			}
 		}
 	}
