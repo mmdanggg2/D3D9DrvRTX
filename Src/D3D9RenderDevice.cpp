@@ -4730,34 +4730,32 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 	if (actor->bParticles) {
 		for (INT i = 0; i < numVerts; i++) {
-			if (!samples[i].Flags) {
-				FTransTexture& sample = samples[i];
-				UTexture* tex = actor->Texture->Get(currentTime);
-				if (actor->bRandomFrame) {
-					tex = actor->MultiSkins[appCeil((&sample - samples) / 3.f) % 8];
-					if (tex) {
-						tex = getTextureWithoutNext(tex, currentTime, actor->LifeFraction());
-					}
-				}
+			FTransTexture& sample = samples[i];
+			UTexture* tex = actor->Texture->Get(currentTime);
+			if (actor->bRandomFrame) {
+				tex = actor->MultiSkins[appCeil((&sample - samples) / 3.f) % 8];
 				if (tex) {
-					DWORD baseFlags = getBasePolyFlags(actor);
-					FLOAT lux = Clamp(actor->ScaleGlow * 0.5f + actor->AmbientGlow / 256.f, 0.f, 1.f);
-					FPlane color = FVector(lux, lux, lux);
-					if (GIsEditor && (baseFlags & PF_Selected)) {
-						color = color * 0.4 + FVector(0.0, 0.6, 0.0);
-					}
-
-					// Transform the local-space point into world-space
-					FVector point = sample.Point;
-					XMVECTOR xpoint = FVecToDXVec(point);
-					xpoint = XMVector3Transform(xpoint, actorMatrix);
-					point = DXVecToFVec(xpoint);
-
-					FTextureInfo texInfo;
-					tex->Lock(texInfo, currentTime, -1, this);
-					renderSpriteGeo(frame, point, actor->DrawScale, texInfo, baseFlags, color);
-					tex->Unlock(texInfo);
+					tex = getTextureWithoutNext(tex, currentTime, actor->LifeFraction());
 				}
+			}
+			if (tex) {
+				DWORD baseFlags = getBasePolyFlags(actor);
+				FLOAT lux = Clamp(actor->ScaleGlow * 0.5f + actor->AmbientGlow / 256.f, 0.f, 1.f);
+				FPlane color = FVector(lux, lux, lux);
+				if (GIsEditor && (baseFlags & PF_Selected)) {
+					color = color * 0.4 + FVector(0.0, 0.6, 0.0);
+				}
+
+				// Transform the local-space point into world-space
+				FVector point = sample.Point;
+				XMVECTOR xpoint = FVecToDXVec(point);
+				xpoint = XMVector3Transform(xpoint, actorMatrix);
+				point = DXVecToFVec(xpoint);
+
+				FTextureInfo texInfo;
+				tex->Lock(texInfo, currentTime, -1, this);
+				renderSpriteGeo(frame, point, actor->DrawScale, texInfo, baseFlags, color);
+				tex->Unlock(texInfo);
 			}
 		}
 		return;
