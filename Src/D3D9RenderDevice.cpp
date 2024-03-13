@@ -4651,14 +4651,10 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		return;
 
 	//dout << "rendering actor " << actor->GetName() << std::endl;
-	XMMATRIX matLoc;
-	XMMATRIX matRot;
-	XMMATRIX matScale;
-
 	XMMATRIX actorMatrix = XMMatrixIdentity();
 
 	if (!actor->bParticles) {
-		matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
+		XMMATRIX matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
 		actorMatrix *= matScale;
 	}
 	if (specialCoord && specialCoord->enabled) {
@@ -4666,9 +4662,8 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		actorMatrix *= FCoordToDXMat(specialCoord->coord);
 		actorMatrix *= ToXMMATRIX(specialCoord->baseMatrix);
 	} else {
-		matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
-		matRot = FRotToDXRotMat(actor->Rotation);
-		matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
+		XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
+		XMMATRIX matRot = FRotToDXRotMat(actor->Rotation);
 		actorMatrix *= matRot;
 		actorMatrix *= matLoc;
 	}
