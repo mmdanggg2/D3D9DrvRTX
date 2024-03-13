@@ -25,6 +25,8 @@ ods_stream::~ods_stream() {
 	delete rdbuf();
 }
 
+ods_stream dout;
+
 std::basic_string<TCHAR> HexString(DWORD data, DWORD numBits) {
 	std::basic_ostringstream<TCHAR> strHexNum;
 

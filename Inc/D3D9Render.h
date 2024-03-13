@@ -21,8 +21,6 @@ using TexFlagKeyMap = std::unordered_map<TexFlagKey, T, TexFlagKey_Hash>;
 class UD3D9Render : public URender {
 	DECLARE_CLASS(UD3D9Render, URender, CLASS_Config, D3D9DrvRTX);
 
-	ods_stream dout;
-
 	// UObject interface.
 	UD3D9Render();
 	void StaticConstructor();

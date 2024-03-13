@@ -443,9 +443,6 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void AssembleShader(void);
 #endif
 
-	//Debug stream
-	ods_stream dout;
-
 	//Debug bits
 	DWORD m_debugBits;
 	inline bool FASTCALL DebugBit(DWORD debugBit) {

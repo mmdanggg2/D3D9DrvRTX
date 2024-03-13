@@ -13,7 +13,7 @@ UD3D9Render::UD3D9Render() : URender() {
 void UD3D9Render::StaticConstructor() {
 	guard(UD3D9Render::StaticConstructor);
 	URender::StaticConstructor();
-	ods_stream() << "Static Constructing UD3D9Render!" << std::endl;
+	dout << "Static Constructing UD3D9Render!" << std::endl;
 	unguard;
 }
 

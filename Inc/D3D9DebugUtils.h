@@ -20,4 +20,6 @@ public:
 	~ods_stream();
 };
 
+extern ods_stream dout;
+
 std::basic_string<TCHAR> HexString(DWORD data, DWORD numBits = 4);
