@@ -140,161 +140,162 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 
 void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	guard(UD3D9Render::DrawWorld);
-	if (GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
-		FMemMark sceneMark(GSceneMem);
-		FMemMark memMark(GMem);
-		FMemMark dynMark(GDynMem);
-		FMemMark vectorMark(VectorMem);
-
-		if (Engine->Audio && !GIsEditor)
-			Engine->Audio->RenderAudioGeometry(frame);
-
-		UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
-
-		const UViewport* viewport = frame->Viewport;
-		AActor* playerActor = NULL;
-		if (!viewport->Actor->bBehindView) {
-			playerActor = viewport->Actor->ViewTarget ? viewport->Actor->ViewTarget : viewport->Actor;
-		}
-
-		//dout << "Starting frame" << std::endl;
-
-		d3d9Dev->startWorldDraw(frame);
-
-		std::vector<AActor*> lightActors;
-		lightActors.reserve(frame->Level->Actors.Num());
-		std::vector<AActor*> viableActors;
-		viableActors.reserve(frame->Level->Actors.Num());
-		std::vector<AMover*> visibleMovers;
-
-		// Sort through all actors and put them in the appropriate pile
-		for (int iActor = 0; iActor < frame->Level->Actors.Num(); iActor++) {
-			AActor* actor = frame->Level->Actors(iActor);
-			if (!actor) continue;
-			if (actor->LightType != LT_None) {
-				lightActors.push_back(actor);
-			}
-			bool isVisible = true;
-			isVisible &= actor != playerActor;
-			isVisible &= GIsEditor ? !actor->bHiddenEd : !actor->bHidden;
-			bool isOwned = actor->IsOwnedBy(frame->Viewport->Actor);
-			isVisible &= !actor->bOnlyOwnerSee || (isOwned && !frame->Viewport->Actor->bBehindView);
-			isVisible &= !isOwned || !actor->bOwnerNoSee || (isOwned && frame->Viewport->Actor->bBehindView);
-			if (isVisible) {
-				if (actor->IsA(AMover::StaticClass())) {
-					visibleMovers.push_back((AMover*)actor);
-					continue;
-				}
-				viableActors.push_back(actor);
-			}
-		}
-
-		// Seems to also update mover bsp nodes for decal calculations
-		OccludeFrame(frame);
-
-		// Add all actors in view and also any in zones that are visible
-		std::unordered_set<AActor*> visibleActors;
-		std::unordered_set<INT> visibleZones;
-		for (int pass : {0, 1, 2}) {
-			for (FBspDrawList* drawList = frame->Draw[pass]; drawList; drawList = drawList->Next) {
-				visibleZones.insert(drawList->iZone);
-			}
-		}
-		for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
-			visibleZones.insert(sprite->Actor->Region.ZoneNumber);
-			visibleActors.insert(sprite->Actor);
-		}
-		for (AActor* actor : viableActors) {
-			if (visibleZones.count(actor->Region.ZoneNumber)) {
-				visibleActors.insert(actor);
-			}
-		}
-
-		ModelFacets modelFacets;
-		getLevelModelFacets(frame, modelFacets);
-
-		std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
-		for (RPASS pass : {SOLID, NONSOLID}) {
-			DecalMap decalMap;
-			for (std::pair<const TexFlagKey, std::vector<FSurfaceFacet>>& facetPair : modelFacets.facetPairs[pass]) {
-				UTexture* texture = facetPair.first.first;
-				DWORD flags = facetPair.first.second;
-				std::vector<FSurfaceFacet>& facets = facetPair.second;
-
-				FTextureInfo* texInfo;
-				if (!lockedTextures.count(texture)) {
-					texInfo = &lockedTextures[texture];
-					texture->Lock(*texInfo, viewport->CurrentTime, -1, viewport->RenDev);
-				} else {
-					texInfo = &lockedTextures[texture];
-				}
-
-				FSurfaceInfo surface{};
-				surface.Level = frame->Level;
-				surface.PolyFlags = flags;
-				surface.Texture = texInfo;
-
-				d3d9Dev->drawLevelSurfaces(frame, surface, facets);
-				if (viewport->GetOuterUClient()->Decals) {
-					for (FSurfaceFacet& facet : facets) {
-						getFacetDecals(frame, facet, decalMap, lockedTextures);
-					}
-				}
-			}
-			// Render all the decals
-			for (const auto& decalsPair : decalMap) {
-				FTextureInfo *const& texInfo = decalsPair.first;
-				const std::vector<std::vector<FTransTexture>>& decals = decalsPair.second;
-				for (std::vector<FTransTexture> decal : decals) {
-					int numPts = decal.size();
-					FTransTexture** pointsPtrs = new FTransTexture * [numPts];
-					for (int i = 0; i < numPts; i++) {
-						pointsPtrs[i] = &decal[i];
-					}
-					d3d9Dev->DrawGouraudPolygon(frame, *texInfo, pointsPtrs, numPts, PF_Modulated, NULL);
-					delete[] pointsPtrs;
-				}
-			}
-			for (AMover* mover : visibleMovers) {
-				d3d9Dev->renderMover(frame, mover);
-			}
-			for (AActor* actor : visibleActors) {
-				UBOOL bTranslucent = actor->Style == STY_Translucent;
-				if ((pass == RPASS::NONSOLID && bTranslucent) || (pass == RPASS::SOLID && !bTranslucent)) {
-					SpecialCoord specialCoord;
-					if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
-						d3d9Dev->renderSprite(frame, actor);
-					} else if (actor->DrawType == DT_Mesh) {
-						d3d9Dev->renderMeshActor(frame, actor, &specialCoord);
-					}
-					if (actor->IsA(APawn::StaticClass())) {
-						drawPawnExtras(frame, d3d9Dev, (APawn*)actor, specialCoord);
-					}
-				}
-			}
-		}
-		for (std::pair<UTexture* const, FTextureInfo>& entry : lockedTextures) {
-			entry.first->Unlock(entry.second);
-		}
-
-		d3d9Dev->renderLights(lightActors);
-
-		d3d9Dev->endWorldDraw(frame);
-
-		// Render view model actor and extra HUD stuff
-		if (!GIsEditor && playerActor && (frame->Viewport->Actor->ShowFlags & SHOW_Actors)) {
-			GUglyHackFlags |= 1;
-			playerActor->eventRenderOverlays(frame->Viewport->Canvas);
-			GUglyHackFlags &= ~1;
-		}
-
-		memMark.Pop();
-		dynMark.Pop();
-		sceneMark.Pop();
-		vectorMark.Pop();
+	if (!GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
+		dout << "Not using D3D9DrvRTX Device! " << GRenderDevice->GetName() << std::endl;
+		Super::DrawWorld(frame);
 		return;
 	}
-	Super::DrawWorld(frame);
+	FMemMark sceneMark(GSceneMem);
+	FMemMark memMark(GMem);
+	FMemMark dynMark(GDynMem);
+	FMemMark vectorMark(VectorMem);
+
+	if (Engine->Audio && !GIsEditor)
+		Engine->Audio->RenderAudioGeometry(frame);
+
+	UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
+
+	const UViewport* viewport = frame->Viewport;
+	AActor* playerActor = NULL;
+	if (!viewport->Actor->bBehindView) {
+		playerActor = viewport->Actor->ViewTarget ? viewport->Actor->ViewTarget : viewport->Actor;
+	}
+
+	//dout << "Starting frame" << std::endl;
+
+	d3d9Dev->startWorldDraw(frame);
+
+	std::vector<AActor*> lightActors;
+	lightActors.reserve(frame->Level->Actors.Num());
+	std::vector<AActor*> viableActors;
+	viableActors.reserve(frame->Level->Actors.Num());
+	std::vector<AMover*> visibleMovers;
+
+	// Sort through all actors and put them in the appropriate pile
+	for (int iActor = 0; iActor < frame->Level->Actors.Num(); iActor++) {
+		AActor* actor = frame->Level->Actors(iActor);
+		if (!actor) continue;
+		if (actor->LightType != LT_None) {
+			lightActors.push_back(actor);
+		}
+		bool isVisible = true;
+		isVisible &= actor != playerActor;
+		isVisible &= GIsEditor ? !actor->bHiddenEd : !actor->bHidden;
+		bool isOwned = actor->IsOwnedBy(frame->Viewport->Actor);
+		isVisible &= !actor->bOnlyOwnerSee || (isOwned && !frame->Viewport->Actor->bBehindView);
+		isVisible &= !isOwned || !actor->bOwnerNoSee || (isOwned && frame->Viewport->Actor->bBehindView);
+		if (isVisible) {
+			if (actor->IsA(AMover::StaticClass())) {
+				visibleMovers.push_back((AMover*)actor);
+				continue;
+			}
+			viableActors.push_back(actor);
+		}
+	}
+
+	// Seems to also update mover bsp nodes for colision decal calculations
+	OccludeFrame(frame);
+
+	// Add all actors in view and also any in zones that are visible
+	std::unordered_set<AActor*> visibleActors;
+	std::unordered_set<INT> visibleZones;
+	for (int pass : {0, 1, 2}) {
+		for (FBspDrawList* drawList = frame->Draw[pass]; drawList; drawList = drawList->Next) {
+			visibleZones.insert(drawList->iZone);
+		}
+	}
+	for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
+		visibleZones.insert(sprite->Actor->Region.ZoneNumber);
+		visibleActors.insert(sprite->Actor);
+	}
+	for (AActor* actor : viableActors) {
+		if (visibleZones.count(actor->Region.ZoneNumber)) {
+			visibleActors.insert(actor);
+		}
+	}
+
+	ModelFacets modelFacets;
+	getLevelModelFacets(frame, modelFacets);
+
+	std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
+	for (RPASS pass : {SOLID, NONSOLID}) {
+		DecalMap decalMap;
+		for (std::pair<const TexFlagKey, std::vector<FSurfaceFacet>>& facetPair : modelFacets.facetPairs[pass]) {
+			UTexture* texture = facetPair.first.first;
+			DWORD flags = facetPair.first.second;
+			std::vector<FSurfaceFacet>& facets = facetPair.second;
+
+			FTextureInfo* texInfo;
+			if (!lockedTextures.count(texture)) {
+				texInfo = &lockedTextures[texture];
+				texture->Lock(*texInfo, viewport->CurrentTime, -1, viewport->RenDev);
+			} else {
+				texInfo = &lockedTextures[texture];
+			}
+
+			FSurfaceInfo surface{};
+			surface.Level = frame->Level;
+			surface.PolyFlags = flags;
+			surface.Texture = texInfo;
+
+			d3d9Dev->drawLevelSurfaces(frame, surface, facets);
+			if (viewport->GetOuterUClient()->Decals) {
+				for (FSurfaceFacet& facet : facets) {
+					getFacetDecals(frame, facet, decalMap, lockedTextures);
+				}
+			}
+		}
+		// Render all the decals
+		for (const auto& decalsPair : decalMap) {
+			FTextureInfo *const& texInfo = decalsPair.first;
+			const std::vector<std::vector<FTransTexture>>& decals = decalsPair.second;
+			for (std::vector<FTransTexture> decal : decals) {
+				int numPts = decal.size();
+				FTransTexture** pointsPtrs = new FTransTexture * [numPts];
+				for (int i = 0; i < numPts; i++) {
+					pointsPtrs[i] = &decal[i];
+				}
+				d3d9Dev->DrawGouraudPolygon(frame, *texInfo, pointsPtrs, numPts, PF_Modulated, NULL);
+				delete[] pointsPtrs;
+			}
+		}
+		for (AMover* mover : visibleMovers) {
+			d3d9Dev->renderMover(frame, mover);
+		}
+		for (AActor* actor : visibleActors) {
+			UBOOL bTranslucent = actor->Style == STY_Translucent;
+			if ((pass == RPASS::NONSOLID && bTranslucent) || (pass == RPASS::SOLID && !bTranslucent)) {
+				SpecialCoord specialCoord;
+				if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
+					d3d9Dev->renderSprite(frame, actor);
+				} else if (actor->DrawType == DT_Mesh) {
+					d3d9Dev->renderMeshActor(frame, actor, &specialCoord);
+				}
+				if (actor->IsA(APawn::StaticClass())) {
+					drawPawnExtras(frame, d3d9Dev, (APawn*)actor, specialCoord);
+				}
+			}
+		}
+	}
+	for (std::pair<UTexture* const, FTextureInfo>& entry : lockedTextures) {
+		entry.first->Unlock(entry.second);
+	}
+
+	d3d9Dev->renderLights(lightActors);
+
+	d3d9Dev->endWorldDraw(frame);
+
+	// Render view model actor and extra HUD stuff
+	if (!GIsEditor && playerActor && (frame->Viewport->Actor->ShowFlags & SHOW_Actors)) {
+		GUglyHackFlags |= 1;
+		playerActor->eventRenderOverlays(frame->Viewport->Canvas);
+		GUglyHackFlags &= ~1;
+	}
+
+	memMark.Pop();
+	dynMark.Pop();
+	sceneMark.Pop();
+	vectorMark.Pop();
 	unguard;
 }
 
@@ -463,16 +464,16 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 
 void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor) {
 	guard(UD3D9Render::DrawActor);
-	if (GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
-		UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
-		// TODO: fix this muzzle flash schtuff
-		d3d9Dev->EndBuffering(); // muzzle flash is drawing before weapon
-		d3d9Dev->startWorldDraw(frame);
-		d3d9Dev->renderMeshActor(frame, actor);
-		//dout << "Drawing actor! " << actor->GetName() << std::endl;
-		d3d9Dev->endWorldDraw(frame);
+	if (!GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
+		Super::DrawActor(frame, actor);
 		return;
 	}
-	Super::DrawActor(frame, actor);
+	UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
+	// TODO: fix this muzzle flash schtuff
+	d3d9Dev->EndBuffering(); // muzzle flash is drawing before weapon
+	d3d9Dev->startWorldDraw(frame);
+	d3d9Dev->renderMeshActor(frame, actor);
+	//dout << "Drawing actor! " << actor->GetName() << std::endl;
+	d3d9Dev->endWorldDraw(frame);
 	unguard;
 }
