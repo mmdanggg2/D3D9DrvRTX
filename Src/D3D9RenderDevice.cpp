@@ -392,6 +392,8 @@ void UD3D9RenderDevice::StaticConstructor() {
 	//Frame rate limit timer not yet initialized
 	m_frameRateLimitTimerInitialized = false;
 
+	HighDetailActors = true;
+
 	DescFlags |= RDDESCF_Certified;
 
 	unguard;
@@ -7493,9 +7495,8 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTex
 
 	//Alpha texture for detail texture uses texture unit 0
 	{
-		INT t = 0;
 		const FGLVertex *pVertex = &m_csVertexArray[0];
-		FGLTexCoord *pTexCoord = m_pTexCoordArray[t];
+		FGLTexCoord *pTexCoord = m_pTexCoordArray[0];
 
 		INT ptCounter = m_csPtCount;
 		do {
