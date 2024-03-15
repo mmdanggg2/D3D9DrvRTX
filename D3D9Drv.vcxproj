@@ -26,30 +26,30 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <PlatformToolset>v143</PlatformToolset>
     <UseOfMfc>false</UseOfMfc>
     <CharacterSet>Unicode</CharacterSet>
     <EnableASAN>false</EnableASAN>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ASAN|Win32'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <PlatformToolset>v143</PlatformToolset>
     <UseOfMfc>false</UseOfMfc>
     <CharacterSet>Unicode</CharacterSet>
     <EnableASAN>true</EnableASAN>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <PlatformToolset>v143</PlatformToolset>
     <UseOfMfc>false</UseOfMfc>
     <CharacterSet>Unicode</CharacterSet>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='EditContinue|Win32'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <PlatformToolset>v143</PlatformToolset>
     <UseOfMfc>false</UseOfMfc>
     <CharacterSet>Unicode</CharacterSet>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -75,32 +75,20 @@
     <_ProjectFileVersion>17.0.33205.214</_ProjectFileVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>$(UNREAL_SYSTEM_DIR)\</OutDir>
     <IntDir>.\Release\</IntDir>
     <LinkIncremental>false</LinkIncremental>
-    <LibraryPath>$(DXSDK_DIR)Lib\x86;$(LibraryPath)</LibraryPath>
-    <IncludePath>$(DXSDK_DIR)Include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='EditContinue|Win32'">
-    <OutDir>$(UNREAL_SYSTEM_DIR)\</OutDir>
     <IntDir>.\Release\</IntDir>
     <LinkIncremental>true</LinkIncremental>
-    <LibraryPath>$(DXSDK_DIR)Lib\x86;$(LibraryPath)</LibraryPath>
-    <IncludePath>$(DXSDK_DIR)Include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>$(UNREAL_SYSTEM_DIR)\</OutDir>
     <IntDir>.\Debug\</IntDir>
     <LinkIncremental>true</LinkIncremental>
-    <LibraryPath>$(DXSDK_DIR)Lib\x86;$(LibraryPath)</LibraryPath>
-    <IncludePath>$(DXSDK_DIR)Include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ASAN|Win32'">
-    <OutDir>$(UNREAL_SYSTEM_DIR)\</OutDir>
     <IntDir>.\Debug\</IntDir>
     <LinkIncremental>true</LinkIncremental>
-    <LibraryPath>$(DXSDK_DIR)Lib\x86;$(LibraryPath)</LibraryPath>
-    <IncludePath>$(DXSDK_DIR)Include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Midl>
@@ -114,43 +102,24 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <AdditionalIncludeDirectories>Inc;$(UNREAL_SDK_DIR)\Core\Inc;$(UNREAL_SDK_DIR)\Render\Inc;$(UNREAL_SDK_DIR)\Engine\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NDEBUG;_WINDOWS;WIN32;UNICODE;NO_UNICODE_OS_SUPPORT;WIN32_LEAN_AND_MEAN;_SECURE_SCL=0;UTGLR_UT_BUILD;NO_APP_MALLOC;WINDOWS_IGNORE_PACKING_MISMATCH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
-      <ExceptionHandling>Async</ExceptionHandling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <StructMemberAlignment>4Bytes</StructMemberAlignment>
-      <BufferSecurityCheck>false</BufferSecurityCheck>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <FloatingPointModel>Fast</FloatingPointModel>
-      <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
       <PrecompiledHeaderOutputFile>.\Release/D3D9Drv.pch</PrecompiledHeaderOutputFile>
       <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
       <AssemblerListingLocation>.\Release/</AssemblerListingLocation>
       <ObjectFileName>.\Release/</ObjectFileName>
       <ProgramDataBaseFileName>.\Release/</ProgramDataBaseFileName>
-      <WarningLevel>Level4</WarningLevel>
-      <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <DisableSpecificWarnings>4121;4324;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>winmm.lib;$(UNREAL_SDK_DIR)\Core\Lib\Core.lib;$(UNREAL_SDK_DIR)\Engine\Lib\Engine.lib;$(UNREAL_SDK_DIR)\Render\Lib\Render.lib;d3dx9.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <OutputFile>$(UNREAL_SYSTEM_DIR)\D3D9DrvRTX.dll</OutputFile>
-      <SuppressStartupBanner>true</SuppressStartupBanner>
-      <ProgramDatabaseFile>.\Lib/D3D9Drv.pdb</ProgramDatabaseFile>
-      <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>.\Release/D3D9Drv.map</MapFileName>
-      <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention />
-      <ImportLibrary>.\Lib/D3D9Drv.lib</ImportLibrary>
-      <TargetMachine>MachineX86</TargetMachine>
       <ImageHasSafeExceptionHandlers>true</ImageHasSafeExceptionHandlers>
     </Link>
     <Bscmake>
@@ -171,44 +140,24 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <AdditionalIncludeDirectories>Inc;$(UNREAL_SDK_DIR)\Core\Inc;$(UNREAL_SDK_DIR)\Render\Inc;$(UNREAL_SDK_DIR)\Engine\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_WINDOWS;WIN32;UNICODE;NO_UNICODE_OS_SUPPORT;WIN32_LEAN_AND_MEAN;_SECURE_SCL=0;UTGLR_UT_BUILD;NO_APP_MALLOC;WINDOWS_IGNORE_PACKING_MISMATCH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
-      <ExceptionHandling>Async</ExceptionHandling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <StructMemberAlignment>4Bytes</StructMemberAlignment>
-      <BufferSecurityCheck>false</BufferSecurityCheck>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <FloatingPointModel>Fast</FloatingPointModel>
-      <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
       <PrecompiledHeaderOutputFile>.\Release/D3D9Drv.pch</PrecompiledHeaderOutputFile>
       <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
       <AssemblerListingLocation>.\Release/</AssemblerListingLocation>
       <ObjectFileName>.\Release/</ObjectFileName>
       <ProgramDataBaseFileName>.\Release/</ProgramDataBaseFileName>
-      <WarningLevel>Level4</WarningLevel>
-      <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <DisableSpecificWarnings>4121;4324;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>winmm.lib;$(UNREAL_SDK_DIR)\Core\Lib\Core.lib;$(UNREAL_SDK_DIR)\Engine\Lib\Engine.lib;$(UNREAL_SDK_DIR)\Render\Lib\Render.lib;d3dx9.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <OutputFile>$(UNREAL_SYSTEM_DIR)\D3D9DrvRTX.dll</OutputFile>
-      <SuppressStartupBanner>true</SuppressStartupBanner>
-      <ProgramDatabaseFile>.\Lib/D3D9Drv.pdb</ProgramDatabaseFile>
-      <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>.\Release/D3D9Drv.map</MapFileName>
-      <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
-      <ImportLibrary>.\Lib/D3D9Drv.lib</ImportLibrary>
-      <TargetMachine>MachineX86</TargetMachine>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
     </Link>
     <Bscmake>
@@ -227,43 +176,24 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>Inc;$(UNREAL_SDK_DIR)\Core\Inc;$(UNREAL_SDK_DIR)\Render\Inc;$(UNREAL_SDK_DIR)\Engine\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_DEBUG;_REALLY_WANT_DEBUG;_WINDOWS;WIN32;UNICODE;NO_UNICODE_OS_SUPPORT;WIN32_LEAN_AND_MEAN;_SECURE_SCL=0;UTGLR_UT_BUILD;NO_APP_MALLOC;WINDOWS_IGNORE_PACKING_MISMATCH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_REALLY_WANT_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
-      <ExceptionHandling>Async</ExceptionHandling>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <StructMemberAlignment>4Bytes</StructMemberAlignment>
-      <BufferSecurityCheck>false</BufferSecurityCheck>
-      <FloatingPointModel>Fast</FloatingPointModel>
-      <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
       <PrecompiledHeaderOutputFile>.\Debug/D3D9Drv.pch</PrecompiledHeaderOutputFile>
       <AssemblerListingLocation>.\Debug/</AssemblerListingLocation>
       <ObjectFileName>.\Debug/</ObjectFileName>
       <ProgramDataBaseFileName>.\Debug/</ProgramDataBaseFileName>
-      <WarningLevel>Level4</WarningLevel>
-      <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <DisableSpecificWarnings>4121;4324;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>winmm.lib;$(UNREAL_SDK_DIR)\Core\Lib\Core.lib;$(UNREAL_SDK_DIR)\Engine\Lib\Engine.lib;$(UNREAL_SDK_DIR)\Render\Lib\Render.lib;d3dx9.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <OutputFile>$(UNREAL_SYSTEM_DIR)\D3D9DrvRTX.dll</OutputFile>
-      <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <ProgramDatabaseFile>.\Lib/D3D9Drv.pdb</ProgramDatabaseFile>
-      <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>.\Debug/D3D9Drv.map</MapFileName>
-      <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention />
-      <ImportLibrary>.\Lib/D3D9Drv.lib</ImportLibrary>
-      <TargetMachine>MachineX86</TargetMachine>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
     </Link>
     <Bscmake>
@@ -283,44 +213,25 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>Inc;$(UNREAL_SDK_DIR)\Core\Inc;$(UNREAL_SDK_DIR)\Render\Inc;$(UNREAL_SDK_DIR)\Engine\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_DEBUG;_REALLY_WANT_DEBUG;_WINDOWS;WIN32;UNICODE;NO_UNICODE_OS_SUPPORT;WIN32_LEAN_AND_MEAN;_SECURE_SCL=0;UTGLR_UT_BUILD;NO_APP_MALLOC;WINDOWS_IGNORE_PACKING_MISMATCH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_REALLY_WANT_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
-      <ExceptionHandling>Async</ExceptionHandling>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <StructMemberAlignment>4Bytes</StructMemberAlignment>
-      <BufferSecurityCheck>false</BufferSecurityCheck>
-      <FloatingPointModel>Fast</FloatingPointModel>
-      <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
       <PrecompiledHeaderOutputFile>.\Debug/D3D9Drv.pch</PrecompiledHeaderOutputFile>
       <AssemblerListingLocation>.\Debug/</AssemblerListingLocation>
       <ObjectFileName>.\Debug/</ObjectFileName>
       <ProgramDataBaseFileName>.\Debug/</ProgramDataBaseFileName>
-      <WarningLevel>Level4</WarningLevel>
-      <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <DisableSpecificWarnings>4121;4324;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>winmm.lib;$(UNREAL_SDK_DIR)\Core\Lib\Core.lib;$(UNREAL_SDK_DIR)\Engine\Lib\Engine.lib;$(UNREAL_SDK_DIR)\Render\Lib\Render.lib;d3dx9.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <OutputFile>$(UNREAL_SYSTEM_DIR)\D3D9DrvRTX.dll</OutputFile>
-      <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <ProgramDatabaseFile>.\Lib/D3D9Drv.pdb</ProgramDatabaseFile>
-      <GenerateMapFile>true</GenerateMapFile>
       <MapFileName>.\Debug/D3D9Drv.map</MapFileName>
-      <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
-      <ImportLibrary>.\Lib/D3D9Drv.lib</ImportLibrary>
-      <TargetMachine>MachineX86</TargetMachine>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
     </Link>
     <Bscmake>

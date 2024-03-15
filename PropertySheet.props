@@ -2,11 +2,37 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
-    <UNREAL_SDK_DIR>E:\programming\UnrealTournament\sdk</UNREAL_SDK_DIR>
-    <UNREAL_SYSTEM_DIR>E:\programming\UnrealTournament\Install\System</UNREAL_SYSTEM_DIR>
+    <UNREAL_SDK_DIR>..\sdk</UNREAL_SDK_DIR>
+    <UNREAL_SYSTEM_DIR>..\Install\System</UNREAL_SYSTEM_DIR>
   </PropertyGroup>
-  <PropertyGroup />
-  <ItemDefinitionGroup />
+  <PropertyGroup>
+    <IncludePath>$(DXSDK_DIR)Include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(DXSDK_DIR)Lib\x86;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>Inc;$(UNREAL_SDK_DIR)\Core\Inc;$(UNREAL_SDK_DIR)\Render\Inc;$(UNREAL_SDK_DIR)\Engine\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/permissive /Zc:implicitNoexcept- %(AdditionalOptions)</AdditionalOptions>
+      <ConformanceMode>false</ConformanceMode>
+      <DisableSpecificWarnings>4121;4324;4458;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <ExceptionHandling>Async</ExceptionHandling>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
+      <WarningLevel>Level4</WarningLevel>
+      <StructMemberAlignment>4Bytes</StructMemberAlignment>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
+      <ForceConformanceInForLoopScope>false</ForceConformanceInForLoopScope>
+    </ClCompile>
+    <Link>
+      <OutputFile>$(UNREAL_SYSTEM_DIR)\D3D9DrvRTX.dll</OutputFile>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <BuildMacro Include="UNREAL_SDK_DIR">
       <Value>$(UNREAL_SDK_DIR)</Value>
