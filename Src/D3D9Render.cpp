@@ -372,7 +372,7 @@ void UD3D9Render::ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSu
 		for (FTransTexture& point : decalPts) {
 			isInside.push_back(clipPlane.PlaneDot(point.Point) >= 0);
 		}
-		for (int decalIdx = 0; decalIdx < decalPts.size(); decalIdx++) {
+		for (unsigned int decalIdx = 0; decalIdx < decalPts.size(); decalIdx++) {
 			int decalNextIdx = (decalIdx + 1) % decalPts.size();
 			if ((isInside[decalIdx] && !isInside[decalNextIdx]) || (!isInside[decalIdx] && isInside[decalNextIdx])) {
 				FTransTexture newPt{};
@@ -383,7 +383,7 @@ void UD3D9Render::ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSu
 			}
 		}
 		// Remove outside points
-		for (int i = 0; i < decalPts.size(); i++) {
+		for (unsigned int i = 0; i < decalPts.size(); i++) {
 			if (!isInside[i]) {
 				decalPts.erase(decalPts.begin() + i);
 				isInside.erase(isInside.begin() + i);

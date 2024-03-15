@@ -44,3 +44,9 @@ private:
 	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord);
 	void getFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures);
 };
+
+#if UNREAL_TOURNAMENT && !UNREAL_TOURNAMENT_OLDUNREAL
+constexpr int UT436_size = 264;
+static_assert(sizeof(URender) == UT436_size);
+static_assert(sizeof(UD3D9Render) == sizeof(URender));
+#endif

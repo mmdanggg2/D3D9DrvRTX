@@ -401,9 +401,12 @@ void UD3D9RenderDevice::StaticConstructor() {
 
 
 void UD3D9RenderDevice::SC_AddBoolConfigParam(DWORD BitMaskOffset, const TCHAR *pName, UBOOL &param, ECppProperty EC_CppProperty, INT InOffset, UBOOL defaultValue) {
-	//param = (((defaultValue) != 0) ? 1 : 0) << BitMaskOffset; //Doesn't exactly work like a UBOOL "// Boolean 0 (false) or 1 (true)."
+#if !UNREAL_TOURNAMENT_OLDUNREAL
+	param = (((defaultValue) != 0) ? 1 : 0) << BitMaskOffset; //Doesn't exactly work like a UBOOL "// Boolean 0 (false) or 1 (true)."
+#else
 	// stijn: we no longer need the manual bitmask shifting in patch 469
 	param = defaultValue;
+#endif
 	new(GetClass(), pName, RF_Public)UBoolProperty(EC_CppProperty, InOffset, TEXT("Options"), CPF_Config);
 }
 
@@ -3985,7 +3988,7 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 #endif
 			}
 			else {
-#ifdef UTGLR_USES_ALPHABLEND
+#if UTGLR_USES_ALPHABLEND
 				if (PolyFlags & PF_AlphaBlend) {
 					if (Info.Texture->Alpha > 0.f)
 						Color.W = Info.Texture->Alpha;
@@ -4512,11 +4515,11 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 
 	UTexture* texture = actor->Texture;
 	FLOAT drawScale = actor->DrawScale;
-	if (frame->Viewport->Actor->ShowFlags & SHOW_ActorIcons) {
-		drawScale = 1.0;
-		if (!texture)
-			texture = GetDefault<AActor>()->Texture;
-	}
+	//if (frame->Viewport->Actor->ShowFlags & SHOW_ActorIcons) {
+	//	drawScale = 1.0;
+	//	if (!texture)
+	//		texture = GetDefault<AActor>()->Texture;
+	//}
 	FTime& currTime = frame->Viewport->CurrentTime;
 	UTexture* renderTexture;
 	if (actor->DrawType == DT_SpriteAnimOnce) {
@@ -5502,6 +5505,7 @@ void UD3D9RenderDevice::PrecacheTexture(FTextureInfo& Info, DWORD PolyFlags) {
 	unguard;
 }
 
+#if UNREAL_TOURNAMENT_OLDUNREAL
 UBOOL UD3D9RenderDevice::SupportsTextureFormat(ETextureFormat Format)
 {
 	switch ( Format )
@@ -5517,6 +5521,7 @@ UBOOL UD3D9RenderDevice::SupportsTextureFormat(ETextureFormat Format)
 	default:          return false;
 	}
 }
+#endif
 
 //This function is safe to call multiple times to initialize once
 void UD3D9RenderDevice::InitNoTextureSafe(void) {
@@ -6153,6 +6158,7 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 					break;
 
 				default:
+#if UNREAL_TOURNAMENT_OLDUNREAL
 					switch (Info.Format) {
 					case TEXF_BGRA8:
 						guard(ConvertBGRA8);
@@ -6170,7 +6176,12 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 						guard(ConvertBGRA7777);
 						(this->*pBind->pConvertBGRA7777)(Mip, Level);
 						unguard;
-					}					
+					}
+#else
+					guard(ConvertBGRA7777);
+					(this->*pBind->pConvertBGRA7777)(Mip, Level);
+					unguard;
+#endif
 				}
 
 				DWORD texWidth, texHeight;
@@ -6350,6 +6361,7 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 				pBind->texFormat = D3DFMT_DXT1;
 			}
 			break;
+#if UNREAL_TOURNAMENT_OLDUNREAL || UTGLR_UNREAL_227_BUILD
 		case TEXF_DXT3: 
 			pBind->texType = TEX_TYPE_COMPRESSED_DXT3; 
 			pBind->texFormat = D3DFMT_DXT3;
@@ -6359,7 +6371,7 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 			pBind->texType = TEX_TYPE_COMPRESSED_DXT5; 
 			pBind->texFormat = D3DFMT_DXT5;
 			break;
-
+#endif
 		default:
 			;
 		}
@@ -6367,7 +6379,11 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 	if (pBind->texType != TEX_TYPE_NONE) {
 		//Using compressed texture
 	}
+#if UNREAL_TOURNAMENT_OLDUNREAL
 	else if (FIsPalettizedFormat(Info.Format)) {
+#else
+	else if (Info.Palette) {
+#endif
 		pBind->texType = TEX_TYPE_HAS_PALETTE;
 		pBind->texFormat = D3DFMT_A8R8G8B8;
 		//Check if texture should be 16-bit

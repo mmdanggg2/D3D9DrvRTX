@@ -8,6 +8,9 @@
   <PropertyGroup>
     <IncludePath>$(DXSDK_DIR)Include;$(IncludePath)</IncludePath>
     <LibraryPath>$(DXSDK_DIR)Lib\x86;$(LibraryPath)</LibraryPath>
+    <OutDir>$(UNREAL_SYSTEM_DIR)\</OutDir>
+    <TargetName>D3D9DrvRTX</TargetName>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -28,9 +31,15 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
       <ForceConformanceInForLoopScope>false</ForceConformanceInForLoopScope>
+      <PreprocessorDefinitions>NO_APP_MALLOC;NO_UNICODE_OS_SUPPORT;_WINDOWS;WIN32;UNICODE;WIN32_LEAN_AND_MEAN;_SECURE_SCL=0;WINDOWS_IGNORE_PACKING_MISMATCH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <OutputFile>$(UNREAL_SYSTEM_DIR)\D3D9DrvRTX.dll</OutputFile>
+      <AdditionalDependencies>$(UNREAL_SDK_DIR)\Core\Lib\Core.lib;$(UNREAL_SDK_DIR)\Engine\Lib\Engine.lib;$(UNREAL_SDK_DIR)\Render\Lib\Render.lib;winmm.lib;d3dx9.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateMapFile>true</GenerateMapFile>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <ProgramDatabaseFile>.\Lib/D3D9Drv.pdb</ProgramDatabaseFile>
+      <ImportLibrary>.\Lib/D3D9Drv.lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

@@ -21,21 +21,22 @@
 
 //#define D3D9_DEBUG
 
-#if defined(UTGLR_UT_BUILD) || UNREAL_TOURNAMENT_OLDUNREAL
-#define UTGLR_VALID_BUILD_CONFIG 1
-#define UTGLR_USES_ALPHABLEND 1
-#define UTGLR_UT_469_BUILD 1
-#endif
-#ifdef UTGLR_DX_BUILD
-#define UTGLR_VALID_BUILD_CONFIG 1
-#endif
-#ifdef UTGLR_RUNE_BUILD
-#define UTGLR_VALID_BUILD_CONFIG 1
-#define UTGLR_USES_ALPHABLEND 1
-#endif
-#ifdef UTGLR_UNREAL_227_BUILD
-#define UTGLR_VALID_BUILD_CONFIG 1
-#define UTGLR_USES_ALPHABLEND 1
+#if defined(UNREAL_TOURNAMENT)
+	#define UTGLR_UT_BUILD 1
+	#define UTGLR_VALID_BUILD_CONFIG 1
+		#if UNREAL_TOURNAMENT_OLDUNREAL
+			#define UTGLR_USES_ALPHABLEND 1
+		#endif
+#elif defined(UTGLR_DX_BUILD)
+	#define UTGLR_VALID_BUILD_CONFIG 1
+#elif defined(UTGLR_RUNE_BUILD)
+	#define UTGLR_VALID_BUILD_CONFIG 1
+	#define UTGLR_USES_ALPHABLEND 1
+#elif defined(UTGLR_UNREAL_227_BUILD)
+	#define UTGLR_VALID_BUILD_CONFIG 1
+	#define UTGLR_USES_ALPHABLEND 1
+#else
+	#define UTGLR_VALID_BUILD_CONFIG 0
 #endif
 
 #if !UTGLR_VALID_BUILD_CONFIG
@@ -52,15 +53,10 @@
 #include <unordered_set>
 #include <map>
 #include <deque>
-#pragma warning(disable : 4663)
 #pragma warning(disable : 4018)
 #include <vector>
 
-#pragma warning(disable : 4244)
 #pragma warning(disable : 4245)
-
-#pragma warning(disable : 4146)
-
 #include "c_gclip.h"
 
 
@@ -72,7 +68,6 @@
 	#endif
 	#define UTGLR_USES_SCENENODEHACK 0
 #elif UTGLR_RUNE_BUILD
-	#define UTGLR_USES_ALPHABLEND 1
 	#define UTGLR_USES_SCENENODEHACK 1
 #else
 	#define UTGLR_USES_SCENENODEHACK 1
@@ -84,6 +79,9 @@
 	#define PF_AlphaBlend 0x020000
 #endif
 
+#if !UNREAL_TOURNAMENT_OLDUNREAL
+typedef DWORD PTRINT;
+#endif
 
 typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
 
@@ -429,14 +427,19 @@ struct SpecialCoord {
 	bool enabled = false;
 };
 
+#if UNREAL_TOURNAMENT_OLDUNREAL
+typedef URenderDeviceOldUnreal469 RENDERDEVICE_SUPER;
+#else
+typedef URenderDevice RENDERDEVICE_SUPER;
+#endif
 //
 // A D3D9 rendering device attached to a viewport.
 //
-class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
-#if defined UTGLR_DX_BUILD
+class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
+#if UTGLR_DX_BUILD
 	DECLARE_CLASS(UD3D9RenderDevice, URenderDevice, CLASS_Config)
 #else
-	DECLARE_CLASS(UD3D9RenderDevice, URenderDeviceOldUnreal469, CLASS_Config, D3D9DrvRTX)
+	DECLARE_CLASS(UD3D9RenderDevice, RENDERDEVICE_SUPER, CLASS_Config, D3D9DrvRTX)
 #endif
 
 #ifdef UTD3D9R_INCLUDE_SHADER_ASM
@@ -489,10 +492,12 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 		D3DLOCKED_RECT lockRect;
 	} m_texConvertCtx;
 
-
-	inline void * FASTCALL AlignMemPtr(void *ptr, PTRINT align) {
-		return (void *)(((PTRINT)ptr + (align - 1)) & -align);
+#pragma warning(push)
+#pragma warning(disable : 4146)
+	inline void * FASTCALL AlignMemPtr(void *ptr, DWORD align) {
+		return (void *)(((DWORD)ptr + (align - 1)) & -align);
 	}
+#pragma warning(pop)
 	enum { VERTEX_ARRAY_ALIGN = 64 };	//Must be even multiple of 16B for SSE
 	enum { VERTEX_ARRAY_TAIL_PADDING = 72 };	//Must include 8B for half SSE tail
 
@@ -1367,7 +1372,9 @@ class UD3D9RenderDevice : public URenderDeviceOldUnreal469 {
 	void ReadPixels(FColor* Pixels);
 	void EndFlash();
 	void PrecacheTexture(FTextureInfo& Info, DWORD PolyFlags);
+#if UNREAL_TOURNAMENT_OLDUNREAL
 	UBOOL SupportsTextureFormat(ETextureFormat Format);
+#endif
 
 	void InitNoTextureSafe(void);
 	void InitAlphaTextureSafe(void);
