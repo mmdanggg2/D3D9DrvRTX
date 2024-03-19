@@ -35,6 +35,10 @@
 #elif defined(UTGLR_UNREAL_227_BUILD)
 	#define UTGLR_VALID_BUILD_CONFIG 1
 	#define UTGLR_USES_ALPHABLEND 1
+#elif defined(UNREAL_GOLD)
+	#define UTGLR_VALID_BUILD_CONFIG 1
+	#define UTGLR_USES_ALPHABLEND 0
+	#define UTGLR_NO_DECALS 1
 #else
 	#define UTGLR_VALID_BUILD_CONFIG 0
 #endif
@@ -81,6 +85,10 @@
 
 #if !UNREAL_TOURNAMENT_OLDUNREAL
 typedef DWORD PTRINT;
+#endif
+
+#if UNREAL_GOLD
+extern DWORD GUglyHackFlags;
 #endif
 
 typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
@@ -436,8 +444,8 @@ typedef URenderDevice RENDERDEVICE_SUPER;
 // A D3D9 rendering device attached to a viewport.
 //
 class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
-#if UTGLR_DX_BUILD
-	DECLARE_CLASS(UD3D9RenderDevice, URenderDevice, CLASS_Config)
+#if UTGLR_DX_BUILD || UNREAL_GOLD
+	DECLARE_CLASS(UD3D9RenderDevice, RENDERDEVICE_SUPER, CLASS_Config)
 #else
 	DECLARE_CLASS(UD3D9RenderDevice, RENDERDEVICE_SUPER, CLASS_Config, D3D9DrvRTX)
 #endif
@@ -880,7 +888,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	UBOOL TexDXT1ToDXT3;
 	INT SwapInterval;
 	INT FrameRateLimit;
-#if defined UTGLR_DX_BUILD || defined UTGLR_RUNE_BUILD
+#if defined UTGLR_DX_BUILD || defined UTGLR_RUNE_BUILD || UNREAL_GOLD
 	FLOAT m_prevFrameTimestamp;
 #else
 	FTime m_prevFrameTimestamp;
@@ -1335,7 +1343,11 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane ScreenClear, DWORD RenderLockFlags, BYTE* InHitData, INT* InHitSize);
 	void SetSceneNode(FSceneNode* Frame);
 	void Unlock(UBOOL Blit);
-	void Flush(UBOOL AllowPrecache);
+#if UNREAL_GOLD
+	void Flush() override;
+#else
+	void Flush(UBOOL AllowPrecache) override;
+#endif
 
 	void DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet);
 	// Takes a list of faces and draws them in batches

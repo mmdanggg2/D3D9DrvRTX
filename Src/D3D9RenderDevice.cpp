@@ -66,6 +66,10 @@ static const char *g_d3d9DllName = "d3d9d.dll";
 static const char *g_d3d9DllName = "d3d9.dll";
 #endif
 
+#if UNREAL_GOLD
+DWORD GUglyHackFlags;
+#endif
+
 static const TCHAR *g_pSection = TEXT("D3D9DrvRTX.D3D9RenderDevice");
 
 //Stream definitions
@@ -394,7 +398,9 @@ void UD3D9RenderDevice::StaticConstructor() {
 
 	HighDetailActors = true;
 
+#if UNREAL_TOURNAMENT_OLDUNREAL
 	DescFlags |= RDDESCF_Certified;
+#endif
 
 	unguard;
 }
@@ -1920,7 +1926,11 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	check(MinLogTextureSize <= MaxLogTextureSize);
 
 	// Flush textures.
+#if UNREAL_GOLD
+	Flush();
+#else
 	Flush(1);
+#endif
 
 	//Invalidate fixed texture ids
 	m_pNoTexObj = NULL;
@@ -1931,7 +1941,9 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 
 
 	//Initialize previous lock variables
+#if !UNREAL_GOLD
 	PL_DetailTextures = DetailTextures;
+#endif
 	PL_OneXBlending = OneXBlending;
 	PL_MaxLogUOverV = MaxLogUOverV;
 	PL_MaxLogVOverU = MaxLogVOverU;
@@ -1973,7 +1985,11 @@ void UD3D9RenderDevice::UnsetRes() {
 	check(m_d3dDevice);
 
 	//Flush textures
+#if UNREAL_GOLD
+	Flush();
+#else
 	Flush(1);
+#endif
 
 	//Free fixed textures if they were allocated
 	if (m_pNoTexObj) {
@@ -2030,7 +2046,9 @@ void UD3D9RenderDevice::ConfigValidate_RefreshDCV(void) {
 }
 
 void UD3D9RenderDevice::ConfigValidate_RequiredExtensions(void) {
+#if !UNREAL_GOLD
 	if (!(m_d3dCaps.TextureOpCaps & D3DTEXOPCAPS_BLENDCURRENTALPHA)) DetailTextures = 0;
+#endif
 	if (!(m_d3dCaps.TextureOpCaps & D3DTEXOPCAPS_BLENDCURRENTALPHA)) UseDetailAlpha = 0;
 	if (!m_alphaTextureCap) UseDetailAlpha = 0;
 	if (!(m_d3dCaps.TextureFilterCaps & D3DPTFILTERCAPS_MINFANISOTROPIC)) MaxAnisotropy = 0;
@@ -2418,9 +2436,11 @@ UBOOL UD3D9RenderDevice::Init(UViewport* InViewport, INT NewX, INT NewY, INT New
 UBOOL UD3D9RenderDevice::Exec(const TCHAR* Cmd, FOutputDevice& Ar) {
 	guard(UD3D9RenderDevice::Exec);
 
-	if (URenderDevice::Exec(Cmd, Ar)) {
+#if !UNREAL_GOLD
+	if (Super::Exec(Cmd, Ar)) {
 		return 1;
 	}
+#endif
 	if (ParseCommand(&Cmd, TEXT("DGL"))) {
 		if (ParseCommand(&Cmd, TEXT("BUFFERTRIS"))) {
 			BufferActorTris = !BufferActorTris;
@@ -2636,10 +2656,12 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 		SetTexLODBiasState(TMUnits);
 	}
 
+#if !UNREAL_GOLD
 	if (DetailTextures != PL_DetailTextures) {
 		PL_DetailTextures = DetailTextures;
 		flushTextures = true;
 	}
+#endif
 
 	if (UseDetailAlpha != PL_UseDetailAlpha) {
 		PL_UseDetailAlpha = UseDetailAlpha;
@@ -2748,7 +2770,11 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 
 	//Flush textures if necessary due to config change
 	if (flushTextures) {
+#if UNREAL_GOLD
+		Flush();
+#else
 		Flush(1);
+#endif
 	}
 
 	unguard;
@@ -2951,7 +2977,7 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 	//Check for optional frame rate limit
 #if !UNREAL_TOURNAMENT_OLDUNREAL
 	if (FrameRateLimit >= 20) {
-#if defined UTGLR_DX_BUILD || defined UTGLR_RUNE_BUILD
+#if defined UTGLR_DX_BUILD || defined UTGLR_RUNE_BUILD || UNREAL_GOLD
 		FLOAT curFrameTimestamp;
 #else
 		FTime curFrameTimestamp;
@@ -2997,7 +3023,11 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 	unguard;
 }
 
+#if UNREAL_GOLD
+void UD3D9RenderDevice::Flush() {
+#else
 void UD3D9RenderDevice::Flush(UBOOL AllowPrecache) {
+#endif
 	guard(UD3D9RenderDevice::Flush);
 	unsigned int u;
 
@@ -3047,9 +3077,11 @@ void UD3D9RenderDevice::Flush(UBOOL AllowPrecache) {
 		TexInfo[u].pBind = NULL;
 	}
 
+#if !UNREAL_GOLD
 	if (AllowPrecache && UsePrecache && !GIsEditor) {
 		PrecacheOnFlip = 1;
 	}
+#endif
 
 	SetGamma(Viewport->GetOuterUClient()->Brightness);
 
@@ -4461,7 +4493,11 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 	unguard;
 }
 
+#if UNREAL_GOLD
+static UTexture* getTextureWithoutNext(UTexture* texture, DOUBLE time, FLOAT fraction) {
+#else
 static UTexture* getTextureWithoutNext(UTexture* texture, FTime time, FLOAT fraction) {
+#endif
 	INT count = 1;
 	for (UTexture* next = texture->AnimNext; next && next != texture; next = next->AnimNext)
 		count++;
@@ -4520,7 +4556,7 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	//	if (!texture)
 	//		texture = GetDefault<AActor>()->Texture;
 	//}
-	FTime& currTime = frame->Viewport->CurrentTime;
+	auto currTime = frame->Viewport->CurrentTime;
 	UTexture* renderTexture;
 	if (actor->DrawType == DT_SpriteAnimOnce) {
 		renderTexture = getTextureWithoutNext(texture, currTime, actor->LifeFraction());
@@ -4726,7 +4762,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	actor->Rotation = origRot;
 	actor->DrawScale = origScale;
 
-	FTime& currentTime = frame->Viewport->CurrentTime;
+	auto currentTime = frame->Viewport->CurrentTime;
 
 	if (actor->bParticles) {
 		for (INT i = 0; i < numVerts; i++) {

@@ -19,7 +19,11 @@ template <typename T>
 using TexFlagKeyMap = std::unordered_map<TexFlagKey, T, TexFlagKey_Hash>;
 
 class UD3D9Render : public URender {
+#if UTGLR_DX_BUILD || UNREAL_GOLD
+	DECLARE_CLASS(UD3D9Render, URender, CLASS_Config);
+#else
 	DECLARE_CLASS(UD3D9Render, URender, CLASS_Config, D3D9DrvRTX);
+#endif
 
 	// UObject interface.
 	UD3D9Render();
@@ -29,8 +33,9 @@ class UD3D9Render : public URender {
 	void DrawWorld(FSceneNode* Frame) override;
 	void DrawActor(FSceneNode* Frame, AActor* Actor) override;
 
+#if !UTGLR_NO_DECALS
 	void ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSurf* surf, FSavedPoly* poly, std::vector<FTransTexture>& decalPoints);
-
+#endif
 
 private:
 	enum RPASS {
@@ -48,5 +53,9 @@ private:
 #if UNREAL_TOURNAMENT && !UNREAL_TOURNAMENT_OLDUNREAL
 constexpr int UT436_size = 264;
 static_assert(sizeof(URender) == UT436_size);
+static_assert(sizeof(UD3D9Render) == sizeof(URender));
+#elif UNREAL_GOLD
+constexpr int UGold_size = 240;
+static_assert(sizeof(URender) == UGold_size);
 static_assert(sizeof(UD3D9Render) == sizeof(URender));
 #endif

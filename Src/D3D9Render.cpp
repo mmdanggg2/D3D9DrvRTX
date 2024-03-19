@@ -31,7 +31,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		const FBspNode* node = &model->Nodes(iNode);
 		INT iSurf = node->iSurf;
 		const FBspSurf* surf = &model->Surfs(iSurf);
-		if (surf->Nodes.Num() == 0) { // Must be a mover, skip it!
+		if (frame->Level->BrushTracker->SurfIsDynamic(iSurf)) { // It's a mover, skip it!
 			//dout << L"Surf " << iSurf << L" has no nodes!" << std::endl;
 			continue;
 		}
@@ -78,6 +78,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 				FLOAT panV = surf->PanV;
 				if (flags & PF_AutoUPan || flags & PF_AutoVPan) {
 					const AZoneInfo* zone = nullptr;
+#if !UNREAL_GOLD
 					for (int i = 0; i < surf->Nodes.Num(); i++) {
 						// Search for a zone actor on any part of the surface since this node may not have it linked.
 						const FBspNode& surfNode = model->Nodes(surf->Nodes(i));
@@ -92,6 +93,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 							break;
 						}
 					}
+#endif
 
 					if (flags & PF_AutoUPan) {
 						panU += fmod(levelTime * 35.0 * (zone ? zone->TexUPanSpeed : 1.0), 1024.0);
@@ -101,8 +103,8 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 					}
 				}
 				if (flags & PF_SmallWavy) {
-					panU += 8.0 * appSin(levelTime) + 4.0 * appCos(2.3 * levelTime);
-					panV += 8.0 * appCos(levelTime) + 4.0 * appSin(2.3 * levelTime);
+					panU += 8.0 * sin(levelTime) + 4.0 * cos(2.3 * levelTime);
+					panV += 8.0 * cos(levelTime) + 4.0 * sin(2.3 * levelTime);
 				}
 				if (panU != 0 || panV != 0) {
 					FVector* pan = New<FVector>(GDynMem);
@@ -115,7 +117,9 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 			FSavedPoly* poly = (FSavedPoly*)New<BYTE>(GDynMem, sizeof(FSavedPoly) + node.NumVertices * sizeof(FTransform*));
 			poly->Next = facet->Polys;
 			facet->Polys = poly;
+#if !(UTGLR_DX_BUILD || UNREAL_GOLD)
 			poly->iNode = iNode;
+#endif
 			poly->NumPts = node.NumVertices;
 
 			// Allocate and store each point
@@ -239,11 +243,13 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			surface.Texture = texInfo;
 
 			d3d9Dev->drawLevelSurfaces(frame, surface, facets);
+#if !UTGLR_NO_DECALS
 			if (viewport->GetOuterUClient()->Decals) {
 				for (FSurfaceFacet& facet : facets) {
 					getFacetDecals(frame, facet, decalMap, lockedTextures);
 				}
 			}
+#endif
 		}
 		// Render all the decals
 		for (const auto& decalsPair : decalMap) {
@@ -299,6 +305,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	unguard;
 }
 
+#if !UTGLR_NO_DECALS
 void UD3D9Render::getFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures) {
 	const UViewport* viewport = frame->Viewport;
 	const UModel* model = frame->Level->Model;
@@ -405,6 +412,7 @@ void UD3D9Render::ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSu
 		point.Light = FVector(vertColor, vertColor, vertColor);
 	}
 }
+#endif
 
 void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord) {
 	AInventory* weapon = pawn->Weapon;
@@ -415,6 +423,7 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 		weapon->Mesh = weapon->ThirdPersonMesh;
 		weapon->DrawScale = weapon->ThirdPersonScale;
 		d3d9Dev->renderMeshActor(frame, weapon, &specialCoord);
+#if UNREAL_TOURNAMENT
 		if (weapon->bSteadyFlash3rd) {
 			weapon->bSteadyToggle = !weapon->bSteadyToggle;
 		}
@@ -443,10 +452,11 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 			weapon->AnimFrame = origFrame;
 			weapon->bUnlit = origLit;
 		}
-		weapon->Mesh = origMesh;
-		weapon->DrawScale = origDrawScale;
 		weapon->OldFlashCount = weapon->FlashCount;
 		weapon->bFirstFrame = 0;
+#endif
+		weapon->Mesh = origMesh;
+		weapon->DrawScale = origDrawScale;
 	}
 	if (pawn->PlayerReplicationInfo && pawn->PlayerReplicationInfo->HasFlag) {
 		AActor* flag = pawn->PlayerReplicationInfo->HasFlag;
