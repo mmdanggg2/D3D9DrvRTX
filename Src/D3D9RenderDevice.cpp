@@ -238,18 +238,6 @@ static inline FVector DXVecToFVec(DirectX::XMVECTOR& vec) {
 	return FVector(XMVectorGetX(vec), XMVectorGetY(vec), XMVectorGetZ(vec));
 }
 
-// Converts from unreal's wacky rotation values to radians
-#define rotConvert(integer) (((float)integer) / ((float)MAXWORD) * (PI * 2))
-
-static DirectX::XMMATRIX FRotToDXRotMat(const FRotator& rot) {
-	using namespace DirectX;
-	XMMATRIX mat = XMMatrixIdentity();
-	mat *= XMMatrixRotationRollPitchYaw(-rotConvert(rot.Roll), 0, 0);
-	mat *= XMMatrixRotationRollPitchYaw(0, -rotConvert(rot.Pitch), 0);
-	mat *= XMMatrixRotationRollPitchYaw(0, 0, rotConvert(rot.Yaw));
-	return mat;
-}
-
 static DirectX::XMMATRIX FCoordToDXMat(const FCoords& coord) {
 	using namespace DirectX;
 	XMMATRIX mat = {
@@ -259,6 +247,13 @@ static DirectX::XMMATRIX FCoordToDXMat(const FCoords& coord) {
 		coord.Origin.X, coord.Origin.Y, coord.Origin.Z, 1.0f
 	};
 	return mat;
+}
+
+static DirectX::XMMATRIX FRotToDXRotMat(const FRotator& rot) {
+	using namespace DirectX;
+	FCoords coords = GMath.UnitCoords;
+	coords *= rot;
+	return FCoordToDXMat(coords);
 }
 
 //#define UTGLR_DEBUG_SHOW_CALL_COUNTS
