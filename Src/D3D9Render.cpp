@@ -149,6 +149,11 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		Super::DrawWorld(frame);
 		return;
 	}
+#if UNREAL_TOURNAMENT && !UNREAL_TOURNAMENT_OLDUNREAL
+	else if (FString(GRenderDevice->GetName()).InStr(TEXT("RenderDeviceProxy")) == 0) {
+		appErrorf(TEXT("D3D9DrvRTX for UT v436 is not compatible with v469.\nInstall D3D9DrvRTX for v469 instead!"));
+	}
+#endif
 	FMemMark sceneMark(GSceneMem);
 	FMemMark memMark(GMem);
 	FMemMark dynMark(GDynMem);
