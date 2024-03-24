@@ -1519,7 +1519,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void FASTCALL ConvertRGBA8_BGRA8888(const FMipmapBase *Mip, INT Level);
 	void FASTCALL ConvertRGBA8_BGRA8888_NoClamp(const FMipmapBase *Mip, INT Level);
 
-	inline void FASTCALL SetBlend(DWORD PolyFlags) {
+	inline void FASTCALL SetBlend(DWORD PolyFlags, bool isUI = false) {
 #if UTGLR_USES_ALPHABLEND
 		if (PolyFlags & PF_AlphaBlend) {
 			if (!(PolyFlags & PF_Masked)) {
@@ -1536,6 +1536,10 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		}
 		else if (PolyFlags & PF_Translucent) {
 			PolyFlags &= ~PF_Masked;
+		}
+
+		if (isUI) {
+			PolyFlags &= ~PF_Occlude;
 		}
 
 		//Only check relevant blend flags
