@@ -31,7 +31,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		const FBspNode* node = &model->Nodes(iNode);
 		INT iSurf = node->iSurf;
 		const FBspSurf* surf = &model->Surfs(iSurf);
-		if (frame->Level->BrushTracker->SurfIsDynamic(iSurf)) { // It's a mover, skip it!
+		if (frame->Level->BrushTracker && frame->Level->BrushTracker->SurfIsDynamic(iSurf)) { // It's a mover, skip it!
 			//dout << L"Surf " << iSurf << L" has no nodes!" << std::endl;
 			continue;
 		}
