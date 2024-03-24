@@ -7815,7 +7815,7 @@ void UD3D9RenderDevice::endWorldDraw(FSceneNode* frame) {
 
 	// World drawing finished, setup for ui
 	D3DMATRIX proj = ToD3DMATRIX(
-		XMMatrixOrthographicOffCenterLH(0.5f, frame->FX + 0.5, frame->FY + 0.5, 0.5f, 0.1f, 1.0f)
+		XMMatrixOrthographicOffCenterLH(0.5f, m_SetRes_NewX + 0.5, m_SetRes_NewY + 0.5, 0.5f, 0.1f, 1.0f)
 	);
 	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &proj);
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
