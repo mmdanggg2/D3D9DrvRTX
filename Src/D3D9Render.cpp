@@ -270,8 +270,10 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				delete[] pointsPtrs;
 			}
 		}
-		for (AMover* mover : visibleMovers) {
-			d3d9Dev->renderMover(frame, mover);
+		if (pass == RPASS::SOLID) {
+			for (AMover* mover : visibleMovers) {
+				d3d9Dev->renderMover(frame, mover);
+			}
 		}
 		for (AActor* actor : visibleActors) {
 			UBOOL bTranslucent = actor->Style == STY_Translucent;
