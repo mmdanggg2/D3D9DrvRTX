@@ -1538,10 +1538,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 			PolyFlags &= ~PF_Masked;
 		}
 
-		if (isUI) {
-			PolyFlags &= ~PF_Occlude;
-		}
-
 		//Only check relevant blend flags
 		DWORD blendFlags = PolyFlags & (
 			PF_Translucent | 
@@ -1556,12 +1552,12 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 			PF_NotSolid
 			);
 		if (m_curBlendFlags != blendFlags) {
-			SetBlendNoCheck(blendFlags);
+			SetBlendNoCheck(blendFlags, isUI);
 		}
 	}
 	void EnableAlphaToCoverageNoCheck(void);
 	void DisableAlphaToCoverageNoCheck(void);
-	void FASTCALL SetBlendNoCheck(DWORD blendFlags);
+	void FASTCALL SetBlendNoCheck(DWORD blendFlags, bool isUI);
 
 	inline void FASTCALL SetTexEnv(INT texUnit, DWORD PolyFlags) {
 		//Only check relevant tex env flags

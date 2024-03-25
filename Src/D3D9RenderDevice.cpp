@@ -6965,8 +6965,12 @@ void UD3D9RenderDevice::DisableAlphaToCoverageNoCheck(void) {
 	return;
 }
 
-void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags) {
+void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags, bool isUI) {
 	guardSlow(UD3D9RenderDevice::SetBlend);
+
+	if (isUI) { // bit of a hack to ensure D3DRS_ZWRITEENABLE is FALSE for ui stuff so remix picks it up correctly
+		blendFlags &= ~PF_Occlude;
+	}
 
 	// Detect changes in the blending modes.
 	DWORD Xor = m_curBlendFlags ^ blendFlags;
@@ -6992,7 +6996,9 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags) {
 			}
 			if (blendFlags & PF_Translucent) {
 				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
-				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCCOLOR);
+				// hack so remix renders translucent stuff without masking white values
+				// https://github.com/NVIDIAGameWorks/rtx-remix/issues/392
+				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, isUI ? D3DBLEND_INVSRCCOLOR : D3DBLEND_ONE);
 			}
 			else if (blendFlags & PF_Modulated) {
 				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
