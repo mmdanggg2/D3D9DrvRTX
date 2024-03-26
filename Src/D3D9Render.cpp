@@ -179,6 +179,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	std::vector<AActor*> viableActors;
 	viableActors.reserve(frame->Level->Actors.Num());
 	std::vector<AMover*> visibleMovers;
+	std::vector<ASkyZoneInfo*> skyZones;
 
 	// Sort through all actors and put them in the appropriate pile
 	for (int iActor = 0; iActor < frame->Level->Actors.Num(); iActor++) {
@@ -186,6 +187,10 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		if (!actor) continue;
 		if (actor->LightType != LT_None) {
 			lightActors.push_back(actor);
+		}
+		if (actor->IsA(ASkyZoneInfo::StaticClass())) {
+			skyZones.push_back((ASkyZoneInfo*)actor);
+			continue;
 		}
 		bool isVisible = true;
 		isVisible &= actor != playerActor;
@@ -292,6 +297,10 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	}
 	for (std::pair<UTexture* const, FTextureInfo>& entry : lockedTextures) {
 		entry.first->Unlock(entry.second);
+	}
+
+	for (ASkyZoneInfo* zone : skyZones) {
+		d3d9Dev->renderSkyZoneAnchor(zone);
 	}
 
 	d3d9Dev->renderLights(lightActors);

@@ -381,36 +381,52 @@ struct FGLMapDot {
 	FLOAT v;
 };
 
+// https://stackoverflow.com/a/57595105/5233018
+template <typename T, typename... Rest>
+void hash_combine(std::size_t& seed, const T& v, const Rest&... rest) {
+	seed ^= std::hash<T>{}(v)+0x9e3779b9 + (seed << 6) + (seed >> 2);
+	(hash_combine(seed, rest), ...);
+}
 
 template<>
 struct std::hash<FVector> {
 	std::size_t operator()(const FVector& t) const {
-		std::size_t seed = 0;
-		seed ^= std::hash<FLOAT>()(t.X) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FLOAT>()(t.Y) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FLOAT>()(t.Z) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		return seed;
+		std::size_t hash = 0;
+		hash_combine(hash, t.X, t.Y, t.Z);
+		return hash;
+	}
+};
+
+template<>
+struct std::hash<FRotator> {
+	std::size_t operator()(const FRotator& t) const {
+		std::size_t hash = 0;
+		hash_combine(hash, t.Roll, t.Pitch, t.Yaw);
+		return hash;
 	}
 };
 
 template<>
 struct std::hash<FTextureInfo> {
 	std::size_t operator()(const FTextureInfo& t) const {
-		std::size_t seed = 0;
-		seed ^= std::hash<UTexture*>()(t.Texture) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.LOD) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FMipmapBase*>()(t.Mips[0]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.NumMips) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FVector>()(t.Pan) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<QWORD>()(t.CacheID) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<QWORD>()(t.PaletteCacheID) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.UClamp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.USize) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FLOAT>()(t.UScale) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.VClamp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<INT>()(t.VSize) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		seed ^= std::hash<FLOAT>()(t.VScale) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		return seed;
+		std::size_t hash = 0;
+		hash_combine(
+			hash,
+			t.Texture,
+			t.LOD,
+			t.Mips[0],
+			t.NumMips,
+			t.Pan,
+			t.CacheID,
+			t.PaletteCacheID,
+			t.UClamp,
+			t.USize,
+			t.UScale,
+			t.VClamp,
+			t.VSize,
+			t.VScale
+		);
+		return hash;
 	}
 };
 
@@ -904,12 +920,14 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	INT NumAASamples;
 	UBOOL NoAATiles;
 
-	FColor SurfaceSelectionColor;
+	UBOOL EnableSkyBoxAnchors;
 
 	UBOOL ZRangeHack;
 	bool m_useZRangeHack;
 	bool m_nearZRangeHackProjectionActive;
 	bool m_requestNearZRangeHackProjection;
+
+	FColor SurfaceSelectionColor;
 
 	UBOOL BufferActorTris;
 	UBOOL BufferClippedActorTris;
@@ -1376,6 +1394,8 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void renderMover(FSceneNode* frame, AMover* mover);
 	// Updates and sends the given lights to dx
 	void renderLights(std::vector<AActor*> lightActors);
+	// Renders a magic shape for anchoring stuff to the sky box
+	void renderSkyZoneAnchor(ASkyZoneInfo* zone);
 
 	void ClearZ(FSceneNode* Frame);
 	void PushHit(const BYTE* Data, INT Count);

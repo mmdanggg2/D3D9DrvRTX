@@ -333,7 +333,8 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(1,  TEXT("UseSoftwareVertexProcessing"), CPP_PROPERTY_LOCAL(UseSoftwareVertexProcessing), 0);
 	SC_AddBoolConfigParam(0,  TEXT("UseAA"), CPP_PROPERTY_LOCAL(UseAA), 0);
 	SC_AddIntConfigParam(TEXT("NumAASamples"), CPP_PROPERTY_LOCAL(NumAASamples), 4);
-	SC_AddBoolConfigParam(1,  TEXT("NoAATiles"), CPP_PROPERTY_LOCAL(NoAATiles), 1);
+	SC_AddBoolConfigParam(2,  TEXT("NoAATiles"), CPP_PROPERTY_LOCAL(NoAATiles), 1);
+	SC_AddBoolConfigParam(1, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 1);
 	SC_AddBoolConfigParam(0,  TEXT("ZRangeHack"), CPP_PROPERTY_LOCAL(ZRangeHack), UTGLR_DEFAULT_ZRangeHack);
 
 	SurfaceSelectionColor = FColor(0, 0, 31, 31);
@@ -4926,7 +4927,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		}
 	}
 
-	D3DMATRIX d3dMatrix = reinterpret_cast<D3DMATRIX&>(actorMatrix);
+	D3DMATRIX d3dMatrix = ToD3DMATRIX(actorMatrix);
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &d3dMatrix);
 
 	bool isViewModel = GUglyHackFlags & 0x1;
@@ -5152,6 +5153,99 @@ void UD3D9RenderDevice::renderLights(std::vector<AActor*> lightActors) {
 	}
 
 	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, FALSE);
+	unguard;
+}
+
+// Helper function to convert a hash to a float in the range [-1, 1]
+static inline float hashToFloat(size_t hash, size_t max_value) {
+	return (static_cast<float>(hash % (2 * max_value)) / static_cast<float>(max_value)) - 1.0f;
+}
+
+static FVector hashToNormalVector(size_t hash) {
+	size_t max_value = std::numeric_limits<size_t>::max();
+
+	FVector norm;
+	norm.X = hashToFloat(hash & 0xFFF, max_value); // Use the lower 12 bits
+	norm.Y = hashToFloat((hash >> 12) & 0xFFF, max_value); // Use the next 12 bits
+	norm.Z = hashToFloat((hash >> 24) & 0xFF, max_value); // Use the remaining 8 bits
+
+	norm.Normalize();
+
+	return norm;
+}
+
+void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone) {
+	guard(UD3D9RenderDevice::renderSkyZoneAnchor);
+	using namespace DirectX;
+
+	if (!EnableSkyBoxAnchors) {
+		return;
+	}
+
+	XMMATRIX actorMatrix = XMMatrixIdentity();
+
+	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(zone->Location));
+	XMMATRIX matRot = FRotToDXRotMat(zone->Rotation);
+	actorMatrix *= matRot;
+	actorMatrix *= matLoc;
+
+	D3DMATRIX d3dMatrix = ToD3DMATRIX(actorMatrix);
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &d3dMatrix);
+
+	size_t locHash = std::hash<FVector>()(zone->Location);
+	size_t rotHash = std::hash<FRotator>()(zone->RotationRate);
+
+	UTexture* tex = zone->Level->DefaultTexture;
+	FTextureInfo texInfo;
+	tex->Lock(texInfo, 0.0, -1, this);
+
+	FTransTexture v1{};
+	v1.Point = FVector(0, 0, 5) + hashToNormalVector(locHash);
+	v1.U = 0.5 * texInfo.USize;
+	v1.V = 1.0 * texInfo.VSize;
+	FTransTexture v2{};
+	v2.Point = FVector(5, 0, 0);
+	v2.U = 0.5 * texInfo.USize;
+	v2.V = 0.25 * texInfo.VSize;
+	FTransTexture v3{};
+	v3.Point = FVector(0, 5, 0) + hashToNormalVector(rotHash);
+	v3.U = 1.0 * texInfo.USize;
+	v3.V = 0.0 * texInfo.VSize;
+	FTransTexture v4{};
+	v4.Point = FVector(0, -5, 0);
+	v4.U = 0.0 * texInfo.USize;
+	v4.V = 0.0 * texInfo.VSize;
+
+	std::vector<FTransTexture> verts;
+	verts.push_back(v1);
+	verts.push_back(v2);
+	verts.push_back(v3);
+
+	verts.push_back(v1);
+	verts.push_back(v4);
+	verts.push_back(v2);
+
+	verts.push_back(v2);
+	verts.push_back(v4);
+	verts.push_back(v3);
+
+	DWORD polyFlags = PF_Occlude;
+
+	m_csPtCount = BufferTriangleSurfaceGeometry(verts);
+
+	//Initialize render passes state information
+	m_rpPassCount = 0;
+	m_rpTMUnits = TMUnits;
+	m_rpForceSingle = false;
+	m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
+	m_rpColor = 0xFFFFFFFF;
+
+	AddRenderPass(&texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
+
+	RenderPasses();
+
+	tex->Unlock(texInfo);
+
 	unguard;
 }
 
