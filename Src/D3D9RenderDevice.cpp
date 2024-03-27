@@ -315,8 +315,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(7,  TEXT("ColorizeDetailTextures"), CPP_PROPERTY_LOCAL(ColorizeDetailTextures), 0);
 	SC_AddBoolConfigParam(6,  TEXT("SinglePassFog"), CPP_PROPERTY_LOCAL(SinglePassFog), 1);
 	SC_AddBoolConfigParam(5,  TEXT("SinglePassDetail"), CPP_PROPERTY_LOCAL_DCV(SinglePassDetail), 0);
-	SC_AddBoolConfigParam(4,  TEXT("UseSSE"), CPP_PROPERTY_LOCAL(UseSSE), 1);
-	SC_AddBoolConfigParam(3,  TEXT("UseSSE2"), CPP_PROPERTY_LOCAL(UseSSE2), 1);
 	SC_AddBoolConfigParam(2,  TEXT("UseTexIdPool"), CPP_PROPERTY_LOCAL(UseTexIdPool), 1);
 	SC_AddBoolConfigParam(1,  TEXT("UseTexPool"), CPP_PROPERTY_LOCAL(UseTexPool), 1);
 	SC_AddIntConfigParam(TEXT("DynamicTexIdRecycleLevel"), CPP_PROPERTY_LOCAL(DynamicTexIdRecycleLevel), 100);
@@ -434,115 +432,6 @@ void UD3D9RenderDevice::DbgPrintInitParam(const TCHAR *pName, FLOAT value) {
 }
 
 
-#ifdef UTGLR_INCLUDE_SSE_CODE
-bool UD3D9RenderDevice::CPU_DetectCPUID(void) {
-	//Check for cpuid instruction support
-	__try {
-		__asm {
-			//CPUID function 0
-			xor eax, eax
-			cpuid
-		}
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER) {
-		return false;
-	}
-
-	return true;
-}
-
-bool UD3D9RenderDevice::CPU_DetectSSE(void) {
-	bool bSupportsSSE;
-
-	//Check for cpuid instruction support
-	if (CPU_DetectCPUID() != true) {
-		return false;
-	}
-
-	//Check for SSE support
-	bSupportsSSE = false;
-	__asm {
-		//CPUID function 1
-		mov eax, 1
-		cpuid
-
-		//Check the SSE bit
-		test edx, 0x02000000
-		jz l_no_sse
-
-		//Set bSupportsSSE to true
-		mov bSupportsSSE, 1
-
-l_no_sse:
-	}
-
-	//Return if no CPU SSE support
-	if (bSupportsSSE == false) {
-		return bSupportsSSE;
-	}
-
-	//Check for SSE OS support
-	__try {
-		__asm {
-			//Execute SSE instruction
-			xorps xmm0, xmm0
-		}
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER) {
-		//Clear SSE support flag
-		bSupportsSSE = false;
-	}
-
-	return bSupportsSSE;
-}
-
-bool UD3D9RenderDevice::CPU_DetectSSE2(void) {
-	bool bSupportsSSE2;
-
-	//Check for cpuid instruction support
-	if (CPU_DetectCPUID() != true) {
-		return false;
-	}
-
-	//Check for SSE2 support
-	bSupportsSSE2 = false;
-	__asm {
-		//CPUID function 1
-		mov eax, 1
-		cpuid
-
-		//Check the SSE2 bit
-		test edx, 0x04000000
-		jz l_no_sse2
-
-		//Set bSupportsSSE2 to true
-		mov bSupportsSSE2, 1
-
-l_no_sse2:
-	}
-
-	//Return if no CPU SSE2 support
-	if (bSupportsSSE2 == false) {
-		return bSupportsSSE2;
-	}
-
-	//Check for SSE2 OS support
-	__try {
-		__asm {
-			//Execute SSE2 instruction
-			xorpd xmm0, xmm0
-		}
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER) {
-		//Clear SSE2 support flag
-		bSupportsSSE2 = false;
-	}
-
-	return bSupportsSSE2;
-}
-#endif //UTGLR_INCLUDE_SSE_CODE
-
-
 void UD3D9RenderDevice::InitFrameRateLimitTimerSafe(void) {
 	//Only initialize once
 	if (m_frameRateLimitTimerInitialized) {
@@ -653,163 +542,6 @@ static void FASTCALL Buffer3ColoredVerts(UD3D9RenderDevice *pRD, FTransTexture**
 	}
 }
 
-#ifdef UTGLR_INCLUDE_SSE_CODE
-__declspec(naked) static void FASTCALL Buffer3ColoredVerts_SSE(UD3D9RenderDevice *pRD, FTransTexture** Pts) {
-	static float f255 = 255.0f;
-	__asm {
-		//pRD is in ecx
-		//Pts is in edx
-
-		push ebx
-		push esi
-		push edi
-
-		mov eax, [ecx]UD3D9RenderDevice.m_bufferedVerts
-
-		lea ebx, [eax*8]
-		add ebx, [ecx]UD3D9RenderDevice.m_pTexCoordArray[0]
-
-		mov edi, eax
-		shl edi, 4
-		add edi, [ecx]UD3D9RenderDevice.m_pVertexColorArray
-
-		//m_bufferedVerts += 3
-		add eax, 3
-		mov [ecx]UD3D9RenderDevice.m_bufferedVerts, eax
-
-		lea eax, [ecx]UD3D9RenderDevice.TexInfo
-		movss xmm0, [eax]FTexInfo.UMult
-		movss xmm1, [eax]FTexInfo.VMult
-		movss xmm2, f255
-
-		//Pts in edx
-		//Get PtsPlus12B
-		lea esi, [edx + 12]
-
-v_loop:
-			mov eax, [edx]
-			add edx, 4
-
-			movss xmm3, [eax]FTransTexture.U
-			mulss xmm3, xmm0
-			movss [ebx]FGLTexCoord.u, xmm3
-			movss xmm3, [eax]FTransTexture.V
-			mulss xmm3, xmm1
-			movss [ebx]FGLTexCoord.v, xmm3
-			add ebx, TYPE FGLTexCoord
-
-			mov ecx, [eax]FOutVector.Point.X
-			mov [edi]FGLVertexColor.x, ecx
-			mov ecx, [eax]FOutVector.Point.Y
-			mov [edi]FGLVertexColor.y, ecx
-			mov ecx, [eax]FOutVector.Point.Z
-			mov [edi]FGLVertexColor.z, ecx
-
-			movss xmm3, [eax]FTransSample.Light + 0
-			mulss xmm3, xmm2
-			movss xmm4, [eax]FTransSample.Light + 4
-			mulss xmm4, xmm2
-			movss xmm5, [eax]FTransSample.Light + 8
-			mulss xmm5, xmm2
-			cvtss2si eax, xmm3
-			shl eax, 16
-			cvtss2si ecx, xmm4
-			and ecx, 255
-			shl ecx, 8
-			or eax, ecx
-			cvtss2si ecx, xmm5
-			and ecx, 255
-			or ecx, 0xFF000000
-			or eax, ecx
-			mov [edi]FGLVertexColor.color, eax
-			add edi, TYPE FGLVertexColor
-
-			cmp edx, esi
-			jne v_loop
-
-		pop edi
-		pop esi
-		pop ebx
-
-		ret
-	}
-}
-
-__declspec(naked) static void FASTCALL Buffer3ColoredVerts_SSE2(UD3D9RenderDevice *pRD, FTransTexture** Pts) {
-	static __m128 fColorMul = { 255.0f, 255.0f, 255.0f, 0.0f };
-	static DWORD alphaOr = 0xFF000000;
-	__asm {
-		//pRD is in ecx
-		//Pts is in edx
-
-		push ebx
-		push esi
-		push edi
-
-		mov eax, [ecx]UD3D9RenderDevice.m_bufferedVerts
-
-		lea ebx, [eax*8]
-		add ebx, [ecx]UD3D9RenderDevice.m_pTexCoordArray[0]
-
-		mov edi, eax
-		shl edi, 4
-		add edi, [ecx]UD3D9RenderDevice.m_pVertexColorArray
-
-		//m_bufferedVerts += 3
-		add eax, 3
-		mov [ecx]UD3D9RenderDevice.m_bufferedVerts, eax
-
-		lea eax, [ecx]UD3D9RenderDevice.TexInfo
-		movss xmm0, [eax]FTexInfo.UMult
-		movss xmm1, [eax]FTexInfo.VMult
-		movaps xmm2, fColorMul
-		movd xmm3, alphaOr
-
-		//Pts in edx
-		//Get PtsPlus12B
-		lea esi, [edx + 12]
-
-v_loop:
-			mov eax, [edx]
-			add edx, 4
-
-			movss xmm4, [eax]FTransTexture.U
-			mulss xmm4, xmm0
-			movss [ebx]FGLTexCoord.u, xmm4
-			movss xmm4, [eax]FTransTexture.V
-			mulss xmm4, xmm1
-			movss [ebx]FGLTexCoord.v, xmm4
-			add ebx, TYPE FGLTexCoord
-
-			mov ecx, [eax]FOutVector.Point.X
-			mov [edi]FGLVertexColor.x, ecx
-			mov ecx, [eax]FOutVector.Point.Y
-			mov [edi]FGLVertexColor.y, ecx
-			mov ecx, [eax]FOutVector.Point.Z
-			mov [edi]FGLVertexColor.z, ecx
-
-			movups xmm4, [eax]FTransSample.Light
-			shufps xmm4, xmm4, 0xC6
-			mulps xmm4, xmm2
-			cvtps2dq xmm4, xmm4
-			packssdw xmm4, xmm4
-			packuswb xmm4, xmm4
-			por xmm4, xmm3
-			movd [edi]FGLVertexColor.color, xmm4
-			add edi, TYPE FGLVertexColor
-
-			cmp edx, esi
-			jne v_loop
-
-		pop edi
-		pop esi
-		pop ebx
-
-		ret
-	}
-}
-#endif
-
 static void FASTCALL Buffer3FoggedVerts(UD3D9RenderDevice *pRD, FTransTexture** Pts) {
 	FGLTexCoord *pTexCoordArray = &pRD->m_pTexCoordArray[0][pRD->m_bufferedVerts];
 	FGLVertexColor *pVertexColorArray = &pRD->m_pVertexColorArray[pRD->m_bufferedVerts];
@@ -833,218 +565,6 @@ static void FASTCALL Buffer3FoggedVerts(UD3D9RenderDevice *pRD, FTransTexture** 
 		pSecondaryColorArray++;
 	}
 }
-
-#ifdef UTGLR_INCLUDE_SSE_CODE
-__declspec(naked) static void FASTCALL Buffer3FoggedVerts_SSE(UD3D9RenderDevice *pRD, FTransTexture** Pts) {
-	static float f255 = 255.0f;
-	static float f1 = 1.0f;
-	__asm {
-		//pRD is in ecx
-		//Pts is in edx
-
-		push ebx
-		push esi
-		push edi
-		push ebp
-		sub esp, 4
-
-		mov eax, [ecx]UD3D9RenderDevice.m_bufferedVerts
-
-		lea ebx, [eax*8]
-		add ebx, [ecx]UD3D9RenderDevice.m_pTexCoordArray[0]
-
-		mov edi, eax
-		shl edi, 4
-		add edi, [ecx]UD3D9RenderDevice.m_pVertexColorArray
-
-		lea esi, [eax*4]
-		add esi, [ecx]UD3D9RenderDevice.m_pSecondaryColorArray
-
-		//m_bufferedVerts += 3
-		add eax, 3
-		mov [ecx]UD3D9RenderDevice.m_bufferedVerts, eax
-
-		lea eax, [ecx]UD3D9RenderDevice.TexInfo
-		movss xmm0, [eax]FTexInfo.UMult
-		movss xmm1, [eax]FTexInfo.VMult
-		movss xmm2, f255
-
-		//Pts in edx
-		//Get PtsPlus12B
-		lea ebp, [edx + 12]
-
-v_loop:
-			mov eax, [edx]
-			add edx, 4
-
-			movss xmm3, [eax]FTransTexture.U
-			mulss xmm3, xmm0
-			movss [ebx]FGLTexCoord.u, xmm3
-			movss xmm3, [eax]FTransTexture.V
-			mulss xmm3, xmm1
-			movss [ebx]FGLTexCoord.v, xmm3
-			add ebx, TYPE FGLTexCoord
-
-			mov [esp], ebx
-
-			movss xmm6, f1
-			subss xmm6, [eax]FTransSample.Fog + 12
-			mulss xmm6, xmm2
-
-			mov ecx, [eax]FOutVector.Point.X
-			mov [edi]FGLVertexColor.x, ecx
-			mov ecx, [eax]FOutVector.Point.Y
-			mov [edi]FGLVertexColor.y, ecx
-			mov ecx, [eax]FOutVector.Point.Z
-			mov [edi]FGLVertexColor.z, ecx
-
-			movss xmm3, [eax]FTransSample.Light + 0
-			mulss xmm3, xmm6
-			movss xmm4, [eax]FTransSample.Light + 4
-			mulss xmm4, xmm6
-			movss xmm5, [eax]FTransSample.Light + 8
-			mulss xmm5, xmm6
-			cvtss2si ebx, xmm3
-			shl ebx, 16
-			cvtss2si ecx, xmm4
-			and ecx, 255
-			shl ecx, 8
-			or ebx, ecx
-			cvtss2si ecx, xmm5
-			and ecx, 255
-			or ecx, 0xFF000000
-			or ebx, ecx
-			mov [edi]FGLVertexColor.color, ebx
-			add edi, TYPE FGLVertexColor
-
-			mov ebx, [esp]
-
-			movss xmm3, [eax]FTransSample.Fog + 0
-			mulss xmm3, xmm2
-			movss xmm4, [eax]FTransSample.Fog + 4
-			mulss xmm4, xmm2
-			movss xmm5, [eax]FTransSample.Fog + 8
-			mulss xmm5, xmm2
-			cvtss2si eax, xmm3
-			and eax, 255
-			shl eax, 16
-			cvtss2si ecx, xmm4
-			and ecx, 255
-			shl ecx, 8
-			or eax, ecx
-			cvtss2si ecx, xmm5
-			and ecx, 255
-			or eax, ecx
-			mov [esi]FGLSecondaryColor.specular, eax
-			add esi, TYPE FGLSecondaryColor
-
-			cmp edx, ebp
-			jne v_loop
-
-		add esp, 4
-		pop ebp
-		pop edi
-		pop esi
-		pop ebx
-
-		ret
-	}
-}
-
-__declspec(naked) static void FASTCALL Buffer3FoggedVerts_SSE2(UD3D9RenderDevice *pRD, FTransTexture** Pts) {
-	static __m128 fColorMul = { 255.0f, 255.0f, 255.0f, 0.0f };
-	static DWORD alphaOr = 0xFF000000;
-	static float f1 = 1.0f;
-	__asm {
-		//pRD is in ecx
-		//Pts is in edx
-
-		push ebx
-		push esi
-		push edi
-		push ebp
-
-		mov eax, [ecx]UD3D9RenderDevice.m_bufferedVerts
-
-		lea ebx, [eax*8]
-		add ebx, [ecx]UD3D9RenderDevice.m_pTexCoordArray[0]
-
-		mov edi, eax
-		shl edi, 4
-		add edi, [ecx]UD3D9RenderDevice.m_pVertexColorArray
-
-		lea esi, [eax*4]
-		add esi, [ecx]UD3D9RenderDevice.m_pSecondaryColorArray
-
-		//m_bufferedVerts += 3
-		add eax, 3
-		mov [ecx]UD3D9RenderDevice.m_bufferedVerts, eax
-
-		lea eax, [ecx]UD3D9RenderDevice.TexInfo
-		movss xmm0, [eax]FTexInfo.UMult
-		movss xmm1, [eax]FTexInfo.VMult
-		movaps xmm2, fColorMul
-		movd xmm3, alphaOr
-
-		//Pts in edx
-		//Get PtsPlus12B
-		lea ebp, [edx + 12]
-
-v_loop:
-			mov eax, [edx]
-			add edx, 4
-
-			movss xmm4, [eax]FTransTexture.U
-			mulss xmm4, xmm0
-			movss [ebx]FGLTexCoord.u, xmm4
-			movss xmm4, [eax]FTransTexture.V
-			mulss xmm4, xmm1
-			movss [ebx]FGLTexCoord.v, xmm4
-			add ebx, TYPE FGLTexCoord
-
-			movss xmm6, f1
-			subss xmm6, [eax]FTransSample.Fog + 12
-			mulss xmm6, xmm2
-			shufps xmm6, xmm6, 0x00
-
-			mov ecx, [eax]FOutVector.Point.X
-			mov [edi]FGLVertexColor.x, ecx
-			mov ecx, [eax]FOutVector.Point.Y
-			mov [edi]FGLVertexColor.y, ecx
-			mov ecx, [eax]FOutVector.Point.Z
-			mov [edi]FGLVertexColor.z, ecx
-
-			movups xmm4, [eax]FTransSample.Light
-			shufps xmm4, xmm4, 0xC6
-			mulps xmm4, xmm6
-			cvtps2dq xmm4, xmm4
-			packssdw xmm4, xmm4
-			packuswb xmm4, xmm4
-			por xmm4, xmm3
-			movd [edi]FGLVertexColor.color, xmm4
-			add edi, TYPE FGLVertexColor
-
-			movups xmm4, [eax]FTransSample.Fog
-			shufps xmm4, xmm4, 0xC6
-			mulps xmm4, xmm2
-			cvtps2dq xmm4, xmm4
-			packssdw xmm4, xmm4
-			packuswb xmm4, xmm4
-			movd [esi]FGLSecondaryColor.specular, xmm4
-			add esi, TYPE FGLSecondaryColor
-
-			cmp edx, ebp
-			jne v_loop
-
-		pop ebp
-		pop edi
-		pop esi
-		pop ebx
-
-		ret
-	}
-}
-#endif
 
 //Must be called with (NumPts > 3)
 void UD3D9RenderDevice::BufferAdditionalClippedVerts(FTransTexture** Pts, INT NumPts) {
@@ -1697,8 +1217,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_DCV(SinglePassDetail);
 //		UTGLR_DEBUG_SHOW_PARAM_REG(BufferActorTris);
 //		UTGLR_DEBUG_SHOW_PARAM_REG(BufferClippedActorTris);
-		UTGLR_DEBUG_SHOW_PARAM_REG(UseSSE);
-		UTGLR_DEBUG_SHOW_PARAM_REG(UseSSE2);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTexIdPool);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTexPool);
 		UTGLR_DEBUG_SHOW_PARAM_REG(DynamicTexIdRecycleLevel);
@@ -1721,25 +1239,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		#undef UTGLR_DEBUG_SHOW_PARAM_REG
 		#undef UTGLR_DEBUG_SHOW_PARAM_DCV
 	}
-
-
-#ifdef UTGLR_INCLUDE_SSE_CODE
-	if (UseSSE) {
-		if (!CPU_DetectSSE()) {
-			UseSSE = 0;
-		}
-	}
-	if (UseSSE2) {
-		if (!CPU_DetectSSE2()) {
-			UseSSE2 = 0;
-		}
-	}
-#else
-	UseSSE = 0;
-	UseSSE2 = 0;
-#endif
-	if (DebugBit(DEBUG_BIT_BASIC)) dout << TEXT("utd3d9r: UseSSE = ") << UseSSE << std::endl;
-	if (DebugBit(DEBUG_BIT_BASIC)) dout << TEXT("utd3d9r: UseSSE2 = ") << UseSSE2 << std::endl;
 
 	SetGamma(Viewport->GetOuterUClient()->Brightness);
 
@@ -1956,8 +1455,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	PL_LODBias = LODBias;
 	PL_UseDetailAlpha = UseDetailAlpha;
 	PL_SinglePassDetail = SinglePassDetail;
-	PL_UseSSE = UseSSE;
-	PL_UseSSE2 = UseSSE2;
 
 
 	//Reset current frame count
@@ -2681,48 +2178,10 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 	}
 
 
-	if (UseSSE != PL_UseSSE) {
-#ifdef UTGLR_INCLUDE_SSE_CODE
-		if (UseSSE) {
-			if (!CPU_DetectSSE()) {
-				UseSSE = 0;
-			}
-		}
-#else
-		UseSSE = 0;
-#endif
-		PL_UseSSE = UseSSE;
-	}
-	if (UseSSE2 != PL_UseSSE2) {
-#ifdef UTGLR_INCLUDE_SSE_CODE
-		if (UseSSE2) {
-			if (!CPU_DetectSSE2()) {
-				UseSSE2 = 0;
-			}
-		}
-#else
-		UseSSE2 = 0;
-#endif
-		PL_UseSSE2 = UseSSE2;
-	}
-
-
 	//Initialize buffer verts proc pointers
 	m_pBuffer3BasicVertsProc = Buffer3BasicVerts;
 	m_pBuffer3ColoredVertsProc = Buffer3ColoredVerts;
 	m_pBuffer3FoggedVertsProc = Buffer3FoggedVerts;
-
-#ifdef UTGLR_INCLUDE_SSE_CODE
-	//Initialize SSE buffer verts proc pointers
-	if (UseSSE) {
-		m_pBuffer3ColoredVertsProc = Buffer3ColoredVerts_SSE;
-		m_pBuffer3FoggedVertsProc = Buffer3FoggedVerts_SSE;
-	}
-	if (UseSSE2) {
-		m_pBuffer3ColoredVertsProc = Buffer3ColoredVerts_SSE2;
-		m_pBuffer3FoggedVertsProc = Buffer3FoggedVerts_SSE2;
-	}
-#endif //UTGLR_INCLUDE_SSE_CODE
 
 	m_pBuffer3VertsProc = NULL;
 
@@ -3979,56 +3438,18 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 		DWORD tileColor;
 		tileColor = 0xFFFFFFFF;
 		if (!(PolyFlags & PF_Modulated)) {
-			if (UseSSE2) {
-#ifdef UTGLR_INCLUDE_SSE_CODE
-				static __m128 fColorMul = { 255.0f, 255.0f, 255.0f, 0.0f };
-				__m128 fColorMulReg;
-				__m128 fColor;
-				__m128 fAlpha;
-				__m128i iColor;
-
-				fColorMulReg = fColorMul;
-				fColor = _mm_loadu_ps(&Color.X);
-				fColor = _mm_mul_ps(fColor, fColorMulReg);
-
-				//RGBA to BGRA
-				fColor = _mm_shuffle_ps(fColor, fColor,  _MM_SHUFFLE(3, 0, 1, 2));
-
-				fAlpha = _mm_setzero_ps();
-				fAlpha = _mm_move_ss(fAlpha, fColorMulReg);
 #if UTGLR_USES_ALPHABLEND
-				if (PolyFlags & PF_AlphaBlend) {
-					if (Info.Texture->Alpha > 0.f)
-						fAlpha = _mm_mul_ss(fAlpha, _mm_load_ss(&Info.Texture->Alpha));
-					else
-						fAlpha = _mm_mul_ss(fAlpha, _mm_load_ss(&Color.W));
-				}
-#endif
-				fAlpha = _mm_shuffle_ps(fAlpha, fAlpha,  _MM_SHUFFLE(0, 1, 1, 1));
-
-				fColor = _mm_or_ps(fColor, fAlpha);
-
-				iColor = _mm_cvtps_epi32(fColor);
-				iColor = _mm_packs_epi32(iColor, iColor);
-				iColor = _mm_packus_epi16(iColor, iColor);
-
-				tileColor = _mm_cvtsi128_si32(iColor);
-#endif
+			if (PolyFlags & PF_AlphaBlend) {
+				if (Info.Texture->Alpha > 0.f)
+					Color.W = Info.Texture->Alpha;
+				tileColor = FPlaneTo_BGRAClamped(&Color);
 			}
 			else {
-#if UTGLR_USES_ALPHABLEND
-				if (PolyFlags & PF_AlphaBlend) {
-					if (Info.Texture->Alpha > 0.f)
-						Color.W = Info.Texture->Alpha;
-					tileColor = FPlaneTo_BGRAClamped(&Color);
-				}
-				else {
-					tileColor = FPlaneTo_BGRClamped_A255(&Color);
-				}
-#else
 				tileColor = FPlaneTo_BGRClamped_A255(&Color);
-#endif
 			}
+#else
+			tileColor = FPlaneTo_BGRClamped_A255(&Color);
+#endif
 		}
 
 		//Buffer the tile

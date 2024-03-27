@@ -66,10 +66,6 @@
 
 //Per-game feature switches
 #if defined UNREAL_TOURNAMENT_UTPG
-	//The base game was built on Visual Studio 2019 and GCC 4.8
-	#if _M_IX86 || _M_X64 || i386 || __x86_64__
-		#define UTGLR_X86_SSE2_MINIMUM 1
-	#endif
 	#define UTGLR_USES_SCENENODEHACK 0
 #elif UTGLR_RUNE_BUILD
 	#define UTGLR_USES_SCENENODEHACK 1
@@ -96,40 +92,6 @@ typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
 
 //Use debug D3D9 DLL
 //#define UTD3D9R_USE_DEBUG_D3D9_DLL
-
-
-//Shader assembly code
-//#define UTD3D9R_INCLUDE_SHADER_ASM
-
-#ifdef UTD3D9R_INCLUDE_SHADER_ASM
-#include <d3dx9.h>
-#endif
-
-
-#ifdef WIN32
-
-//Optional ASM code
-#if !BUILD_64
-#define UTGLR_USE_ASM_CODE
-
-//Optional SSE code
-#define UTGLR_INCLUDE_SSE_CODE
-#endif
-
-#endif
-
-#ifdef UTGLR_INCLUDE_SSE_CODE
-#include <xmmintrin.h>
-#include <emmintrin.h>
-#endif
-
-
-//Optional opcode patch code
-//#define UTGLR_INCLUDE_OPCODE_PATCH_CODE
-
-#ifdef UTGLR_INCLUDE_OPCODE_PATCH_CODE
-#include "OpcodePatch.h"
-#endif
 
 
 //Optional fastcall calling convention usage
@@ -464,10 +426,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	DECLARE_CLASS(UD3D9RenderDevice, RENDERDEVICE_SUPER, CLASS_Config)
 #else
 	DECLARE_CLASS(UD3D9RenderDevice, RENDERDEVICE_SUPER, CLASS_Config, D3D9DrvRTX)
-#endif
-
-#ifdef UTD3D9R_INCLUDE_SHADER_ASM
-	void AssembleShader(void);
 #endif
 
 	//Debug bits
@@ -896,8 +854,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	UBOOL ColorizeDetailTextures;
 	UBOOL SinglePassFog;
 	UBOOL SinglePassDetail;
-	UBOOL UseSSE;
-	UBOOL UseSSE2;
 	UBOOL UseTexIdPool;
 	UBOOL UseTexPool;
 	INT DynamicTexIdRecycleLevel;
@@ -981,8 +937,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	FLOAT PL_LODBias;
 	UBOOL PL_UseDetailAlpha;
 	UBOOL PL_SinglePassDetail;
-	UBOOL PL_UseSSE;
-	UBOOL PL_UseSSE2;
 
 	bool m_setGammaRampSucceeded;
 	FLOAT SavedGammaCorrection;
@@ -1104,26 +1058,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		return (a << 24) | (r << 16) | (g << 8) | b;
 	}
 
-
-#if defined WIN32 && defined UTGLR_USE_ASM_CODE
-	static inline DWORD FPlaneTo_BGR_A255(const FPlane *pPlane) {
-		static FLOAT f255 = 255.0f;
-		INT iR, iG, iB;
-		__asm {
-			mov eax, pPlane
-			fld [eax]FVector.X
-			fmul [f255]
-			fistp [iR]
-			fld [eax]FVector.Y
-			fmul [f255]
-			fistp [iG]
-			fld [eax]FVector.Z
-			fmul [f255]
-			fistp [iB]
-		}
-		return BGRA_MAKE(iB, iG, iR, 255);
-	}
-#else
 	static inline DWORD FASTCALL FPlaneTo_BGR_A255(const FPlane *pPlane) {
 		return BGRA_MAKE(
 					appRound(pPlane->Z * 255.0f),
@@ -1131,27 +1065,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 					appRound(pPlane->X * 255.0f),
 					255);
 	}
-#endif
 
-#if defined WIN32 && defined UTGLR_USE_ASM_CODE
-	static inline DWORD FPlaneTo_BGRClamped_A255(const FPlane *pPlane) {
-		static FLOAT f255 = 255.0f;
-		INT iR, iG, iB;
-		__asm {
-			mov eax, pPlane
-			fld [eax]FVector.X
-			fmul [f255]
-			fistp [iR]
-			fld [eax]FVector.Y
-			fmul [f255]
-			fistp [iG]
-			fld [eax]FVector.Z
-			fmul [f255]
-			fistp [iB]
-		}
-		return BGRA_MAKE(Clamp(iB, 0, 255), Clamp(iG, 0, 255), Clamp(iR, 0, 255), 255);
-	}
-#else
 	static inline DWORD FASTCALL FPlaneTo_BGRClamped_A255(const FPlane *pPlane) {
 		return BGRA_MAKE(
 					Clamp(appRound(pPlane->Z * 255.0f), 0, 255),
@@ -1159,27 +1073,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 					Clamp(appRound(pPlane->X * 255.0f), 0, 255),
 					255);
 	}
-#endif
 
-#if defined WIN32 && defined UTGLR_USE_ASM_CODE
-	static inline DWORD FPlaneTo_BGR_A0(const FPlane *pPlane) {
-		static FLOAT f255 = 255.0f;
-		INT iR, iG, iB;
-		__asm {
-			mov eax, pPlane
-			fld [eax]FVector.X
-			fmul [f255]
-			fistp [iR]
-			fld [eax]FVector.Y
-			fmul [f255]
-			fistp [iG]
-			fld [eax]FVector.Z
-			fmul [f255]
-			fistp [iB]
-		}
-		return BGRA_MAKE(iB, iG, iR, 0);
-	}
-#else
 	static inline DWORD FASTCALL FPlaneTo_BGR_A0(const FPlane *pPlane) {
 		return BGRA_MAKE(
 					appRound(pPlane->Z * 255.0f),
@@ -1187,27 +1081,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 					appRound(pPlane->X * 255.0f),
 					0);
 	}
-#endif
 
-#if defined WIN32 && defined UTGLR_USE_ASM_CODE
-	static inline DWORD FPlaneTo_BGR_Aub(const FPlane *pPlane, BYTE alpha) {
-		static FLOAT f255 = 255.0f;
-		INT iR, iG, iB;
-		__asm {
-			mov eax, pPlane
-			fld [eax]FVector.X
-			fmul [f255]
-			fistp [iR]
-			fld [eax]FVector.Y
-			fmul [f255]
-			fistp [iG]
-			fld [eax]FVector.Z
-			fmul [f255]
-			fistp [iB]
-		}
-		return BGRA_MAKE(iB, iG, iR, alpha);
-	}
-#else
 	static inline DWORD FASTCALL FPlaneTo_BGR_Aub(const FPlane *pPlane, BYTE alpha) {
 		return BGRA_MAKE(
 					appRound(pPlane->Z * 255.0f),
@@ -1215,30 +1089,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 					appRound(pPlane->X * 255.0f),
 					alpha);
 	}
-#endif
 
-#if defined WIN32 && defined UTGLR_USE_ASM_CODE
-	static inline DWORD FPlaneTo_BGRA(const FPlane *pPlane) {
-		static FLOAT f255 = 255.0f;
-		INT iR, iG, iB, iA;
-		__asm {
-			mov eax, pPlane
-			fld [eax]FVector.X
-			fmul [f255]
-			fistp [iR]
-			fld [eax]FVector.Y
-			fmul [f255]
-			fistp [iG]
-			fld [eax]FVector.Z
-			fmul [f255]
-			fistp [iB]
-			fld [eax]FPlane.W
-			fmul [f255]
-			fistp [iA]
-		}
-		return BGRA_MAKE(iB, iG, iR, iA);
-	}
-#else
 	static inline DWORD FASTCALL FPlaneTo_BGRA(const FPlane *pPlane) {
 		return BGRA_MAKE(
 					appRound(pPlane->Z * 255.0f),
@@ -1246,30 +1097,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 					appRound(pPlane->X * 255.0f),
 					appRound(pPlane->W * 255.0f));
 	}
-#endif
 
-#if defined WIN32 && defined UTGLR_USE_ASM_CODE
-	static inline DWORD FPlaneTo_BGRAClamped(const FPlane *pPlane) {
-		static FLOAT f255 = 255.0f;
-		INT iR, iG, iB, iA;
-		__asm {
-			mov eax, pPlane
-			fld [eax]FVector.X
-			fmul [f255]
-			fistp [iR]
-			fld [eax]FVector.Y
-			fmul [f255]
-			fistp [iG]
-			fld [eax]FVector.Z
-			fmul [f255]
-			fistp [iB]
-			fld [eax]FPlane.W
-			fmul [f255]
-			fistp [iA]
-		}
-		return BGRA_MAKE(Clamp(iB, 0, 255), Clamp(iG, 0, 255), Clamp(iR, 0, 255), Clamp(iA, 0, 255));
-	}
-#else
 	static inline DWORD FASTCALL FPlaneTo_BGRAClamped(const FPlane *pPlane) {
 		return BGRA_MAKE(
 					Clamp(appRound(pPlane->Z * 255.0f), 0, 255),
@@ -1277,26 +1105,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 					Clamp(appRound(pPlane->X * 255.0f), 0, 255),
 					Clamp(appRound(pPlane->W * 255.0f), 0, 255));
 	}
-#endif
 
-#if defined WIN32 && defined UTGLR_USE_ASM_CODE
-	static inline DWORD FPlaneTo_BGRScaled_A255(const FPlane *pPlane, FLOAT rgbScale) {
-		INT iR, iG, iB;
-		__asm {
-			mov eax, pPlane
-			fld [eax]FVector.X
-			fmul [rgbScale]
-			fistp [iR]
-			fld [eax]FVector.Y
-			fmul [rgbScale]
-			fistp [iG]
-			fld [eax]FVector.Z
-			fmul [rgbScale]
-			fistp [iB]
-		}
-		return BGRA_MAKE(iB, iG, iR, 255);
-	}
-#else
 	static inline DWORD FASTCALL FPlaneTo_BGRScaled_A255(const FPlane *pPlane, FLOAT rgbScale) {
 		return BGRA_MAKE(
 					appRound(pPlane->Z * rgbScale),
@@ -1304,7 +1113,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 					appRound(pPlane->X * rgbScale),
 					255);
 	}
-#endif
 
 
 	// UObject interface.
@@ -1318,12 +1126,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	void FASTCALL DbgPrintInitParam(const TCHAR *pName, INT value);
 	void FASTCALL DbgPrintInitParam(const TCHAR *pName, FLOAT value);
-
-#ifdef UTGLR_INCLUDE_SSE_CODE
-	static bool CPU_DetectCPUID(void);
-	static bool CPU_DetectSSE(void);
-	static bool CPU_DetectSSE2(void);
-#endif //UTGLR_INCLUDE_SSE_CODE
 
 	void InitFrameRateLimitTimerSafe(void);
 	void ShutdownFrameRateLimitTimer(void);
