@@ -1197,7 +1197,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	// Updates and sends the given lights to dx
 	void renderLights(std::vector<AActor*> lightActors);
 	// Renders a magic shape for anchoring stuff to the sky box
-	void renderSkyZoneAnchor(ASkyZoneInfo* zone);
+	void renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* location);
 
 	void ClearZ(FSceneNode* Frame);
 	void PushHit(const BYTE* Data, INT Count);

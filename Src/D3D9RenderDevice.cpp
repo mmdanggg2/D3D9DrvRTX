@@ -4595,7 +4595,7 @@ static FVector hashToNormalVector(size_t hash) {
 	return norm;
 }
 
-void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone) {
+void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* location) {
 	guard(UD3D9RenderDevice::renderSkyZoneAnchor);
 	using namespace DirectX;
 
@@ -4605,8 +4605,8 @@ void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone) {
 
 	XMMATRIX actorMatrix = XMMatrixIdentity();
 
-	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(zone->Location));
-	XMMATRIX matRot = FRotToDXRotMat(zone->Rotation);
+	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(location ? *location : zone->Location));
+	XMMATRIX matRot = XMMatrixInverse(nullptr, FRotToDXRotMat(zone->Rotation));
 	actorMatrix *= matRot;
 	actorMatrix *= matLoc;
 

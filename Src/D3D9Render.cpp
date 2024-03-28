@@ -300,7 +300,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	}
 
 	for (ASkyZoneInfo* zone : skyZones) {
-		d3d9Dev->renderSkyZoneAnchor(zone);
+		d3d9Dev->renderSkyZoneAnchor(zone, &frame->Coords.Origin);
 	}
 
 	d3d9Dev->renderLights(lightActors);
