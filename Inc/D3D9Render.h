@@ -19,7 +19,7 @@ template <typename T>
 using TexFlagKeyMap = std::unordered_map<TexFlagKey, T, TexFlagKey_Hash>;
 
 class UD3D9Render : public URender {
-#if UTGLR_DX_BUILD || UNREAL_GOLD
+#if DEUS_EX || UNREAL_GOLD
 	DECLARE_CLASS(UD3D9Render, URender, CLASS_Config);
 #else
 	DECLARE_CLASS(UD3D9Render, URender, CLASS_Config, D3D9DrvRTX);

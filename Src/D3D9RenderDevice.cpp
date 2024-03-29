@@ -270,19 +270,19 @@ void UD3D9RenderDevice::StaticConstructor() {
 
 	guard(UD3D9RenderDevice::StaticConstructor);
 
-#ifdef UTGLR_DX_BUILD
+#ifdef DEUS_EX
 	const UBOOL UTGLR_DEFAULT_OneXBlending = 1;
 #else
 	const UBOOL UTGLR_DEFAULT_OneXBlending = 0;
 #endif
 
-#if defined UTGLR_DX_BUILD || defined UTGLR_RUNE_BUILD
+#if defined DEUS_EX || defined UTGLR_RUNE_BUILD
 	const UBOOL UTGLR_DEFAULT_UseS3TC = 0;
 #else
 	const UBOOL UTGLR_DEFAULT_UseS3TC = 1;
 #endif
 
-#if defined UTGLR_DX_BUILD || defined UTGLR_RUNE_BUILD
+#if defined DEUS_EX || defined UTGLR_RUNE_BUILD
 	const UBOOL UTGLR_DEFAULT_ZRangeHack = 0;
 #else
 	const UBOOL UTGLR_DEFAULT_ZRangeHack = 0;
@@ -2432,7 +2432,7 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 	//Check for optional frame rate limit
 #if !UNREAL_TOURNAMENT_OLDUNREAL
 	if (FrameRateLimit >= 20) {
-#if defined UTGLR_DX_BUILD || defined UTGLR_RUNE_BUILD || UNREAL_GOLD
+#if defined DEUS_EX || defined UTGLR_RUNE_BUILD || UNREAL_GOLD
 		FLOAT curFrameTimestamp;
 #else
 		FTime curFrameTimestamp;
@@ -3910,7 +3910,7 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 	unguard;
 }
 
-#if UNREAL_GOLD
+#if UNREAL_GOLD || DEUS_EX
 static UTexture* getTextureWithoutNext(UTexture* texture, DOUBLE time, FLOAT fraction) {
 #else
 static UTexture* getTextureWithoutNext(UTexture* texture, FTime time, FLOAT fraction) {

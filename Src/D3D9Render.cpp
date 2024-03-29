@@ -117,7 +117,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 			FSavedPoly* poly = (FSavedPoly*)New<BYTE>(GDynMem, sizeof(FSavedPoly) + node.NumVertices * sizeof(FTransform*));
 			poly->Next = facet->Polys;
 			facet->Polys = poly;
-#if !(UTGLR_DX_BUILD || UNREAL_GOLD)
+#if !UNREAL_GOLD
 			poly->iNode = iNode;
 #endif
 			poly->NumPts = node.NumVertices;

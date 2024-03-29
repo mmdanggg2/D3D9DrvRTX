@@ -27,7 +27,7 @@
 		#if UNREAL_TOURNAMENT_OLDUNREAL
 			#define UTGLR_USES_ALPHABLEND 1
 		#endif
-#elif defined(UTGLR_DX_BUILD)
+#elif defined(DEUS_EX)
 	#define UTGLR_VALID_BUILD_CONFIG 1
 #elif defined(UTGLR_RUNE_BUILD)
 	#define UTGLR_VALID_BUILD_CONFIG 1
@@ -422,7 +422,7 @@ typedef URenderDevice RENDERDEVICE_SUPER;
 // A D3D9 rendering device attached to a viewport.
 //
 class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
-#if UTGLR_DX_BUILD || UNREAL_GOLD
+#if DEUS_EX || UNREAL_GOLD
 	DECLARE_CLASS(UD3D9RenderDevice, RENDERDEVICE_SUPER, CLASS_Config)
 #else
 	DECLARE_CLASS(UD3D9RenderDevice, RENDERDEVICE_SUPER, CLASS_Config, D3D9DrvRTX)
@@ -860,7 +860,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	UBOOL TexDXT1ToDXT3;
 	INT SwapInterval;
 	INT FrameRateLimit;
-#if defined UTGLR_DX_BUILD || defined UTGLR_RUNE_BUILD || UNREAL_GOLD
+#if defined DEUS_EX || defined UTGLR_RUNE_BUILD || UNREAL_GOLD
 	FLOAT m_prevFrameTimestamp;
 #else
 	FTime m_prevFrameTimestamp;
