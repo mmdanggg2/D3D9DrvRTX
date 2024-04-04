@@ -261,6 +261,7 @@
     <None Include="Config\D3D9DrvRTX.int" />
     <None Include="Config\dxvk.conf" />
     <None Include="Config\rtx.conf" />
+    <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

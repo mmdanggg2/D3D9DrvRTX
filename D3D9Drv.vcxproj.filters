@@ -1,21 +1,64 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="Src\c_gclip.cpp" />
-    <ClCompile Include="Src\D3D9DrvRTX.cpp" />
-    <ClCompile Include="Src\D3D9Render.cpp" />
-    <ClCompile Include="Src\D3D9RenderDevice.cpp" />
-    <ClCompile Include="Src\D3D9DebugUtils.cpp" />
+    <ClCompile Include="Src\c_gclip.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\D3D9DebugUtils.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\D3D9DrvRTX.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\D3D9Render.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\D3D9RenderDevice.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Inc\c_rbtree.h" />
-    <ClInclude Include="Inc\D3D9Render.h" />
-    <ClInclude Include="Inc\D3D9RenderDevice.h" />
-    <ClInclude Include="Inc\D3D9DebugUtils.h" />
-    <ClInclude Include="Inc\c_gclip.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="Inc\c_gclip.h">
+      <Filter>Inc</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\c_rbtree.h">
+      <Filter>Inc</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\D3D9DebugUtils.h">
+      <Filter>Inc</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\D3D9Render.h">
+      <Filter>Inc</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\D3D9RenderDevice.h">
+      <Filter>Inc</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="D3D9DrvRTX.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" />
+    <None Include="Config\dxvk.conf">
+      <Filter>Conf</Filter>
+    </None>
+    <None Include="Config\rtx.conf">
+      <Filter>Conf</Filter>
+    </None>
+    <None Include="Config\D3D9DrvRTX.int">
+      <Filter>Conf</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Src">
+      <UniqueIdentifier>{5cbdc968-d9c4-4f78-a7d6-e90d30286aca}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Inc">
+      <UniqueIdentifier>{dc8edefe-7f62-4ecb-8b59-9ceec5f53e40}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Conf">
+      <UniqueIdentifier>{ce0f73d3-66ca-402d-99ce-eca7486cc528}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>
