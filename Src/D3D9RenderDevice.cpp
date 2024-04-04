@@ -7296,7 +7296,11 @@ void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 	using namespace DirectX;
 
 	// Setup projection and view matrices for current frame
+#if DEUS_EX
+	float aspect = (float)m_SetRes_NewX / (float)m_SetRes_NewY;
+#else
 	float aspect = frame->FX / frame->FY;
+#endif
 	float fov = Viewport->Actor->FovAngle * PI / 180.0f;
 	fov = 2.0 * atan(tan(fov * 0.5) / aspect);
 	D3DMATRIX proj = ToD3DMATRIX(
