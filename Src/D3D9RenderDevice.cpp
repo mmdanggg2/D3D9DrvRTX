@@ -299,8 +299,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(4,  TEXT("UsePrecache"), CPP_PROPERTY_LOCAL(UsePrecache), 0);
 	SC_AddBoolConfigParam(3,  TEXT("UseTrilinear"), CPP_PROPERTY_LOCAL(UseTrilinear), 0);
 	SC_AddBoolConfigParam(2,  TEXT("UseS3TC"), CPP_PROPERTY_LOCAL(UseS3TC), UTGLR_DEFAULT_UseS3TC);
-	SC_AddBoolConfigParam(1,  TEXT("Use16BitTextures"), CPP_PROPERTY_LOCAL(Use16BitTextures), 0);
-	SC_AddBoolConfigParam(0,  TEXT("Use565Textures"), CPP_PROPERTY_LOCAL(Use565Textures), 0);
 	SC_AddIntConfigParam(TEXT("MaxAnisotropy"), CPP_PROPERTY_LOCAL(MaxAnisotropy), 0);
 	SC_AddBoolConfigParam(0,  TEXT("NoFiltering"), CPP_PROPERTY_LOCAL(NoFiltering), 0);
 	SC_AddIntConfigParam(TEXT("MaxTMUnits"), CPP_PROPERTY_LOCAL(MaxTMUnits), 0);
@@ -1096,8 +1094,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTrilinear);
 //		UTGLR_DEBUG_SHOW_PARAM_REG(UseVertexSpecular);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseS3TC);
-		UTGLR_DEBUG_SHOW_PARAM_REG(Use16BitTextures);
-		UTGLR_DEBUG_SHOW_PARAM_REG(Use565Textures);
 		UTGLR_DEBUG_SHOW_PARAM_REG(NoFiltering);
 		UTGLR_DEBUG_SHOW_PARAM_REG(DetailMax);
 //		UTGLR_DEBUG_SHOW_PARAM_REG(UseDetailAlpha);
@@ -1162,25 +1158,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	hResult = m_d3d9->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, 0, D3DRTYPE_TEXTURE, D3DFMT_DXT5);
 	if (FAILED(hResult)) {
 		m_dxt5TextureCap = false;
-	}
-
-	//Set 16-bit texture capability flags
-	m_16BitTextureCap = true;
-	m_565TextureCap = true;
-	//Check RGBA5551
-	hResult = m_d3d9->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, 0, D3DRTYPE_TEXTURE, D3DFMT_A1R5G5B5);
-	if (FAILED(hResult)) {
-		m_16BitTextureCap = false;
-	}
-	//Check RGB555
-	hResult = m_d3d9->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, 0, D3DRTYPE_TEXTURE, D3DFMT_X1R5G5B5);
-	if (FAILED(hResult)) {
-		m_16BitTextureCap = false;
-	}
-	//Check RGB565
-	hResult = m_d3d9->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, 0, D3DRTYPE_TEXTURE, D3DFMT_R5G6B5);
-	if (FAILED(hResult)) {
-		m_565TextureCap = false;
 	}
 
 	//Set alpha texture capability flag
@@ -1334,8 +1311,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	PL_MaxLogTextureSize = MaxLogTextureSize;
 	PL_NoFiltering = NoFiltering;
 	PL_UseTrilinear = UseTrilinear;
-	PL_Use16BitTextures = Use16BitTextures;
-	PL_Use565Textures = Use565Textures;
 	PL_TexDXT1ToDXT3 = TexDXT1ToDXT3;
 	PL_MaxAnisotropy = MaxAnisotropy;
 	PL_SmoothMaskedTextures = SmoothMaskedTextures;
@@ -1435,8 +1410,6 @@ void UD3D9RenderDevice::ConfigValidate_RequiredExtensions(void) {
 	if (!(m_d3dCaps.TextureFilterCaps & D3DPTFILTERCAPS_MINFANISOTROPIC)) MaxAnisotropy = 0;
 	if (!(m_d3dCaps.RasterCaps & D3DPRASTERCAPS_MIPMAPLODBIAS)) LODBias = 0;
 	if (!m_dxt3TextureCap) TexDXT1ToDXT3 = 0;
-	if (!m_16BitTextureCap) Use16BitTextures = 0;
-	if (!m_565TextureCap) Use565Textures = 0;
 
 	if (!(m_d3dCaps.TextureOpCaps & D3DTEXOPCAPS_MODULATEINVALPHA_ADDCOLOR)) SinglePassFog = 0;
 
@@ -1981,14 +1954,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 	}
 	if (UseTrilinear != PL_UseTrilinear) {
 		PL_UseTrilinear = UseTrilinear;
-		flushTextures = true;
-	}
-	if (Use16BitTextures != PL_Use16BitTextures) {
-		PL_Use16BitTextures = Use16BitTextures;
-		flushTextures = true;
-	}
-	if (Use565Textures != PL_Use565Textures) {
-		PL_Use565Textures = Use565Textures;
 		flushTextures = true;
 	}
 	if (TexDXT1ToDXT3 != PL_TexDXT1ToDXT3) {
@@ -3066,13 +3031,6 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 	if ((CacheID & 0xFF) == 0xE0) {
 		//Alter texture cache id if masked texture hack is enabled and texture is masked
 		CacheID |= ((PolyFlags & PF_Masked) ? TEX_CACHE_ID_FLAG_MASKED : 0) & m_maskedTextureHackMask;
-
-		//Check for 16 bit texture option
-		if (Use16BitTextures) {
-			if (Info.Palette && (Info.Palette[128].A == 255)) {
-				CacheID |= TEX_CACHE_ID_FLAG_16BIT;
-			}
-		}
 	}
 
 	//Decide if should request near Z range hack projection
@@ -3263,13 +3221,6 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 		if ((CacheID & 0xFF) == 0xE0) {
 			//Alter texture cache id if masked texture hack is enabled and texture is masked
 			CacheID |= ((PolyFlags & PF_Masked) ? TEX_CACHE_ID_FLAG_MASKED : 0) & m_maskedTextureHackMask;
-
-			//Check for 16 bit texture option
-			if (Use16BitTextures) {
-				if (Info.Palette && (Info.Palette[128].A == 255)) {
-					CacheID |= TEX_CACHE_ID_FLAG_16BIT;
-				}
-			}
 		}
 
 		//Check if need to start new tile buffering
@@ -4927,8 +4878,6 @@ UBOOL UD3D9RenderDevice::SupportsTextureFormat(ETextureFormat Format)
 	case TEXF_BC1:    return SupportsTC && m_dxt1TextureCap;
 	case TEXF_BC2:    return SupportsTC && m_dxt3TextureCap;
 	case TEXF_BC3:    return SupportsTC && m_dxt5TextureCap;
-	//TODO: m_16BitTextureCap
-	case TEXF_R5G6B5: return m_565TextureCap && false; // Renderer is missing code to upload these textures directly.
 	default:          return false;
 	}
 }
@@ -5797,10 +5746,6 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 #endif
 		pBind->texType = TEX_TYPE_HAS_PALETTE;
 		pBind->texFormat = D3DFMT_A8R8G8B8;
-		//Check if texture should be 16-bit
-		if (PolyFlags & PF_Memorized) {
-			pBind->texFormat = (PolyFlags & PF_Masked) ? D3DFMT_A1R5G5B5 : ((Use565Textures) ? D3DFMT_R5G6B5 : D3DFMT_X1R5G5B5);
-		}
 	}
 	else {
 		pBind->texType = TEX_TYPE_NORMAL;

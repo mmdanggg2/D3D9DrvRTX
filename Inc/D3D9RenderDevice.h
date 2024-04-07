@@ -446,8 +446,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	//Texture cache id flags
 	enum {
-		TEX_CACHE_ID_FLAG_MASKED	= 0x1,
-		TEX_CACHE_ID_FLAG_16BIT		= 0x2
+		TEX_CACHE_ID_FLAG_MASKED	= 0x1
 	};
 
 	//Mask for poly flags that impact texture object state
@@ -832,8 +831,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	UBOOL UseTrilinear;
 	UBOOL UseVertexSpecular;
 	UBOOL UseS3TC;
-	UBOOL Use16BitTextures;
-	UBOOL Use565Textures;
 	UBOOL NoFiltering;
 	INT DetailMax;
 	UBOOL UseDetailAlpha;
@@ -915,8 +912,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	INT PL_MaxLogTextureSize;
 	UBOOL PL_NoFiltering;
 	UBOOL PL_UseTrilinear;
-	UBOOL PL_Use16BitTextures;
-	UBOOL PL_Use565Textures;
 	UBOOL PL_TexDXT1ToDXT3;
 	INT PL_MaxAnisotropy;
 	UBOOL PL_SmoothMaskedTextures;
@@ -1023,8 +1018,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	bool m_dxt1TextureCap;
 	bool m_dxt3TextureCap;
 	bool m_dxt5TextureCap;
-	bool m_16BitTextureCap;
-	bool m_565TextureCap;
 	bool m_alphaTextureCap;
 	bool m_supportsAlphaToCoverage;
 
@@ -1214,9 +1207,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		Tex.UPan = Info.Pan.X + (PanBias * Info.UScale);
 		Tex.VPan = Info.Pan.Y + (PanBias * Info.VScale);
 
-		//PF_Memorized used internally to indicate 16-bit texture
-		PolyFlags &= ~PF_Memorized;
-
 		//Load texture cache id
 		CacheID = Info.CacheID;
 
@@ -1224,14 +1214,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		if ((CacheID & 0xFF) == 0xE0) {
 			//Alter texture cache id if masked texture hack is enabled and texture is masked
 			CacheID |= ((PolyFlags & PF_Masked) ? TEX_CACHE_ID_FLAG_MASKED : 0) & m_maskedTextureHackMask;
-
-			//Check for 16 bit texture option
-			if (Use16BitTextures) {
-				if (Info.Palette && (Info.Palette[128].A == 255)) {
-					CacheID |= TEX_CACHE_ID_FLAG_16BIT;
-					PolyFlags |= PF_Memorized;
-				}
-			}
 		}
 
 		//Get dynamic poly flags
@@ -1260,9 +1242,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		Tex.UPan = Info.Pan.X;
 		Tex.VPan = Info.Pan.Y;
 
-		//PF_Memorized used internally to indicate 16-bit texture
-		PolyFlags &= ~PF_Memorized;
-
 		//Load texture cache id
 		CacheID = Info.CacheID;
 
@@ -1270,14 +1249,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		if ((CacheID & 0xFF) == 0xE0) {
 			//Alter texture cache id if masked texture hack is enabled and texture is masked
 			CacheID |= ((PolyFlags & PF_Masked) ? TEX_CACHE_ID_FLAG_MASKED : 0) & m_maskedTextureHackMask;
-
-			//Check for 16 bit texture option
-			if (Use16BitTextures) {
-				if (Info.Palette && (Info.Palette[128].A == 255)) {
-					CacheID |= TEX_CACHE_ID_FLAG_16BIT;
-					PolyFlags |= PF_Memorized;
-				}
-			}
 		}
 
 		//Get dynamic poly flags
