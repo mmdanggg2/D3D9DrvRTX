@@ -832,7 +832,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	UBOOL UseVertexSpecular;
 	UBOOL UseS3TC;
 	UBOOL NoFiltering;
-	INT DetailMax;
 	UBOOL UseDetailAlpha;
 	UBOOL DetailClipping;
 	UBOOL ColorizeDetailTextures;
@@ -842,7 +841,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	UBOOL UseTexPool;
 	INT DynamicTexIdRecycleLevel;
 	UBOOL TexDXT1ToDXT3;
-	INT SwapInterval;
 	INT FrameRateLimit;
 #if defined DEUS_EX || defined UTGLR_RUNE_BUILD || UNREAL_GOLD
 	FLOAT m_prevFrameTimestamp;

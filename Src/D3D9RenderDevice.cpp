@@ -303,7 +303,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(0,  TEXT("NoFiltering"), CPP_PROPERTY_LOCAL(NoFiltering), 0);
 	SC_AddIntConfigParam(TEXT("MaxTMUnits"), CPP_PROPERTY_LOCAL(MaxTMUnits), 0);
 	SC_AddIntConfigParam(TEXT("RefreshRate"), CPP_PROPERTY_LOCAL(RefreshRate), 0);
-	SC_AddIntConfigParam(TEXT("DetailMax"), CPP_PROPERTY_LOCAL(DetailMax), 0);
 	SC_AddBoolConfigParam(8,  TEXT("DetailClipping"), CPP_PROPERTY_LOCAL(DetailClipping), 0);
 	SC_AddBoolConfigParam(7,  TEXT("ColorizeDetailTextures"), CPP_PROPERTY_LOCAL(ColorizeDetailTextures), 0);
 	SC_AddBoolConfigParam(6,  TEXT("SinglePassFog"), CPP_PROPERTY_LOCAL(SinglePassFog), 1);
@@ -312,7 +311,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(1,  TEXT("UseTexPool"), CPP_PROPERTY_LOCAL(UseTexPool), 1);
 	SC_AddIntConfigParam(TEXT("DynamicTexIdRecycleLevel"), CPP_PROPERTY_LOCAL(DynamicTexIdRecycleLevel), 100);
 	SC_AddBoolConfigParam(1,  TEXT("TexDXT1ToDXT3"), CPP_PROPERTY_LOCAL(TexDXT1ToDXT3), 0);
-	SC_AddIntConfigParam(TEXT("SwapInterval"), CPP_PROPERTY_LOCAL(SwapInterval), -1);
 	SC_AddIntConfigParam(TEXT("FrameRateLimit"), CPP_PROPERTY_LOCAL(FrameRateLimit), 0);
 #if UTGLR_USES_SCENENODEHACK
 	SC_AddBoolConfigParam(6,  TEXT("SceneNodeHack"), CPP_PROPERTY_LOCAL(SceneNodeHack), 1);
@@ -957,25 +955,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		}
 	}
 
-	//Set swap interval
-	if (SwapInterval >= 0) {
-		switch (SwapInterval) {
-		case 0:
-			if (m_d3dCaps.PresentationIntervals & D3DPRESENT_INTERVAL_IMMEDIATE) {
-				m_d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
-			}
-			break;
-		case 1:
-			if (m_d3dCaps.PresentationIntervals & D3DPRESENT_INTERVAL_ONE) {
-				m_d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
-			}
-			break;
-		default:
-			;
-		}
-	}
-
-
 	//Set increased back buffer count if using triple buffering
 	if (UseTripleBuffering) {
 		m_d3dpp.BackBufferCount = 2;
@@ -1095,7 +1074,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 //		UTGLR_DEBUG_SHOW_PARAM_REG(UseVertexSpecular);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseS3TC);
 		UTGLR_DEBUG_SHOW_PARAM_REG(NoFiltering);
-		UTGLR_DEBUG_SHOW_PARAM_REG(DetailMax);
 //		UTGLR_DEBUG_SHOW_PARAM_REG(UseDetailAlpha);
 		UTGLR_DEBUG_SHOW_PARAM_REG(DetailClipping);
 		UTGLR_DEBUG_SHOW_PARAM_REG(ColorizeDetailTextures);
@@ -1107,7 +1085,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTexPool);
 		UTGLR_DEBUG_SHOW_PARAM_REG(DynamicTexIdRecycleLevel);
 		UTGLR_DEBUG_SHOW_PARAM_REG(TexDXT1ToDXT3);
-		UTGLR_DEBUG_SHOW_PARAM_REG(SwapInterval);
 		UTGLR_DEBUG_SHOW_PARAM_REG(FrameRateLimit);
 #if UTGLR_USES_SCENENODEHACK
 		UTGLR_DEBUG_SHOW_PARAM_REG(SceneNodeHack);
@@ -1427,9 +1404,6 @@ void UD3D9RenderDevice::ConfigValidate_Main(void) {
 	if (TMUnits < 4) SinglePassDetail = 0;
 	//Single pass detail texturing requires detail alpha
 	if (!UseDetailAlpha) SinglePassDetail = 0;
-
-	//Limit maximum DetailMax
-	if (DetailMax > 3) DetailMax = 3;
 
 	return;
 }
