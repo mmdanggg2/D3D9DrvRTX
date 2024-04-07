@@ -392,7 +392,7 @@ void UD3D9RenderDevice::StaticConstructor() {
 
 	HighDetailActors = true;
 
-#if UNREAL_TOURNAMENT_OLDUNREAL
+#if !UNREAL_GOLD
 	DescFlags |= RDDESCF_Certified;
 #endif
 
