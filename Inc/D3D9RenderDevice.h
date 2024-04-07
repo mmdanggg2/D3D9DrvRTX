@@ -747,13 +747,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	//Texture state cache information
 	BYTE m_texEnableBits;
 
-
-	struct FByteGammaRamp {
-		BYTE red[256];
-		BYTE green[256];
-		BYTE blue[256];
-	};
-
 #ifdef WIN32
 	// Permanent variables.
 	HWND m_hWnd;
@@ -826,12 +819,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	} DCV;
 
 	FLOAT LODBias;
-	FLOAT GammaOffset;
-	FLOAT GammaOffsetRed;
-	FLOAT GammaOffsetGreen;
-	FLOAT GammaOffsetBlue;
-	INT Brightness;
-	UBOOL GammaCorrectScreenshots;
 	UBOOL OneXBlending;
 	INT MaxLogUOverV;
 	INT MaxLogVOverU;
@@ -938,9 +925,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	UBOOL PL_UseDetailAlpha;
 	UBOOL PL_SinglePassDetail;
 
-	bool m_setGammaRampSucceeded;
-	FLOAT SavedGammaCorrection;
-
 	DWORD m_numDepthBits;
 
 	INT AllocatedTextures;
@@ -1024,9 +1008,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	static HMODULE hModuleD3d9;
 	static LPDIRECT3DCREATE9 pDirect3DCreate9;
-
-	static bool g_gammaFirstTime;
-	static bool g_haveOriginalGammaRamp;
 
 
 	IDirect3D9 *m_d3d9;
@@ -1129,11 +1110,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	void InitFrameRateLimitTimerSafe(void);
 	void ShutdownFrameRateLimitTimer(void);
-
-	void BuildGammaRamp(float redGamma, float greenGamma, float blueGamma, int brightness, D3DGAMMARAMP &ramp);
-	void BuildGammaRamp(float redGamma, float greenGamma, float blueGamma, int brightness, FByteGammaRamp &ramp);
-	void SetGamma(FLOAT GammaCorrection);
-	void ResetGamma(void);
 
 	UBOOL FailedInitf(const TCHAR* Fmt, ...);
 	void Exit();

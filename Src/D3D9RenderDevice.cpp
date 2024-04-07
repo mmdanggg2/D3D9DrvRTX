@@ -293,11 +293,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 
 	//Set parameter defaults and add parameters
 	SC_AddFloatConfigParam(TEXT("LODBias"), CPP_PROPERTY_LOCAL(LODBias), 0.0f);
-	SC_AddFloatConfigParam(TEXT("GammaOffset"), CPP_PROPERTY_LOCAL(GammaOffset), 0.0f);
-	SC_AddFloatConfigParam(TEXT("GammaOffsetRed"), CPP_PROPERTY_LOCAL(GammaOffsetRed), 0.0f);
-	SC_AddFloatConfigParam(TEXT("GammaOffsetGreen"), CPP_PROPERTY_LOCAL(GammaOffsetGreen), 0.0f);
-	SC_AddFloatConfigParam(TEXT("GammaOffsetBlue"), CPP_PROPERTY_LOCAL(GammaOffsetBlue), 0.0f);
-	SC_AddBoolConfigParam(1,  TEXT("GammaCorrectScreenshots"), CPP_PROPERTY_LOCAL(GammaCorrectScreenshots), 0);
 	SC_AddBoolConfigParam(0,  TEXT("OneXBlending"), CPP_PROPERTY_LOCAL(OneXBlending), UTGLR_DEFAULT_OneXBlending);
 	SC_AddIntConfigParam(TEXT("MinLogTextureSize"), CPP_PROPERTY_LOCAL(MinLogTextureSize), 0);
 	SC_AddIntConfigParam(TEXT("MaxLogTextureSize"), CPP_PROPERTY_LOCAL(MaxLogTextureSize), 8);
@@ -659,96 +654,6 @@ void UD3D9RenderDevice::BufferAdditionalClippedVerts(FTransTexture** Pts, INT Nu
 }
 
 
-void UD3D9RenderDevice::BuildGammaRamp(float redGamma, float greenGamma, float blueGamma, int brightness, D3DGAMMARAMP &ramp) {
-	unsigned int u;
-
-	//Parameter clamping
-	if (brightness < -50) brightness = -50;
-	if (brightness > 50) brightness = 50;
-
-	float rcpRedGamma = 1.0f / (2.5f * redGamma);
-	float rcpGreenGamma = 1.0f / (2.5f * greenGamma);
-	float rcpBlueGamma = 1.0f / (2.5f * blueGamma);
-	for (u = 0; u < 256; u++) {
-		int iVal;
-
-		//Initial value
-		iVal = u;
-
-		//Brightness
-		iVal += brightness;
-		//Clamping
-		if (iVal < 0) iVal = 0;
-		if (iVal > 255) iVal = 255;
-
-		//Gamma + Save results
-		ramp.red[u] = (_WORD)(int)appRound((float)appPow(iVal / 255.0f, rcpRedGamma) * 65535.0f);
-		ramp.green[u] = (_WORD)(int)appRound((float)appPow(iVal / 255.0f, rcpGreenGamma) * 65535.0f);
-		ramp.blue[u] = (_WORD)(int)appRound((float)appPow(iVal / 255.0f, rcpBlueGamma) * 65535.0f);
-	}
-
-	return;
-}
-
-void UD3D9RenderDevice::BuildGammaRamp(float redGamma, float greenGamma, float blueGamma, int brightness, FByteGammaRamp &ramp) {
-	unsigned int u;
-
-	//Parameter clamping
-	if (brightness < -50) brightness = -50;
-	if (brightness > 50) brightness = 50;
-
-	float rcpRedGamma = 1.0f / (2.5f * redGamma);
-	float rcpGreenGamma = 1.0f / (2.5f * greenGamma);
-	float rcpBlueGamma = 1.0f / (2.5f * blueGamma);
-	for (u = 0; u < 256; u++) {
-		int iVal;
-
-		//Initial value
-		iVal = u;
-
-		//Brightness
-		iVal += brightness;
-		//Clamping
-		if (iVal < 0) iVal = 0;
-		if (iVal > 255) iVal = 255;
-
-		//Gamma + Save results
-		ramp.red[u] = (BYTE)(int)appRound((float)appPow(iVal / 255.0f, rcpRedGamma) * 255.0f);
-		ramp.green[u] = (BYTE)(int)appRound((float)appPow(iVal / 255.0f, rcpGreenGamma) * 255.0f);
-		ramp.blue[u] = (BYTE)(int)appRound((float)appPow(iVal / 255.0f, rcpBlueGamma) * 255.0f);
-	}
-
-	return;
-}
-
-void UD3D9RenderDevice::SetGamma(FLOAT GammaCorrection) {
-	D3DGAMMARAMP gammaRamp;
-
-	GammaCorrection += GammaOffset;
-
-	//Do not attempt to set gamma if <= zero
-	if (GammaCorrection <= 0.0f) {
-		return;
-	}
-
-	BuildGammaRamp(GammaCorrection + GammaOffsetRed, GammaCorrection + GammaOffsetGreen, GammaCorrection + GammaOffsetBlue, Brightness, gammaRamp);
-
-	m_setGammaRampSucceeded = false;
-	m_d3dDevice->SetGammaRamp(0, D3DSGR_NO_CALIBRATION, &gammaRamp);
-	if (1) {
-		m_setGammaRampSucceeded = true;
-		SavedGammaCorrection = GammaCorrection;
-	}
-
-	return;
-}
-
-void UD3D9RenderDevice::ResetGamma(void) {
-	return;
-}
-
-
-
 UBOOL UD3D9RenderDevice::FailedInitf(const TCHAR* Fmt, ...) {
 	TCHAR TempStr[4096];
 	GET_VARARGS(TempStr, ARRAY_COUNT(TempStr), Fmt);
@@ -765,9 +670,6 @@ void UD3D9RenderDevice::Exit() {
 	if (m_d3d9) {
 		UnsetRes();
 	}
-
-	//Reset gamma ramp
-	ResetGamma();
 
 	//Timer shutdown
 	ShutdownFrameRateLimitTimer();
@@ -796,9 +698,6 @@ void UD3D9RenderDevice::ShutdownAfterError() {
 	}
 
 	//ChangeDisplaySettings(NULL, 0);
-
-	//Reset gamma ramp
-	ResetGamma();
 
 	unguard;
 }
@@ -1180,21 +1079,12 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	//Display depth buffer bit depth
 	debugf(NAME_Init, TEXT("Depth bits: %u"), m_numDepthBits);
 
-	//Get other defaults
-	if (!GConfig->GetInt(g_pSection, TEXT("Brightness"), Brightness)) Brightness = 0;
-
 	//Debug parameter listing
 	if (DebugBit(DEBUG_BIT_BASIC)) {
 		#define UTGLR_DEBUG_SHOW_PARAM_REG(_name) DbgPrintInitParam(TEXT(#_name), _name)
 		#define UTGLR_DEBUG_SHOW_PARAM_DCV(_name) DbgPrintInitParam(TEXT(#_name), DCV._name)
 
 		UTGLR_DEBUG_SHOW_PARAM_REG(LODBias);
-		UTGLR_DEBUG_SHOW_PARAM_REG(GammaOffset);
-		UTGLR_DEBUG_SHOW_PARAM_REG(GammaOffsetRed);
-		UTGLR_DEBUG_SHOW_PARAM_REG(GammaOffsetGreen);
-		UTGLR_DEBUG_SHOW_PARAM_REG(GammaOffsetBlue);
-		UTGLR_DEBUG_SHOW_PARAM_REG(Brightness);
-		UTGLR_DEBUG_SHOW_PARAM_REG(GammaCorrectScreenshots);
 		UTGLR_DEBUG_SHOW_PARAM_REG(OneXBlending);
 		UTGLR_DEBUG_SHOW_PARAM_REG(MinLogTextureSize);
 		UTGLR_DEBUG_SHOW_PARAM_REG(MaxLogTextureSize);
@@ -1239,8 +1129,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		#undef UTGLR_DEBUG_SHOW_PARAM_REG
 		#undef UTGLR_DEBUG_SHOW_PARAM_DCV
 	}
-
-	SetGamma(Viewport->GetOuterUClient()->Brightness);
 
 	//Restrict dynamic tex id recycle level range
 	if (DynamicTexIdRecycleLevel < 10) DynamicTexIdRecycleLevel = 10;
@@ -1870,11 +1758,6 @@ UBOOL UD3D9RenderDevice::Init(UViewport* InViewport, INT NewX, INT NewY, INT New
 	guard(UD3D9RenderDevice::Init);
 
 	debugf(TEXT("Initializing D3D9Drv..."));
-
-	if (NumDevices == 0) {
-		g_gammaFirstTime = true;
-		g_haveOriginalGammaRamp = false;
-	}
 
 	// Get list of device modes.
 	for (INT i = 0; ; i++) {
@@ -2537,8 +2420,6 @@ void UD3D9RenderDevice::Flush(UBOOL AllowPrecache) {
 		PrecacheOnFlip = 1;
 	}
 #endif
-
-	SetGamma(Viewport->GetOuterUClient()->Brightness);
 
 	unguard;
 }
@@ -4937,22 +4818,6 @@ void UD3D9RenderDevice::ReadPixels(FColor* Pixels) {
 
 		//Release surface to hold screenshot
 		d3dsFrontBuffer->Release();
-	}
-
-
-	//Gamma correct screenshots if the option is true and the gamma ramp was set successfully
-	if (GammaCorrectScreenshots && m_setGammaRampSucceeded) {
-		INT DestSizeX = Viewport->SizeX;
-		INT DestSizeY = Viewport->SizeY;
-		FByteGammaRamp gammaByteRamp;
-		BuildGammaRamp(SavedGammaCorrection, SavedGammaCorrection, SavedGammaCorrection, Brightness, gammaByteRamp);
-		for (y = 0; y < DestSizeY; y++) {
-			for (x = 0; x < DestSizeX; x++) {
-				Pixels[x + y * DestSizeX].R = gammaByteRamp.red[Pixels[x + y * DestSizeX].R];
-				Pixels[x + y * DestSizeX].G = gammaByteRamp.green[Pixels[x + y * DestSizeX].G];
-				Pixels[x + y * DestSizeX].B = gammaByteRamp.blue[Pixels[x + y * DestSizeX].B];
-			}
-		}
 	}
 
 	unguard;
@@ -7356,9 +7221,6 @@ INT UD3D9RenderDevice::LockCount = 0;
 
 HMODULE UD3D9RenderDevice::hModuleD3d9 = NULL;
 LPDIRECT3DCREATE9 UD3D9RenderDevice::pDirect3DCreate9 = NULL;
-
-bool UD3D9RenderDevice::g_gammaFirstTime = false;
-bool UD3D9RenderDevice::g_haveOriginalGammaRamp = false;
 
 /*-----------------------------------------------------------------------------
 	The End.
