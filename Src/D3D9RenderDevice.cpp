@@ -4131,6 +4131,8 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		float scaleU = texInfo->UScale * texInfo->USize / 256.0;
 		float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
 
+		polyFlags |= texInfo->Texture->PolyFlags;
+
 		// Sort triangles into surface/flag groups
 		std::vector<FTransTexture>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
 		pointsVec.reserve(numTris*3);
@@ -4255,7 +4257,8 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 		} else {
 			texInfo = &textureInfos[tex];
 		}
-		
+
+		flags |= texInfo->Texture->PolyFlags;
 		flags &= ~PF_FlatShaded;// Ignore this for poly matching, meaningless for rendering
 		polys[SurfKey(texInfo, flags)].push_back(poly);
 	}
