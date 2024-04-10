@@ -295,7 +295,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(2,  TEXT("UseS3TC"), CPP_PROPERTY_LOCAL(UseS3TC), UTGLR_DEFAULT_UseS3TC);
 	SC_AddIntConfigParam(TEXT("MaxAnisotropy"), CPP_PROPERTY_LOCAL(MaxAnisotropy), 0);
 	SC_AddBoolConfigParam(0,  TEXT("NoFiltering"), CPP_PROPERTY_LOCAL(NoFiltering), 0);
-	SC_AddIntConfigParam(TEXT("MaxTMUnits"), CPP_PROPERTY_LOCAL(MaxTMUnits), 0);
 	SC_AddIntConfigParam(TEXT("RefreshRate"), CPP_PROPERTY_LOCAL(RefreshRate), 0);
 	SC_AddBoolConfigParam(8,  TEXT("DetailClipping"), CPP_PROPERTY_LOCAL(DetailClipping), 0);
 	SC_AddBoolConfigParam(7,  TEXT("ColorizeDetailTextures"), CPP_PROPERTY_LOCAL(ColorizeDetailTextures), 0);
@@ -973,7 +972,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(MaxLogTextureSize);
 		UTGLR_DEBUG_SHOW_PARAM_REG(MaxAnisotropy);
 		UTGLR_DEBUG_SHOW_PARAM_REG(TMUnits);
-		UTGLR_DEBUG_SHOW_PARAM_REG(MaxTMUnits);
 		UTGLR_DEBUG_SHOW_PARAM_REG(RefreshRate);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UsePrecache);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTrilinear);
@@ -1049,15 +1047,10 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	//Required extensions config validation pass
 	ConfigValidate_RequiredExtensions();
 
-
-	if (!MaxTMUnits || (MaxTMUnits > MAX_TMUNITS)) {
-		MaxTMUnits = MAX_TMUNITS;
-	}
-
 	TMUnits = m_d3dCaps.MaxSimultaneousTextures;
 	debugf(TEXT("%i Texture Mapping Units found"), TMUnits);
-	if (TMUnits > MaxTMUnits) {
-		TMUnits = MaxTMUnits;
+	if (TMUnits > MAX_TMUNITS) {
+		TMUnits = MAX_TMUNITS;
 	}
 
 

@@ -808,7 +808,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	INT MaxLogTextureSize;
 	INT MaxAnisotropy;
 	INT TMUnits;
-	INT MaxTMUnits;
 	INT RefreshRate;
 	UBOOL UsePrecache;
 	UBOOL UseTrilinear;
