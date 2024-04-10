@@ -2713,7 +2713,7 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 	//Make sure enough entries are left in the vertex buffers
 	//based on the current position when it was locked
 	if ((m_curPolyFlags != PolyFlags) ||
-		(TexInfo[0].CurrentCacheID != Info.CacheID) ||
+		(TexInfo[0].CurrentCacheID != calcCacheID(Info, PolyFlags)) ||
 		((m_curVertexBufferPos + m_bufferedVerts + NumPts) >= (VERTEX_BUFFER_SIZE - 14)) ||
 		(m_bufferedVerts == 0))
 	{
@@ -2862,7 +2862,7 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 	if (1) {
 		//Check if need to start new tile buffering
 		if ((m_curPolyFlags != PolyFlags) ||
-			(TexInfo[0].CurrentCacheID != Info.CacheID) ||
+			(TexInfo[0].CurrentCacheID != calcCacheID(Info, PolyFlags)) ||
 			((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 6)) ||
 			(m_bufferedVerts == 0))
 		{
@@ -3772,8 +3772,6 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		}
 		float scaleU = texInfo->UScale * texInfo->USize / 256.0;
 		float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
-
-		polyFlags |= texInfo->Texture->PolyFlags;
 
 		// Sort triangles into surface/flag groups
 		std::vector<FTransTexture>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
