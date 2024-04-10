@@ -310,11 +310,10 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(6,  TEXT("SceneNodeHack"), CPP_PROPERTY_LOCAL(SceneNodeHack), 1);
 #endif
 	SC_AddBoolConfigParam(5,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
-	SC_AddBoolConfigParam(4,  TEXT("MaskedTextureHack"), CPP_PROPERTY_LOCAL(MaskedTextureHack), 1);
-	SC_AddBoolConfigParam(3,  TEXT("UseTripleBuffering"), CPP_PROPERTY_LOCAL(UseTripleBuffering), 0);
+	SC_AddBoolConfigParam(1,  TEXT("UseTripleBuffering"), CPP_PROPERTY_LOCAL(UseTripleBuffering), 0);
+	SC_AddBoolConfigParam(0, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 1);
 	SC_AddBoolConfigParam(2,  TEXT("UsePureDevice"), CPP_PROPERTY_LOCAL(UsePureDevice), 1);
 	SC_AddBoolConfigParam(1,  TEXT("UseSoftwareVertexProcessing"), CPP_PROPERTY_LOCAL(UseSoftwareVertexProcessing), 0);
-	SC_AddBoolConfigParam(1, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 1);
 
 	SurfaceSelectionColor = FColor(0, 0, 31, 31);
 	//new(GetClass(), TEXT("SurfaceSelectionColor"), RF_Public)UStructProperty(CPP_PROPERTY(SurfaceSelectionColor), TEXT("Options"), CPF_Config, FindObjectChecked<UStruct>(NULL, TEXT("Core.Object.Color"), 1));
@@ -1015,16 +1014,12 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(RefreshRate);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UsePrecache);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTrilinear);
-//		UTGLR_DEBUG_SHOW_PARAM_REG(UseVertexSpecular);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseS3TC);
 		UTGLR_DEBUG_SHOW_PARAM_REG(NoFiltering);
-//		UTGLR_DEBUG_SHOW_PARAM_REG(UseDetailAlpha);
 		UTGLR_DEBUG_SHOW_PARAM_REG(DetailClipping);
 		UTGLR_DEBUG_SHOW_PARAM_REG(ColorizeDetailTextures);
 		UTGLR_DEBUG_SHOW_PARAM_REG(SinglePassFog);
 		UTGLR_DEBUG_SHOW_PARAM_DCV(SinglePassDetail);
-//		UTGLR_DEBUG_SHOW_PARAM_REG(BufferActorTris);
-//		UTGLR_DEBUG_SHOW_PARAM_REG(BufferClippedActorTris);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTexIdPool);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTexPool);
 		UTGLR_DEBUG_SHOW_PARAM_REG(DynamicTexIdRecycleLevel);
@@ -1034,7 +1029,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(SceneNodeHack);
 #endif
 		UTGLR_DEBUG_SHOW_PARAM_REG(SmoothMaskedTextures);
-		UTGLR_DEBUG_SHOW_PARAM_REG(MaskedTextureHack);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTripleBuffering);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UsePureDevice);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseSoftwareVertexProcessing);
@@ -1231,7 +1225,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	PL_TexDXT1ToDXT3 = TexDXT1ToDXT3;
 	PL_MaxAnisotropy = MaxAnisotropy;
 	PL_SmoothMaskedTextures = SmoothMaskedTextures;
-	PL_MaskedTextureHack = MaskedTextureHack;
 	PL_LODBias = LODBias;
 	PL_UseDetailAlpha = UseDetailAlpha;
 	PL_SinglePassDetail = SinglePassDetail;
@@ -1889,11 +1882,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 		}
 	}
 
-	if (MaskedTextureHack != PL_MaskedTextureHack) {
-		PL_MaskedTextureHack = MaskedTextureHack;
-		flushTextures = true;
-	}
-
 	if (LODBias != PL_LODBias) {
 		PL_LODBias = LODBias;
 		SetTexLODBiasState(TMUnits);
@@ -1953,9 +1941,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 	else {
 		m_detailTextureColor4ub = 0x00808080;
 	}
-
-	//Precalculate mask for MaskedTextureHack based on if it's enabled
-	m_maskedTextureHackMask = (MaskedTextureHack) ? TEX_CACHE_ID_FLAG_MASKED : 0;
 
 	// Remember stuff.
 	FlashScale = InFlashScale;
@@ -2885,7 +2870,6 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 	if (NumPts > m_bufferActorTrisCutoff) {
 		EndBuffering();
 
-		SetDefaultAAState();
 		//No need to set default projection state here as DrawGouraudPolygonOld will set its own projection state
 		//No need to set default stream state here as DrawGouraudPolygonOld will set its own stream state
 		SetDefaultTextureState();
@@ -2895,21 +2879,11 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 		return;
 	}
 
-	//Load texture cache id
-	QWORD CacheID = Info.CacheID;
-
-	//Only attempt to alter texture cache id on certain textures
-	if ((CacheID & 0xFF) == 0xE0) {
-		//Alter texture cache id if masked texture hack is enabled and texture is masked
-		CacheID |= ((PolyFlags & PF_Masked) ? TEX_CACHE_ID_FLAG_MASKED : 0) & m_maskedTextureHackMask;
-	}
-
 	//Check if need to start new poly buffering
 	//Make sure enough entries are left in the vertex buffers
 	//based on the current position when it was locked
 	if ((m_curPolyFlags != PolyFlags) ||
-		(m_curPolyFlags2 != PolyFlags2) ||
-		(TexInfo[0].CurrentCacheID != CacheID) ||
+		(TexInfo[0].CurrentCacheID != Info.CacheID) ||
 		((m_curVertexBufferPos + m_bufferedVerts + NumPts) >= (VERTEX_BUFFER_SIZE - 14)) ||
 		(m_bufferedVerts == 0))
 	{
@@ -3071,19 +3045,9 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 	}
 
 	if (1) {
-		//Load texture cache id
-		QWORD CacheID = Info.CacheID;
-
-		//Only attempt to alter texture cache id on certain textures
-		if ((CacheID & 0xFF) == 0xE0) {
-			//Alter texture cache id if masked texture hack is enabled and texture is masked
-			CacheID |= ((PolyFlags & PF_Masked) ? TEX_CACHE_ID_FLAG_MASKED : 0) & m_maskedTextureHackMask;
-		}
-
 		//Check if need to start new tile buffering
 		if ((m_curPolyFlags != PolyFlags) ||
-			(m_curPolyFlags2 != PolyFlags2) ||
-			(TexInfo[0].CurrentCacheID != CacheID) ||
+			(TexInfo[0].CurrentCacheID != Info.CacheID) ||
 			((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 6)) ||
 			(m_bufferedVerts == 0))
 		{
@@ -4960,9 +4924,6 @@ void UD3D9RenderDevice::SetAlphaTextureNoCheck(INT Multi) {
 
 	unguard;
 }
-
-//This function must use Tex.CurrentCacheID and NEVER use Info.CacheID to reference the texture cache id
-//This makes it work with the masked texture hack code
 
 bool UD3D9RenderDevice::BindTexture(DWORD texNum, FTexInfo& Tex, FTextureInfo& Info, DWORD PolyFlags, FCachedTexture*& Bind)
 {

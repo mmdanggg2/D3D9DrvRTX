@@ -443,11 +443,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	#define TEX_CACHE_ID_NO_TEX		0xFFFFFFFF00000010ULL
 	#define TEX_CACHE_ID_ALPHA_TEX	0xFFFFFFFF00000020ULL
 
-	//Texture cache id flags
-	enum {
-		TEX_CACHE_ID_FLAG_MASKED	= 0x1
-	};
-
 	//Mask for poly flags that impact texture object state
 	#define TEX_DYNAMIC_POLY_FLAGS_MASK		(PF_NoSmooth)
 
@@ -848,7 +843,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 #endif
 	UBOOL SceneNodeHack;
 	UBOOL SmoothMaskedTextures;
-	UBOOL MaskedTextureHack;
 
 	UBOOL UseTripleBuffering;
 	UBOOL UsePureDevice;
@@ -904,7 +898,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	UBOOL PL_TexDXT1ToDXT3;
 	INT PL_MaxAnisotropy;
 	UBOOL PL_SmoothMaskedTextures;
-	UBOOL PL_MaskedTextureHack;
 	FLOAT PL_LODBias;
 	UBOOL PL_UseDetailAlpha;
 	UBOOL PL_SinglePassDetail;
@@ -948,8 +941,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	INT m_bufferActorTrisCutoff;
 
 	DWORD m_detailTextureColor4ub;
-
-	DWORD m_maskedTextureHackMask;
 
 	enum {
 		CF_COLOR_ARRAY		= 0x01,
@@ -1180,24 +1171,16 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	inline void FASTCALL SetTexture(INT Multi, FTextureInfo& Info, DWORD PolyFlags, FLOAT PanBias) {
 		FTexInfo& Tex = TexInfo[Multi];
-		QWORD CacheID;
-		DWORD DynamicPolyFlags;
 
 		// Set panning.
 		Tex.UPan = Info.Pan.X + (PanBias * Info.UScale);
 		Tex.VPan = Info.Pan.Y + (PanBias * Info.VScale);
 
 		//Load texture cache id
-		CacheID = Info.CacheID;
-
-		//Only attempt to alter texture cache id on certain textures
-		if ((CacheID & 0xFF) == 0xE0) {
-			//Alter texture cache id if masked texture hack is enabled and texture is masked
-			CacheID |= ((PolyFlags & PF_Masked) ? TEX_CACHE_ID_FLAG_MASKED : 0) & m_maskedTextureHackMask;
-		}
+		QWORD CacheID = Info.CacheID;
 
 		//Get dynamic poly flags
-		DynamicPolyFlags = PolyFlags & TEX_DYNAMIC_POLY_FLAGS_MASK;
+		DWORD DynamicPolyFlags = PolyFlags & TEX_DYNAMIC_POLY_FLAGS_MASK;
 
 		// Find in cache.
 		if ((CacheID == Tex.CurrentCacheID) && (DynamicPolyFlags == Tex.CurrentDynamicPolyFlags) && !Info.bRealtimeChanged) {
@@ -1215,24 +1198,16 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	inline void FASTCALL SetTextureNoPanBias(INT Multi, FTextureInfo& Info, DWORD PolyFlags) {
 		FTexInfo& Tex = TexInfo[Multi];
-		QWORD CacheID;
-		DWORD DynamicPolyFlags;
 
 		// Set panning.
 		Tex.UPan = Info.Pan.X;
 		Tex.VPan = Info.Pan.Y;
 
 		//Load texture cache id
-		CacheID = Info.CacheID;
-
-		//Only attempt to alter texture cache id on certain textures
-		if ((CacheID & 0xFF) == 0xE0) {
-			//Alter texture cache id if masked texture hack is enabled and texture is masked
-			CacheID |= ((PolyFlags & PF_Masked) ? TEX_CACHE_ID_FLAG_MASKED : 0) & m_maskedTextureHackMask;
-		}
+		QWORD CacheID = Info.CacheID;
 
 		//Get dynamic poly flags
-		DynamicPolyFlags = PolyFlags & TEX_DYNAMIC_POLY_FLAGS_MASK;
+		DWORD DynamicPolyFlags = PolyFlags & TEX_DYNAMIC_POLY_FLAGS_MASK;
 
 		// Find in cache.
 		if ((CacheID == Tex.CurrentCacheID) && (DynamicPolyFlags == Tex.CurrentDynamicPolyFlags) && !Info.bRealtimeChanged) {
