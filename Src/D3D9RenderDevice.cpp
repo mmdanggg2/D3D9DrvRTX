@@ -282,12 +282,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	const UBOOL UTGLR_DEFAULT_UseS3TC = 1;
 #endif
 
-#if defined DEUS_EX || defined UTGLR_RUNE_BUILD
-	const UBOOL UTGLR_DEFAULT_ZRangeHack = 0;
-#else
-	const UBOOL UTGLR_DEFAULT_ZRangeHack = 0;
-#endif
-
 #define CPP_PROPERTY_LOCAL(_name) _name, CPP_PROPERTY(_name)
 #define CPP_PROPERTY_LOCAL_DCV(_name) DCV._name, CPP_PROPERTY(DCV._name)
 
@@ -324,7 +318,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddIntConfigParam(TEXT("NumAASamples"), CPP_PROPERTY_LOCAL(NumAASamples), 4);
 	SC_AddBoolConfigParam(2,  TEXT("NoAATiles"), CPP_PROPERTY_LOCAL(NoAATiles), 1);
 	SC_AddBoolConfigParam(1, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 1);
-	SC_AddBoolConfigParam(0,  TEXT("ZRangeHack"), CPP_PROPERTY_LOCAL(ZRangeHack), UTGLR_DEFAULT_ZRangeHack);
 
 	SurfaceSelectionColor = FColor(0, 0, 31, 31);
 	//new(GetClass(), TEXT("SurfaceSelectionColor"), RF_Public)UStructProperty(CPP_PROPERTY(SurfaceSelectionColor), TEXT("Options"), CPF_Config, FindObjectChecked<UStruct>(NULL, TEXT("Core.Object.Color"), 1));
@@ -1097,7 +1090,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseAA);
 		UTGLR_DEBUG_SHOW_PARAM_REG(NumAASamples);
 		UTGLR_DEBUG_SHOW_PARAM_REG(NoAATiles);
-		UTGLR_DEBUG_SHOW_PARAM_REG(ZRangeHack);
 
 		#undef UTGLR_DEBUG_SHOW_PARAM_REG
 		#undef UTGLR_DEBUG_SHOW_PARAM_DCV
@@ -1608,11 +1600,6 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	//Initialize color flags
 	m_requestedColorFlags = 0;
 
-	//Initialize Z range hack state
-	m_useZRangeHack = false;
-	m_nearZRangeHackProjectionActive = false;
-	m_requestNearZRangeHackProjection = false;
-
 	lightSlots = new LightSlots(m_d3dCaps.MaxActiveLights);
 
 	unguard;
@@ -2097,23 +2084,6 @@ void UD3D9RenderDevice::SetSceneNode(FSceneNode* Frame) {
 	d3dViewport.MinZ = 0.0f;
 	d3dViewport.MaxZ = 1.0f;
 	m_d3dDevice->SetViewport(&d3dViewport);
-
-	//Decide whether or not to use Z range hack
-	m_useZRangeHack = false;
-	if (ZRangeHack && !GIsEditor) {
-		m_useZRangeHack = true;
-	}
-
-	// Set projection.
-	//if (Frame->Viewport->IsOrtho()) {
-	//	//Don't use Z range hack if ortho projection
-	//	m_useZRangeHack = false;
-
-	//	SetOrthoProjection();
-	//}
-	//else {
-	//	SetProjectionStateNoCheck(false);
-	//}
 
 	//Set clip planes if doing selection
 	if (m_HitData) {
@@ -2827,14 +2797,6 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 	guard(UD3D9RenderDevice::DrawGouraudPolygonOld);
 	clockFast(GouraudCycles);
 
-	//Decide if should request near Z range hack projection
-	bool requestNearZRangeHackProjection = false;
-	if (m_useZRangeHack && (GUglyHackFlags & 0x1)) {
-		requestNearZRangeHackProjection = true;
-	}
-	//Set projection state
-	SetProjectionState(requestNearZRangeHackProjection);
-
 	//Check if should render fog and if vertex specular is supported
 	bool drawFog = (((PolyFlags & (PF_RenderFog | PF_Translucent | PF_Modulated | PF_AlphaBlend)) == PF_RenderFog) && UseVertexSpecular) ? true : false;
 
@@ -3007,11 +2969,6 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 		CacheID |= ((PolyFlags & PF_Masked) ? TEX_CACHE_ID_FLAG_MASKED : 0) & m_maskedTextureHackMask;
 	}
 
-	//Decide if should request near Z range hack projection
-	if (m_useZRangeHack && (GUglyHackFlags & 0x1)) {
-		PolyFlags2 |= PF2_NEAR_Z_RANGE_HACK;
-	}
-
 	//Check if need to start new poly buffering
 	//Make sure enough entries are left in the vertex buffers
 	//based on the current position when it was locked
@@ -3054,8 +3011,6 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 		m_curPolyFlags = PolyFlags;
 		m_curPolyFlags2 = PolyFlags2;
 
-		//Set request near Z range hack projection flag
-		m_requestNearZRangeHackProjection = (PolyFlags2 & PF2_NEAR_Z_RANGE_HACK) ? true : false;
 
 		//Set default texture state
 		SetDefaultTextureState();
@@ -3147,13 +3102,6 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 		}
 	}
 # endif
-
-	//Adjust Z coordinate if Z range hack is active
-	if (m_useZRangeHack) {
-		if ((Z >= 0.5f) && (Z < 8.0f)) {
-			Z = (((Z - 0.5f) / 7.5f) * 4.0f) + 4.0f;
-		}
-	}
 
 	FLOAT RPX1 = X;
 	FLOAT RPX2 = X + XL;
@@ -6543,122 +6491,6 @@ void UD3D9RenderDevice::SetAAStateNoCheck(bool AAEnable) {
 }
 
 
-void UD3D9RenderDevice::SetProjectionStateNoCheck(bool requestNearZRangeHackProjection) {
-	float left, right, bottom, top, zNear, zFar;
-	float invRightMinusLeft, invTopMinusBottom, invNearMinusFar;
-
-	//Save new Z range hack projection state
-	m_nearZRangeHackProjectionActive = requestNearZRangeHackProjection;
-
-	//Set default zNearVal
-	FLOAT zNearVal = 0.5f;
-
-	FLOAT zScaleVal = 1.0f;
-	if (requestNearZRangeHackProjection) {
-#ifdef UTGLR_DEBUG_Z_RANGE_HACK_WIREFRAME
-		m_d3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
-#endif
-
-		zScaleVal = 0.125f;
-		zNearVal = 0.5;
-	}
-	else {
-#ifdef UTGLR_DEBUG_Z_RANGE_HACK_WIREFRAME
-		m_d3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
-#endif
-
-		if (m_useZRangeHack) {
-			zNearVal = 4.0f;
-		}
-	}
-
-	left = -m_RProjZ * zNearVal;
-	right = +m_RProjZ * zNearVal;
-	bottom = -m_Aspect*m_RProjZ * zNearVal;
-	top = +m_Aspect*m_RProjZ * zNearVal;
-	zNear = 1.0f * zNearVal;
-
-	//Set zFar
-	zFar = 65536.0f; // stijn: increased from 32k to 64k for UT v469b
-	if (requestNearZRangeHackProjection) {
-		zFar *= zScaleVal;
-	}
-
-	invRightMinusLeft = 1.0f / (right - left);
-	invTopMinusBottom = 1.0f / (top - bottom);
-	invNearMinusFar = 1.0f / (zNear - zFar);
-
-	D3DMATRIX d3dProj;
-	d3dProj.m[0][0] = 2.0f * zNear * invRightMinusLeft;
-	d3dProj.m[0][1] = 0.0f;
-	d3dProj.m[0][2] = 0.0f;
-	d3dProj.m[0][3] = 0.0f;
-
-	d3dProj.m[1][0] = 0.0f;
-	d3dProj.m[1][1] = 2.0f * zNear * invTopMinusBottom;
-	d3dProj.m[1][2] = 0.0f;
-	d3dProj.m[1][3] = 0.0f;
-
-	d3dProj.m[2][0] = 1.0f / (FLOAT)m_sceneNodeX;
-	d3dProj.m[2][1] = -1.0f / (FLOAT)m_sceneNodeY;
-	d3dProj.m[2][2] = zScaleVal * (zFar * invNearMinusFar);
-	d3dProj.m[2][3] = -1.0f;
-
-	d3dProj.m[3][0] = 0.0f;
-	d3dProj.m[3][1] = 0.0f;
-	d3dProj.m[3][2] = zScaleVal * zScaleVal * (zNear * zFar * invNearMinusFar);
-	d3dProj.m[3][3] = 0.0f;
-
-	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &d3dProj);
-
-	return;
-}
-
-void UD3D9RenderDevice::SetOrthoProjection(void) {
-	float left, right, bottom, top, zNear, zFar;
-	float invRightMinusLeft, invTopMinusBottom, invNearMinusFar;
-	D3DMATRIX d3dProj;
-
-	//Save new Z range hack projection state
-	m_nearZRangeHackProjectionActive = false;
-
-	left = -m_RProjZ;
-	right = +m_RProjZ;
-	bottom = -m_Aspect*m_RProjZ;
-	top = +m_Aspect*m_RProjZ;
-	zNear = 1.0f * 0.5f;
-	zFar = 65536.0f; // stijn: increased from 32k to 64k for UT v469b
-
-	invRightMinusLeft = 1.0f / (right - left);
-	invTopMinusBottom = 1.0f / (top - bottom);
-	invNearMinusFar = 1.0f / (zNear - zFar);
-
-	d3dProj.m[0][0] = 2.0f * invRightMinusLeft;
-	d3dProj.m[0][1] = 0.0f;
-	d3dProj.m[0][2] = 0.0f;
-	d3dProj.m[0][3] = 0.0f;
-
-	d3dProj.m[1][0] = 0.0f;
-	d3dProj.m[1][1] = 2.0f * invTopMinusBottom;
-	d3dProj.m[1][2] = 0.0f;
-	d3dProj.m[1][3] = 0.0f;
-
-	d3dProj.m[2][0] = 0.0f;
-	d3dProj.m[2][1] = 0.0f;
-	d3dProj.m[2][2] = 1.0f * invNearMinusFar;
-	d3dProj.m[2][3] = 0.0f;
-
-	d3dProj.m[3][0] = -1.0f / (FLOAT)m_sceneNodeX;
-	d3dProj.m[3][1] = 1.0f / (FLOAT)m_sceneNodeY;
-	d3dProj.m[3][2] = zNear * invNearMinusFar;
-	d3dProj.m[3][3] = 1.0f;
-
-	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &d3dProj);
-
-	return;
-}
-
-
 void UD3D9RenderDevice::RenderPassesExec(void) {
 	guard(UD3D9RenderDevice::RenderPassesExec);
 
@@ -6996,9 +6828,6 @@ void UD3D9RenderDevice::EndGouraudPolygonBufferingNoCheck(void) {
 
 	clockFast(GouraudCycles);
 
-	//Set projection state
-	SetProjectionState(m_requestNearZRangeHackProjection);
-
 	//Unlock vertexColor and texCoord0 buffers
 	//Unlock secondary color buffer if fog
 	UnlockVertexColorBuffer();
@@ -7028,7 +6857,6 @@ void UD3D9RenderDevice::EndTileBufferingNoCheck(void) {
 	else {
 		SetDefaultAAState();
 	}
-	SetDefaultProjectionState();
 	//Stream state set when start buffering
 	//Default texture state set when start buffering
 

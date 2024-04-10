@@ -113,7 +113,6 @@ typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
 //#define UTGLR_DEBUG_SHOW_CALL_COUNTS
 //#define UTGLR_DEBUG_WORLD_WIREFRAME
 //#define UTGLR_DEBUG_ACTOR_WIREFRAME
-//#define UTGLR_DEBUG_Z_RANGE_HACK_WIREFRAME
 
 
 #include "c_rbtree.h"
@@ -860,11 +859,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	UBOOL EnableSkyBoxAnchors;
 
-	UBOOL ZRangeHack;
-	bool m_useZRangeHack;
-	bool m_nearZRangeHackProjectionActive;
-	bool m_requestNearZRangeHackProjection;
-
 	FColor SurfaceSelectionColor;
 
 	UBOOL BufferActorTris;
@@ -952,10 +946,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	bool m_isATI;
 	bool m_isNVIDIA;
-
-	enum {
-		PF2_NEAR_Z_RANGE_HACK	= 0x01
-	};
 	DWORD m_curBlendFlags;
 	DWORD m_smoothMaskedTexturesBit;
 	bool m_useAlphaToCoverageForMasked;
@@ -1410,19 +1400,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		}
 	}
 	void FASTCALL SetVertexDeclNoCheck(IDirect3DVertexDeclaration9 *vertexDecl);
-	inline void SetDefaultProjectionState(void) {
-		//See if non-default projection is active
-		if (m_nearZRangeHackProjectionActive) {
-			SetProjectionStateNoCheck(false);
-		}
-	}
-
-	inline void FASTCALL SetProjectionState(bool requestNearZRangeHackProjection) {
-		if (requestNearZRangeHackProjection != m_nearZRangeHackProjectionActive) {
-			//Set requested projection state
-			SetProjectionStateNoCheck(requestNearZRangeHackProjection);
-		}
-	}
 
 	inline void SetDefaultAAState(void) {
 		if (m_defAAEnable != m_curAAEnable) {
@@ -1435,9 +1412,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		}
 	}
 	void FASTCALL SetAAStateNoCheck(bool AAEnable);
-
-	void FASTCALL SetProjectionStateNoCheck(bool);
-	void SetOrthoProjection(void);
 
 	inline void RenderPasses(void) {
 		if (m_rpPassCount != 0) {
