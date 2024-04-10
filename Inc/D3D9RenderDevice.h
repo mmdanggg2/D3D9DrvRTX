@@ -63,17 +63,6 @@
 #pragma warning(disable : 4245)
 #include "c_gclip.h"
 
-
-//Per-game feature switches
-#if defined UNREAL_TOURNAMENT_UTPG
-	#define UTGLR_USES_SCENENODEHACK 0
-#elif UTGLR_RUNE_BUILD
-	#define UTGLR_USES_SCENENODEHACK 1
-#else
-	#define UTGLR_USES_SCENENODEHACK 1
-#endif
-
-
 #if !UTGLR_USES_ALPHABLEND
 	#define UTGLR_USES_ALPHABLEND 0
 	#define PF_AlphaBlend 0x020000
@@ -797,10 +786,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	DWORD m_fpEnableCount;
 	DWORD m_fpSwitchCount;
 	DWORD m_AASwitchCount;
-#if UTGLR_USES_SCENENODEHACK
-	DWORD m_sceneNodeCount;
-	DWORD m_sceneNodeHackCount;
-#endif
 	DWORD m_vbFlushCount;
 	DWORD m_stat0Count;
 	DWORD m_stat1Count;
@@ -841,7 +826,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 #else
 	FTime m_prevFrameTimestamp;
 #endif
-	UBOOL SceneNodeHack;
 	UBOOL SmoothMaskedTextures;
 
 	UBOOL UseTripleBuffering;

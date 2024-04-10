@@ -306,9 +306,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddIntConfigParam(TEXT("DynamicTexIdRecycleLevel"), CPP_PROPERTY_LOCAL(DynamicTexIdRecycleLevel), 100);
 	SC_AddBoolConfigParam(1,  TEXT("TexDXT1ToDXT3"), CPP_PROPERTY_LOCAL(TexDXT1ToDXT3), 0);
 	SC_AddIntConfigParam(TEXT("FrameRateLimit"), CPP_PROPERTY_LOCAL(FrameRateLimit), 0);
-#if UTGLR_USES_SCENENODEHACK
-	SC_AddBoolConfigParam(3,  TEXT("SceneNodeHack"), CPP_PROPERTY_LOCAL(SceneNodeHack), 1);
-#endif
 	SC_AddBoolConfigParam(2,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
 	SC_AddBoolConfigParam(1,  TEXT("UseTripleBuffering"), CPP_PROPERTY_LOCAL(UseTripleBuffering), 0);
 	SC_AddBoolConfigParam(0, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 1);
@@ -991,9 +988,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(DynamicTexIdRecycleLevel);
 		UTGLR_DEBUG_SHOW_PARAM_REG(TexDXT1ToDXT3);
 		UTGLR_DEBUG_SHOW_PARAM_REG(FrameRateLimit);
-#if UTGLR_USES_SCENENODEHACK
-		UTGLR_DEBUG_SHOW_PARAM_REG(SceneNodeHack);
-#endif
 		UTGLR_DEBUG_SHOW_PARAM_REG(SmoothMaskedTextures);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTripleBuffering);
 
@@ -1677,9 +1671,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 	m_fpSwitchCount = 0;
 	m_AASwitchCount = 0;
 	m_sceneNodeCount = 0;
-# if UTGLR_USES_SCENENODEHACK
-	m_sceneNodeHackCount = 0;
-# endif
 	m_vbFlushCount = 0;
 	m_stat0Count = 0;
 	m_stat1Count = 0;
@@ -2082,10 +2073,7 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 	dout << TEXT("FP enable count = ") << m_fpEnableCount << std::endl;
 	dout << TEXT("FP switch count = ") << m_fpSwitchCount << std::endl;
 	dout << TEXT("AA switch count = ") << m_AASwitchCount << std::endl;
-	dout << TEXT("Scene node count = ") << m_sceneNodeCount << std::endl; 
-# if UTGLR_USES_SCENENODEHACK
-	dout << TEXT("Scene node hack count = ") << m_sceneNodeHackCount << std::endl;
-# endif
+	dout << TEXT("Scene node count = ") << m_sceneNodeCount << std::endl;
 	dout << TEXT("VB flush count = ") << m_vbFlushCount << std::endl;
 	dout << TEXT("Stat 0 count = ") << m_stat0Count << std::endl;
 	dout << TEXT("Stat 1 count = ") << m_stat1Count << std::endl;
@@ -2169,17 +2157,6 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	guard(UD3D9RenderDevice::DrawComplexSurface);
 
 	EndBuffering();
-
-# if UTGLR_USES_SCENENODEHACK
-	if (SceneNodeHack) {
-		if ((Frame->X != m_sceneNodeX) || (Frame->Y != m_sceneNodeY)) {
-#ifdef D3D9_DEBUG
-			m_sceneNodeHackCount++;
-#endif
-			SetSceneNode(Frame);
-		}
-	}
-# endif
 
 	//This function uses cached stream state information
 	//This function uses cached texture state information
@@ -2353,17 +2330,6 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 
 	EndBuffering();
 	StartBuffering(BV_TYPE_NONE);
-
-# if UTGLR_USES_SCENENODEHACK
-	if (SceneNodeHack) {
-		if ((frame->X != m_sceneNodeX) || (frame->Y != m_sceneNodeY)) {
-#ifdef D3D9_DEBUG
-			m_sceneNodeHackCount++;
-#endif
-			SetSceneNode(frame);
-		}
-	}
-# endif
 
 	//This function uses cached stream state information
 	//This function uses cached texture state information
@@ -2721,17 +2687,6 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 
 	EndBufferingExcept(BV_TYPE_GOURAUD_POLYS);
 
-# if UTGLR_USES_SCENENODEHACK
-	if (SceneNodeHack) {
-		if ((Frame->X != m_sceneNodeX) || (Frame->Y != m_sceneNodeY)) {
-#ifdef D3D9_DEBUG
-			m_sceneNodeHackCount++;
-#endif
-			SetSceneNode(Frame);
-		}
-	}
-# endif
-
 	//Reject invalid polygons early so that other parts of the code do not have to deal with them
 	if (NumPts < 3) {
 		return;
@@ -2894,17 +2849,6 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 	}
 
 	EndBufferingExcept(BV_TYPE_TILES);
-
-# if UTGLR_USES_SCENENODEHACK
-	if (SceneNodeHack) {
-		if ((Frame->X != m_sceneNodeX) || (Frame->Y != m_sceneNodeY)) {
-#ifdef D3D9_DEBUG
-			m_sceneNodeHackCount++;
-#endif
-			SetSceneNode(Frame);
-		}
-	}
-# endif
 
 	FLOAT RPX1 = X;
 	FLOAT RPX2 = X + XL;
@@ -4501,7 +4445,6 @@ void UD3D9RenderDevice::EndFlash() {
 		FLOAT RPY1 = 0;
 		FLOAT RPY2 = RPY1 + m_sceneNodeY;
 
-		//Adjust Z coordinate if Z range hack is active
 		FLOAT ZCoord = 0.5f;
 
 		//Make sure at least 4 entries are left in the vertex buffers
