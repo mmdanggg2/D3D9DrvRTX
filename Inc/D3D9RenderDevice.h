@@ -929,12 +929,8 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	FLOAT m_RFX2, m_RFY2;
 	INT m_sceneNodeX, m_sceneNodeY;
 
-	bool m_isATI;
-	bool m_isNVIDIA;
 	DWORD m_curBlendFlags;
 	DWORD m_smoothMaskedTexturesBit;
-	bool m_useAlphaToCoverageForMasked;
-	bool m_alphaToCoverageEnabled;
 	bool m_alphaTestEnabled;
 	DWORD m_curPolyFlags;
 	DWORD m_curPolyFlags2;
@@ -990,7 +986,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	bool m_dxt3TextureCap;
 	bool m_dxt5TextureCap;
 	bool m_alphaTextureCap;
-	bool m_supportsAlphaToCoverage;
 
 	D3DPRESENT_PARAMETERS m_d3dpp;
 	bool m_doSoftwareVertexInit;
@@ -1279,8 +1274,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 			SetBlendNoCheck(blendFlags, isUI);
 		}
 	}
-	void EnableAlphaToCoverageNoCheck(void);
-	void DisableAlphaToCoverageNoCheck(void);
 	void FASTCALL SetBlendNoCheck(DWORD blendFlags, bool isUI);
 
 	inline void FASTCALL SetTexEnv(INT texUnit, DWORD PolyFlags) {

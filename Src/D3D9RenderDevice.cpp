@@ -812,30 +812,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		appErrorf(TEXT("GetDeviceCaps failed (0x%08X)"), hResult);
 	}
 
-	//Get adapter identifier for other vendor specific checks
-	m_isATI = false;
-	m_isNVIDIA = false;
-	{
-		D3DADAPTER_IDENTIFIER9 ident;
-
-		hResult = m_d3d9->GetAdapterIdentifier(D3DADAPTER_DEFAULT, 0, &ident);
-		if (FAILED(hResult)) {
-			appErrorf(TEXT("GetAdapterIdentifier failed (0x%08X)"), hResult);
-		}
-
-		debugf(TEXT("D3D adapter driver      : %s"), appFromAnsi(ident.Driver));
-		debugf(TEXT("D3D adapter description : %s"), appFromAnsi(ident.Description));
-		debugf(TEXT("D3D adapter id          : 0x%04X:0x%04X"), ident.VendorId, ident.DeviceId);
-
-		//Identifying vendor based on vendor id number
-		if (ident.VendorId == 0x1002) {
-			m_isATI = true;
-		}
-		else if (ident.VendorId == 0x10DE) {
-			m_isNVIDIA = true;
-		}
-	}
-
 
 	//Create D3D device
 
@@ -1077,29 +1053,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	if (FAILED(hResult)) {
 		m_alphaTextureCap = false;
 	}
-
-	//Set alpha to coverage capability flag
-	m_supportsAlphaToCoverage = false;
-	//ATI says all cards supporting the DX9 feature set support alpha to coverage
-	//NVIDIA has a way to detect alpha to coverage support
-	//In this case will start filtering based on if supports ps3.0
-	if (m_d3dCaps.PixelShaderVersion >= D3DPS_VERSION(3,0)) {
-		if (m_isATI) {
-			//Supported on ATI DX9 class HW
-			m_supportsAlphaToCoverage = true;
-		}
-		else if (m_isNVIDIA) {
-			//Check if alpha to coverage supported for NVIDIA
-			hResult = m_d3d9->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL,
-				D3DFMT_X8R8G8B8, 0, D3DRTYPE_SURFACE, (D3DFORMAT)MAKEFOURCC('A', 'T', 'O', 'C'));
-			if (FAILED(hResult)) {
-			}
-			else {
-				m_supportsAlphaToCoverage = true;
-			}
-		}
-	}
-
 
 
 	// Validate flags.
@@ -1532,8 +1485,6 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 
 	m_curBlendFlags = PF_Occlude;
 	m_smoothMaskedTexturesBit = 0;
-	m_useAlphaToCoverageForMasked = false;
-	m_alphaToCoverageEnabled = false;
 	m_alphaTestEnabled = false;
 	m_curPolyFlags = 0;
 	m_curPolyFlags2 = 0;
@@ -1874,12 +1825,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 
 		//Clear masked blending state if set before adjusting smooth masked textures bit
 		SetBlend(PF_Occlude);
-
-		//Disable alpha to coverage if currently enabled
-		if (m_alphaToCoverageEnabled) {
-			m_alphaToCoverageEnabled = false;
-			DisableAlphaToCoverageNoCheck();
-		}
 	}
 
 	if (LODBias != PL_LODBias) {
@@ -1905,16 +1850,13 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 		PL_SinglePassDetail = SinglePassDetail;
 	}
 
-
 	//Smooth masked textures bit controls alpha blend for masked textures
 	m_smoothMaskedTexturesBit = 0;
-	m_useAlphaToCoverageForMasked = false;
 	if (SmoothMaskedTextures) {
 		//Use alpha to coverage if using AA and enough samples, and if supported at all
 		//Also requiring fragment program mode for alpha to coverage with D3D9
 		m_smoothMaskedTexturesBit = PF_Masked;
 	}
-
 
 	//Initialize buffer verts proc pointers
 	m_pBuffer3BasicVertsProc = Buffer3BasicVerts;
@@ -6079,30 +6021,6 @@ void UD3D9RenderDevice::ConvertRGBA8_BGRA8888_NoClamp(const FMipmapBase *Mip, IN
 #endif
 }
 
-void UD3D9RenderDevice::EnableAlphaToCoverageNoCheck(void) {
-	//Vendor specific enable alpha to coverage
-	if (m_isATI) {
-		m_d3dDevice->SetRenderState(D3DRS_POINTSIZE, MAKEFOURCC('A', '2', 'M', '1'));
-	}
-	else if (m_isNVIDIA) {
-		m_d3dDevice->SetRenderState(D3DRS_ADAPTIVETESS_Y, (D3DFORMAT)MAKEFOURCC('A', 'T', 'O', 'C'));
-	}
-
-	return;
-}
-
-void UD3D9RenderDevice::DisableAlphaToCoverageNoCheck(void) {
-	//Vendor specific disable alpha to coverage
-	if (m_isATI) {
-		m_d3dDevice->SetRenderState(D3DRS_POINTSIZE, MAKEFOURCC('A', '2', 'M', '0'));
-	}
-	else if (m_isNVIDIA) {
-		m_d3dDevice->SetRenderState(D3DRS_ADAPTIVETESS_Y, D3DFMT_UNKNOWN);
-	}
-
-	return;
-}
-
 void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags, bool isUI) {
 	guardSlow(UD3D9RenderDevice::SetBlend);
 
@@ -6173,11 +6091,6 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags, bool isUI) {
 			m_alphaTestEnabled = true;
 			m_d3dDevice->SetRenderState(D3DRS_ALPHAREF, 127);
 			m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
-
-			if (m_useAlphaToCoverageForMasked) {
-				m_alphaToCoverageEnabled = true;
-				EnableAlphaToCoverageNoCheck();
-			}
 		}
 		else {
 			//Disable alpha test
@@ -6185,11 +6098,6 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags, bool isUI) {
 
 			m_alphaTestEnabled = false;
 			m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
-
-			if (m_useAlphaToCoverageForMasked) {
-				m_alphaToCoverageEnabled = false;
-				DisableAlphaToCoverageNoCheck();
-			}
 		}
 	}
 	if (Xor & PF_Invisible) {
