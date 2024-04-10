@@ -307,13 +307,11 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(1,  TEXT("TexDXT1ToDXT3"), CPP_PROPERTY_LOCAL(TexDXT1ToDXT3), 0);
 	SC_AddIntConfigParam(TEXT("FrameRateLimit"), CPP_PROPERTY_LOCAL(FrameRateLimit), 0);
 #if UTGLR_USES_SCENENODEHACK
-	SC_AddBoolConfigParam(6,  TEXT("SceneNodeHack"), CPP_PROPERTY_LOCAL(SceneNodeHack), 1);
+	SC_AddBoolConfigParam(3,  TEXT("SceneNodeHack"), CPP_PROPERTY_LOCAL(SceneNodeHack), 1);
 #endif
-	SC_AddBoolConfigParam(5,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
+	SC_AddBoolConfigParam(2,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
 	SC_AddBoolConfigParam(1,  TEXT("UseTripleBuffering"), CPP_PROPERTY_LOCAL(UseTripleBuffering), 0);
 	SC_AddBoolConfigParam(0, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 1);
-	SC_AddBoolConfigParam(2,  TEXT("UsePureDevice"), CPP_PROPERTY_LOCAL(UsePureDevice), 1);
-	SC_AddBoolConfigParam(1,  TEXT("UseSoftwareVertexProcessing"), CPP_PROPERTY_LOCAL(UseSoftwareVertexProcessing), 0);
 
 	SurfaceSelectionColor = FColor(0, 0, 31, 31);
 	//new(GetClass(), TEXT("SurfaceSelectionColor"), RF_Public)UStructProperty(CPP_PROPERTY(SurfaceSelectionColor), TEXT("Options"), CPF_Config, FindObjectChecked<UStruct>(NULL, TEXT("Core.Object.Color"), 1));
@@ -879,21 +877,13 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		m_d3dpp.BackBufferCount = 2;
 	}
 
-	//Set initial HW/SW vertex processing preference
-	m_doSoftwareVertexInit = false;
-	if (UseSoftwareVertexProcessing) {
-		m_doSoftwareVertexInit = true;
-	}
-
+	bool doSoftwareVertexInit = false;
 	//Try HW vertex init if not forcing SW vertex init
-	if (!m_doSoftwareVertexInit) {
+	if (!doSoftwareVertexInit) {
 		bool tryDefaultRefreshRate = true;
 		DWORD behaviorFlags = D3DCREATE_HARDWARE_VERTEXPROCESSING;
 
-		//Check if should use pure device
-		if (UsePureDevice && (m_d3dCaps.DevCaps & D3DDEVCAPS_PUREDEVICE)) {
-			behaviorFlags |= D3DCREATE_PUREDEVICE;
-		}
+		behaviorFlags |= D3DCREATE_PUREDEVICE;
 
 		//Possibly attempt to set refresh rate if fullscreen
 		if (!m_d3dpp.Windowed && (RefreshRate > 0)) {
@@ -921,12 +911,12 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 			}
 			if (FAILED(hResult)) {
 				debugf(NAME_Init, TEXT("Failed to create D3D device with hardware vertex processing (0x%08X)"), hResult);
-				m_doSoftwareVertexInit = true;
+				doSoftwareVertexInit = true;
 			}
 		}
 	}
 	//Try SW vertex init if forced earlier or if HW vertex init failed
-	if (m_doSoftwareVertexInit) {
+	if (doSoftwareVertexInit) {
 		bool tryDefaultRefreshRate = true;
 		DWORD behaviorFlags = D3DCREATE_SOFTWARE_VERTEXPROCESSING;
 
@@ -1006,8 +996,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 #endif
 		UTGLR_DEBUG_SHOW_PARAM_REG(SmoothMaskedTextures);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTripleBuffering);
-		UTGLR_DEBUG_SHOW_PARAM_REG(UsePureDevice);
-		UTGLR_DEBUG_SHOW_PARAM_REG(UseSoftwareVertexProcessing);
 
 		#undef UTGLR_DEBUG_SHOW_PARAM_REG
 		#undef UTGLR_DEBUG_SHOW_PARAM_DCV
@@ -1020,9 +1008,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	UseVertexSpecular = 1;
 
 	SupportsTC = UseS3TC;
-
-	BufferActorTris = 1;
-	BufferClippedActorTris = 1;
 
 	UseDetailAlpha = 1;
 
@@ -1642,21 +1627,7 @@ UBOOL UD3D9RenderDevice::Exec(const TCHAR* Cmd, FOutputDevice& Ar) {
 		return 1;
 	}
 #endif
-	if (ParseCommand(&Cmd, TEXT("DGL"))) {
-		if (ParseCommand(&Cmd, TEXT("BUFFERTRIS"))) {
-			BufferActorTris = !BufferActorTris;
-			if (!UseVertexSpecular) BufferActorTris = 0;
-			debugf(TEXT("BUFFERTRIS [%i]"), BufferActorTris);
-			return 1;
-		}
-		else if (ParseCommand(&Cmd, TEXT("BUILD"))) {
-			debugf(TEXT("D3D9 renderer built: ?????"));
-			return 1;
-		}
-
-		return 0;
-	}
-	else if (ParseCommand(&Cmd, TEXT("GetRes"))) {
+	if (ParseCommand(&Cmd, TEXT("GetRes"))) {
 		TArray<FPlane> Relevant;
 		INT i;
 		for (i = 0; i < Modes.Num(); i++) {
@@ -1863,17 +1834,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 	m_pBuffer3FoggedVertsProc = Buffer3FoggedVerts;
 
 	m_pBuffer3VertsProc = NULL;
-
-	//Precalculate the cutoff for buffering actor triangles based on config settings
-	if (!BufferActorTris) {
-		m_bufferActorTrisCutoff = 0;
-	}
-	else if (!BufferClippedActorTris) {
-		m_bufferActorTrisCutoff = 3;
-	}
-	else {
-		m_bufferActorTrisCutoff = 10;
-	}
 
 	//Precalculate detail texture color
 	if (ColorizeDetailTextures) {
@@ -2805,7 +2765,7 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 		return;
 	}
 
-	if (NumPts > m_bufferActorTrisCutoff) {
+	if (NumPts > 10) {
 		EndBuffering();
 
 		//No need to set default projection state here as DrawGouraudPolygonOld will set its own projection state

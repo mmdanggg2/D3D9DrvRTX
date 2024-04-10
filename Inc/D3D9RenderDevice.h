@@ -845,15 +845,10 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	UBOOL SmoothMaskedTextures;
 
 	UBOOL UseTripleBuffering;
-	UBOOL UsePureDevice;
-	UBOOL UseSoftwareVertexProcessing;
 
 	UBOOL EnableSkyBoxAnchors;
 
 	FColor SurfaceSelectionColor;
-
-	UBOOL BufferActorTris;
-	UBOOL BufferClippedActorTris;
 
 	enum {
 		BV_TYPE_NONE			= 0x00,
@@ -933,7 +928,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	DWORD m_smoothMaskedTexturesBit;
 	bool m_alphaTestEnabled;
 	DWORD m_curPolyFlags;
-	INT m_bufferActorTrisCutoff;
 
 	DWORD m_detailTextureColor4ub;
 
@@ -987,7 +981,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	bool m_alphaTextureCap;
 
 	D3DPRESENT_PARAMETERS m_d3dpp;
-	bool m_doSoftwareVertexInit;
 
 
 #ifdef BGRA_MAKE
