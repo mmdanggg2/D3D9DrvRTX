@@ -296,7 +296,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddIntConfigParam(TEXT("MaxAnisotropy"), CPP_PROPERTY_LOCAL(MaxAnisotropy), 0);
 	SC_AddBoolConfigParam(0,  TEXT("NoFiltering"), CPP_PROPERTY_LOCAL(NoFiltering), 0);
 	SC_AddIntConfigParam(TEXT("RefreshRate"), CPP_PROPERTY_LOCAL(RefreshRate), 0);
-	SC_AddBoolConfigParam(8,  TEXT("DetailClipping"), CPP_PROPERTY_LOCAL(DetailClipping), 0);
 	SC_AddBoolConfigParam(7,  TEXT("ColorizeDetailTextures"), CPP_PROPERTY_LOCAL(ColorizeDetailTextures), 0);
 	SC_AddBoolConfigParam(6,  TEXT("SinglePassFog"), CPP_PROPERTY_LOCAL(SinglePassFog), 1);
 	SC_AddBoolConfigParam(5,  TEXT("SinglePassDetail"), CPP_PROPERTY_LOCAL_DCV(SinglePassDetail), 0);
@@ -977,7 +976,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTrilinear);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseS3TC);
 		UTGLR_DEBUG_SHOW_PARAM_REG(NoFiltering);
-		UTGLR_DEBUG_SHOW_PARAM_REG(DetailClipping);
 		UTGLR_DEBUG_SHOW_PARAM_REG(ColorizeDetailTextures);
 		UTGLR_DEBUG_SHOW_PARAM_REG(SinglePassFog);
 		UTGLR_DEBUG_SHOW_PARAM_DCV(SinglePassDetail);
@@ -1137,9 +1135,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 
 
 	//Initialize previous lock variables
-#if !UNREAL_GOLD
-	PL_DetailTextures = DetailTextures;
-#endif
 	PL_OneXBlending = OneXBlending;
 	PL_MaxLogUOverV = MaxLogUOverV;
 	PL_MaxLogVOverU = MaxLogVOverU;
@@ -1786,13 +1781,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 		SetTexLODBiasState(TMUnits);
 	}
 
-#if !UNREAL_GOLD
-	if (DetailTextures != PL_DetailTextures) {
-		PL_DetailTextures = DetailTextures;
-		flushTextures = true;
-	}
-#endif
-
 	if (UseDetailAlpha != PL_UseDetailAlpha) {
 		PL_UseDetailAlpha = UseDetailAlpha;
 		if (UseDetailAlpha) {
@@ -2124,11 +2112,13 @@ void UD3D9RenderDevice::Flush(UBOOL AllowPrecache) {
 		TexInfo[u].pBind = NULL;
 	}
 
-#if !UNREAL_GOLD
+#if UNREAL_GOLD
+	if (UsePrecache && !GIsEditor) {
+#else
 	if (AllowPrecache && UsePrecache && !GIsEditor) {
+#endif
 		PrecacheOnFlip = 1;
 	}
-#endif
 
 	unguard;
 }

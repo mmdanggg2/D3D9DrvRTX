@@ -815,7 +815,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	UBOOL UseS3TC;
 	UBOOL NoFiltering;
 	UBOOL UseDetailAlpha;
-	UBOOL DetailClipping;
 	UBOOL ColorizeDetailTextures;
 	UBOOL SinglePassFog;
 	UBOOL SinglePassDetail;
@@ -865,7 +864,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	//Previous lock variables
 	//Used to detect changes in settings
-	BITFIELD PL_DetailTextures;
 	UBOOL PL_OneXBlending;
 	INT PL_MaxLogUOverV;
 	INT PL_MaxLogVOverU;
