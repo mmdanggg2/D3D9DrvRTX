@@ -2040,13 +2040,9 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 	//Check for optional frame rate limit
 #if !UNREAL_TOURNAMENT_OLDUNREAL
 	if (FrameRateLimit >= 20) {
-#if defined DEUS_EX || defined UTGLR_RUNE_BUILD || UNREAL_GOLD
-		FLOAT curFrameTimestamp;
-#else
 		FTime curFrameTimestamp;
-#endif
-		float timeDiff;
-		float rcpFrameRateLimit;
+		DOUBLE timeDiff;
+		DOUBLE rcpFrameRateLimit;
 
 		//First time timer init if necessary
 		InitFrameRateLimitTimerSafe();
@@ -2057,9 +2053,7 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 
 		rcpFrameRateLimit = 1.0f / FrameRateLimit;
 		if (timeDiff < rcpFrameRateLimit) {
-			float sleepTime;
-
-			sleepTime = rcpFrameRateLimit - timeDiff;
+			float sleepTime = rcpFrameRateLimit - timeDiff;
 			appSleep(sleepTime);
 
 			m_prevFrameTimestamp = appSeconds();
@@ -3385,11 +3379,7 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 	unguard;
 }
 
-#if UNREAL_GOLD || DEUS_EX
-static UTexture* getTextureWithoutNext(UTexture* texture, DOUBLE time, FLOAT fraction) {
-#else
 static UTexture* getTextureWithoutNext(UTexture* texture, FTime time, FLOAT fraction) {
-#endif
 	INT count = 1;
 	for (UTexture* next = texture->AnimNext; next && next != texture; next = next->AnimNext)
 		count++;
@@ -3448,7 +3438,7 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	//	if (!texture)
 	//		texture = GetDefault<AActor>()->Texture;
 	//}
-	auto currTime = frame->Viewport->CurrentTime;
+	FTime currTime = frame->Viewport->CurrentTime;
 	UTexture* renderTexture;
 	if (actor->DrawType == DT_SpriteAnimOnce) {
 		renderTexture = getTextureWithoutNext(texture, currTime, actor->LifeFraction());
@@ -3654,7 +3644,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	actor->Rotation = origRot;
 	actor->DrawScale = origScale;
 
-	auto currentTime = frame->Viewport->CurrentTime;
+	FTime currentTime = frame->Viewport->CurrentTime;
 
 	if (actor->bParticles) {
 		for (INT i = 0; i < numVerts; i++) {

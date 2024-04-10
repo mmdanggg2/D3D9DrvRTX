@@ -72,6 +72,10 @@
 typedef DWORD PTRINT;
 #endif
 
+#if defined DEUS_EX || defined UTGLR_RUNE_BUILD || UNREAL_GOLD
+typedef DOUBLE FTime;
+#endif
+
 #if UNREAL_GOLD
 extern DWORD GUglyHackFlags;
 #endif
@@ -821,11 +825,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	INT DynamicTexIdRecycleLevel;
 	UBOOL TexDXT1ToDXT3;
 	INT FrameRateLimit;
-#if defined DEUS_EX || defined UTGLR_RUNE_BUILD || UNREAL_GOLD
-	FLOAT m_prevFrameTimestamp;
-#else
 	FTime m_prevFrameTimestamp;
-#endif
 	UBOOL SmoothMaskedTextures;
 
 	UBOOL UseTripleBuffering;
