@@ -314,9 +314,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(3,  TEXT("UseTripleBuffering"), CPP_PROPERTY_LOCAL(UseTripleBuffering), 0);
 	SC_AddBoolConfigParam(2,  TEXT("UsePureDevice"), CPP_PROPERTY_LOCAL(UsePureDevice), 1);
 	SC_AddBoolConfigParam(1,  TEXT("UseSoftwareVertexProcessing"), CPP_PROPERTY_LOCAL(UseSoftwareVertexProcessing), 0);
-	SC_AddBoolConfigParam(0,  TEXT("UseAA"), CPP_PROPERTY_LOCAL(UseAA), 0);
-	SC_AddIntConfigParam(TEXT("NumAASamples"), CPP_PROPERTY_LOCAL(NumAASamples), 4);
-	SC_AddBoolConfigParam(2,  TEXT("NoAATiles"), CPP_PROPERTY_LOCAL(NoAATiles), 1);
 	SC_AddBoolConfigParam(1, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 1);
 
 	SurfaceSelectionColor = FColor(0, 0, 31, 31);
@@ -902,52 +899,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		}
 	}
 
-	m_usingAA = false;
-	m_curAAEnable = true;
-	m_defAAEnable = true;
-	m_initNumAASamples = NumAASamples;
-
-	//Select AA mode
-	if (UseAA) {
-		D3DMULTISAMPLE_TYPE MultiSampleType;
-
-		switch (NumAASamples) {
-		case  0: MultiSampleType = D3DMULTISAMPLE_NONE; break;
-		case  1: MultiSampleType = D3DMULTISAMPLE_NONE; break;
-		case  2: MultiSampleType = D3DMULTISAMPLE_2_SAMPLES; break;
-		case  3: MultiSampleType = D3DMULTISAMPLE_3_SAMPLES; break;
-		case  4: MultiSampleType = D3DMULTISAMPLE_4_SAMPLES; break;
-		case  5: MultiSampleType = D3DMULTISAMPLE_5_SAMPLES; break;
-		case  6: MultiSampleType = D3DMULTISAMPLE_6_SAMPLES; break;
-		case  7: MultiSampleType = D3DMULTISAMPLE_7_SAMPLES; break;
-		case  8: MultiSampleType = D3DMULTISAMPLE_8_SAMPLES; break;
-		case  9: MultiSampleType = D3DMULTISAMPLE_9_SAMPLES; break;
-		case 10: MultiSampleType = D3DMULTISAMPLE_10_SAMPLES; break;
-		case 11: MultiSampleType = D3DMULTISAMPLE_11_SAMPLES; break;
-		case 12: MultiSampleType = D3DMULTISAMPLE_12_SAMPLES; break;
-		case 13: MultiSampleType = D3DMULTISAMPLE_13_SAMPLES; break;
-		case 14: MultiSampleType = D3DMULTISAMPLE_14_SAMPLES; break;
-		case 15: MultiSampleType = D3DMULTISAMPLE_15_SAMPLES; break;
-		case 16: MultiSampleType = D3DMULTISAMPLE_16_SAMPLES; break;
-		default:
-			MultiSampleType = D3DMULTISAMPLE_NONE;
-		}
-		m_d3dpp.MultiSampleType = MultiSampleType;
-
-		hResult = m_d3d9->CheckDeviceMultiSampleType(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_d3dpp.BackBufferFormat, m_d3dpp.Windowed, m_d3dpp.MultiSampleType, NULL);
-		if (FAILED(hResult)) {
-			m_d3dpp.MultiSampleType = D3DMULTISAMPLE_NONE;
-		}
-		hResult = m_d3d9->CheckDeviceMultiSampleType(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_d3dpp.AutoDepthStencilFormat, m_d3dpp.Windowed, m_d3dpp.MultiSampleType, NULL);
-		if (FAILED(hResult)) {
-			m_d3dpp.MultiSampleType = D3DMULTISAMPLE_NONE;
-		}
-
-		if (m_d3dpp.MultiSampleType != D3DMULTISAMPLE_NONE) {
-			m_usingAA = true;
-		}
-	}
-
 	//Set increased back buffer count if using triple buffering
 	if (UseTripleBuffering) {
 		m_d3dpp.BackBufferCount = 2;
@@ -1087,9 +1038,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTripleBuffering);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UsePureDevice);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseSoftwareVertexProcessing);
-		UTGLR_DEBUG_SHOW_PARAM_REG(UseAA);
-		UTGLR_DEBUG_SHOW_PARAM_REG(NumAASamples);
-		UTGLR_DEBUG_SHOW_PARAM_REG(NoAATiles);
 
 		#undef UTGLR_DEBUG_SHOW_PARAM_REG
 		#undef UTGLR_DEBUG_SHOW_PARAM_DCV
@@ -1762,13 +1710,6 @@ UBOOL UD3D9RenderDevice::Exec(const TCHAR* Cmd, FOutputDevice& Ar) {
 			debugf(TEXT("D3D9 renderer built: ?????"));
 			return 1;
 		}
-		else if (ParseCommand(&Cmd, TEXT("AA"))) {
-			if (m_usingAA) {
-				m_defAAEnable = !m_defAAEnable;
-				debugf(TEXT("AA Enable [%u]"), (m_defAAEnable) ? 1 : 0);
-			}
-			return 1;
-		}
 
 		return 0;
 	}
@@ -2165,8 +2106,6 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 
 	EndBuffering();
 
-	SetDefaultAAState();
-	SetDefaultProjectionState();
 	SetDefaultStreamState();
 	SetDefaultTextureState();
 
@@ -2356,8 +2295,6 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	}
 # endif
 
-	SetDefaultAAState();
-	SetDefaultProjectionState();
 	//This function uses cached stream state information
 	//This function uses cached texture state information
 
@@ -2542,8 +2479,6 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 	}
 # endif
 
-	SetDefaultAAState();
-	SetDefaultProjectionState();
 	//This function uses cached stream state information
 	//This function uses cached texture state information
 
@@ -3342,8 +3277,6 @@ void UD3D9RenderDevice::Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 			//Start line buffering
 			StartBuffering(BV_TYPE_LINES);
 
-			SetDefaultAAState();
-			SetDefaultProjectionState();
 			SetDefaultStreamState();
 			SetDefaultTextureState();
 
@@ -3450,8 +3383,6 @@ void UD3D9RenderDevice::Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 		//Start line buffering
 		StartBuffering(BV_TYPE_LINES);
 
-		SetDefaultAAState();
-		SetDefaultProjectionState();
 		SetDefaultStreamState();
 		SetDefaultTextureState();
 
@@ -3581,8 +3512,6 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 		//Start point buffering
 		StartBuffering(BV_TYPE_POINTS);
 
-		SetDefaultAAState();
-		SetDefaultProjectionState();
 		SetDefaultStreamState();
 		SetDefaultTextureState();
 
@@ -4710,8 +4639,6 @@ void UD3D9RenderDevice::EndFlash() {
 	if ((FlashScale != FPlane(0.5f, 0.5f, 0.5f, 0.0f)) || (FlashFog != FPlane(0.0f, 0.0f, 0.0f, 0.0f))) {
 		EndBuffering();
 
-		SetDefaultAAState();
-		SetDefaultProjectionState();
 		SetDefaultStreamState();
 		SetDefaultTextureState();
 
@@ -6476,19 +6403,6 @@ void UD3D9RenderDevice::SetVertexDeclNoCheck(IDirect3DVertexDeclaration9 *vertex
 
 	return;
 }
-void UD3D9RenderDevice::SetAAStateNoCheck(bool AAEnable) {
-	//Save new AA state
-	m_curAAEnable = AAEnable;
-
-#ifdef D3D9_DEBUG
-	m_AASwitchCount++;
-#endif
-
-	//Set new AA state
-	m_d3dDevice->SetRenderState(D3DRS_MULTISAMPLEANTIALIAS, (AAEnable) ? TRUE : FALSE);
-
-	return;
-}
 
 
 void UD3D9RenderDevice::RenderPassesExec(void) {
@@ -6821,7 +6735,6 @@ void UD3D9RenderDevice::EndBufferingNoCheck(void) {
 }
 
 void UD3D9RenderDevice::EndGouraudPolygonBufferingNoCheck(void) {
-	SetDefaultAAState();
 	//EndGouraudPolygonBufferingNoCheck sets its own projection state
 	//Stream state set when start buffering
 	//Default texture state set when start buffering
@@ -6851,12 +6764,6 @@ void UD3D9RenderDevice::EndGouraudPolygonBufferingNoCheck(void) {
 }
 
 void UD3D9RenderDevice::EndTileBufferingNoCheck(void) {
-	if (NoAATiles) {
-		SetDisabledAAState();
-	}
-	else {
-		SetDefaultAAState();
-	}
 	//Stream state set when start buffering
 	//Default texture state set when start buffering
 

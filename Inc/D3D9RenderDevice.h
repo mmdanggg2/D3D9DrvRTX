@@ -853,9 +853,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	UBOOL UseTripleBuffering;
 	UBOOL UsePureDevice;
 	UBOOL UseSoftwareVertexProcessing;
-	UBOOL UseAA;
-	INT NumAASamples;
-	UBOOL NoAATiles;
 
 	UBOOL EnableSkyBoxAnchors;
 
@@ -938,11 +935,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	FLOAT m_RProjZ, m_Aspect;
 	FLOAT m_RFX2, m_RFY2;
 	INT m_sceneNodeX, m_sceneNodeY;
-
-	bool m_usingAA;
-	bool m_curAAEnable;
-	bool m_defAAEnable;
-	INT m_initNumAASamples;
 
 	bool m_isATI;
 	bool m_isNVIDIA;
@@ -1400,18 +1392,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		}
 	}
 	void FASTCALL SetVertexDeclNoCheck(IDirect3DVertexDeclaration9 *vertexDecl);
-
-	inline void SetDefaultAAState(void) {
-		if (m_defAAEnable != m_curAAEnable) {
-			SetAAStateNoCheck(m_defAAEnable);
-		}
-	}
-	inline void SetDisabledAAState(void) {
-		if (m_curAAEnable && m_usingAA) {
-			SetAAStateNoCheck(false);
-		}
-	}
-	void FASTCALL SetAAStateNoCheck(bool AAEnable);
 
 	inline void RenderPasses(void) {
 		if (m_rpPassCount != 0) {
