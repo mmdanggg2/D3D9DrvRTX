@@ -933,7 +933,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	DWORD m_smoothMaskedTexturesBit;
 	bool m_alphaTestEnabled;
 	DWORD m_curPolyFlags;
-	DWORD m_curPolyFlags2;
 	INT m_bufferActorTrisCutoff;
 
 	DWORD m_detailTextureColor4ub;

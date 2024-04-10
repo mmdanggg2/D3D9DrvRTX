@@ -1487,7 +1487,6 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	m_smoothMaskedTexturesBit = 0;
 	m_alphaTestEnabled = false;
 	m_curPolyFlags = 0;
-	m_curPolyFlags2 = 0;
 
 	//Initialize color flags
 	m_requestedColorFlags = 0;
@@ -2760,9 +2759,6 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 #endif
 	guard(UD3D9RenderDevice::DrawGouraudPolygon);
 
-	//DrawGouraudPolygon only uses PolyFlags2 locally
-	DWORD PolyFlags2 = 0;
-
 	EndBufferingExcept(BV_TYPE_GOURAUD_POLYS);
 
 # if UTGLR_USES_SCENENODEHACK
@@ -2860,7 +2856,6 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 
 		//Update current poly flags
 		m_curPolyFlags = PolyFlags;
-		m_curPolyFlags2 = PolyFlags2;
 
 
 		//Set default texture state
@@ -2929,9 +2924,6 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 }
 #endif
 	guard(UD3D9RenderDevice::DrawTile);
-
-	//DrawTile does not use PolyFlags2
-	const DWORD PolyFlags2 = 0;
 
 	// stijn: fix for invisible actor icons in ortho viewports
 	if (GIsEditor &&
@@ -3006,7 +2998,6 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 
 			//Update current poly flags (before possible local modification)
 			m_curPolyFlags = PolyFlags;
-			m_curPolyFlags2 = PolyFlags2;
 
 			//Set default texture state
 			SetDefaultTextureState();
@@ -3163,11 +3154,9 @@ void UD3D9RenderDevice::Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 
 		//Draw3DLine does not use PolyFlags2
 		const DWORD PolyFlags = PF_Highlighted | PF_Occlude;
-		const DWORD PolyFlags2 = 0;
 
 		//Check if need to start new line buffering
 		if ((m_curPolyFlags != PolyFlags) ||
-			(m_curPolyFlags2 != PolyFlags2) ||
 			(TexInfo[0].CurrentCacheID != TEX_CACHE_ID_NO_TEX) ||
 			((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 2)) ||
 			(m_bufferedVerts == 0))
@@ -3188,7 +3177,6 @@ void UD3D9RenderDevice::Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 
 			//Update current poly flags
 			m_curPolyFlags = PolyFlags;
-			m_curPolyFlags2 = PolyFlags2;
 
 			//Set blending and no texture for lines
 			SetBlend(PolyFlags);
@@ -3269,11 +3257,9 @@ void UD3D9RenderDevice::Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 
 	//Draw2DLine does not use PolyFlags2
 	const DWORD PolyFlags = PF_Highlighted | PF_Occlude;
-	const DWORD PolyFlags2 = 0;
 
 	//Check if need to start new line buffering
 	if ((m_curPolyFlags != PolyFlags) ||
-		(m_curPolyFlags2 != PolyFlags2) ||
 		(TexInfo[0].CurrentCacheID != TEX_CACHE_ID_NO_TEX) ||
 		((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 2)) ||
 		(m_bufferedVerts == 0))
@@ -3294,7 +3280,6 @@ void UD3D9RenderDevice::Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 
 		//Update current poly flags
 		m_curPolyFlags = PolyFlags;
-		m_curPolyFlags2 = PolyFlags2;
 
 		//Set blending and no texture for lines
 		SetBlend(PolyFlags);
@@ -3398,11 +3383,9 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 
 	//Draw2DPoint does not use PolyFlags2
 	const DWORD PolyFlags = PF_Highlighted | PF_Occlude;
-	const DWORD PolyFlags2 = 0;
 
 	//Check if need to start new point buffering
 	if ((m_curPolyFlags != PolyFlags) ||
-		(m_curPolyFlags2 != PolyFlags2) ||
 		(TexInfo[0].CurrentCacheID != TEX_CACHE_ID_NO_TEX) ||
 		((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 6)) ||
 		(m_bufferedVerts == 0))
@@ -3423,7 +3406,6 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 
 		//Update current poly flags
 		m_curPolyFlags = PolyFlags;
-		m_curPolyFlags2 = PolyFlags2;
 
 		//Set blending and no texture for points
 		SetBlend(PolyFlags);
