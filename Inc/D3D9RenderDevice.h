@@ -816,8 +816,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	FTime m_prevFrameTimestamp;
 	UBOOL SmoothMaskedTextures;
 
-	UBOOL UseTripleBuffering;
-
 	UBOOL EnableSkyBoxAnchors;
 
 	FColor SurfaceSelectionColor;

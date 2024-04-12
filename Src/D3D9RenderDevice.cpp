@@ -301,8 +301,7 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddIntConfigParam(TEXT("DynamicTexIdRecycleLevel"), CPP_PROPERTY_LOCAL(DynamicTexIdRecycleLevel), 100);
 	SC_AddBoolConfigParam(0,  TEXT("TexDXT1ToDXT3"), CPP_PROPERTY_LOCAL(TexDXT1ToDXT3), 0);
 	SC_AddIntConfigParam(TEXT("FrameRateLimit"), CPP_PROPERTY_LOCAL(FrameRateLimit), 0);
-	SC_AddBoolConfigParam(2,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
-	SC_AddBoolConfigParam(1,  TEXT("UseTripleBuffering"), CPP_PROPERTY_LOCAL(UseTripleBuffering), 0);
+	SC_AddBoolConfigParam(1,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
 	SC_AddBoolConfigParam(0, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 1);
 
 	SurfaceSelectionColor = FColor(0, 0, 31, 31);
@@ -862,11 +861,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		}
 	}
 
-	//Set increased back buffer count if using triple buffering
-	if (UseTripleBuffering) {
-		m_d3dpp.BackBufferCount = 2;
-	}
-
 	bool doSoftwareVertexInit = false;
 	//Try HW vertex init if not forcing SW vertex init
 	if (!doSoftwareVertexInit) {
@@ -880,10 +874,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 			//Attempt to create with specific refresh rate
 			m_d3dpp.FullScreen_RefreshRateInHz = RefreshRate;
 			hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
-			//Try again if triple buffering failed
-			if (FAILED(hResult) && UseTripleBuffering && (m_d3dpp.BackBufferCount != 2)) {
-				hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
-			}
 			if (FAILED(hResult)) {
 			}
 			else {
@@ -895,10 +885,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 			//Attempt to create with default refresh rate
 			m_d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
 			hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
-			//Try again if triple buffering failed
-			if (FAILED(hResult) && UseTripleBuffering && (m_d3dpp.BackBufferCount != 2)) {
-				hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
-			}
 			if (FAILED(hResult)) {
 				debugf(NAME_Init, TEXT("Failed to create D3D device with hardware vertex processing (0x%08X)"), hResult);
 				doSoftwareVertexInit = true;
@@ -915,10 +901,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 			//Attempt to create with specific refresh rate
 			m_d3dpp.FullScreen_RefreshRateInHz = RefreshRate;
 			hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
-			//Try again if triple buffering failed
-			if (FAILED(hResult) && UseTripleBuffering && (m_d3dpp.BackBufferCount != 2)) {
-				hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
-			}
 			if (FAILED(hResult)) {
 				debugf(NAME_Init, TEXT("Failed to create D3D device with software vertex processing (0x%08X)"), hResult);
 			}
@@ -931,10 +913,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 			//Attempt to create with default refresh rate
 			m_d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
 			hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
-			//Try again if triple buffering failed
-			if (FAILED(hResult) && UseTripleBuffering && (m_d3dpp.BackBufferCount != 2)) {
-				hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
-			}
 			if (FAILED(hResult)) {
 				// stijn: on win10, we also see devices getting lost here...
 				if (hResult == D3DERR_DEVICELOST) {
@@ -977,7 +955,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(TexDXT1ToDXT3);
 		UTGLR_DEBUG_SHOW_PARAM_REG(FrameRateLimit);
 		UTGLR_DEBUG_SHOW_PARAM_REG(SmoothMaskedTextures);
-		UTGLR_DEBUG_SHOW_PARAM_REG(UseTripleBuffering);
 
 		#undef UTGLR_DEBUG_SHOW_PARAM_REG
 	}
