@@ -434,7 +434,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	//Fixed texture cache ids
 	#define TEX_CACHE_ID_UNUSED		0xFFFFFFFFFFFFFFFFULL
 	#define TEX_CACHE_ID_NO_TEX		0xFFFFFFFF00000010ULL
-	#define TEX_CACHE_ID_ALPHA_TEX	0xFFFFFFFF00000020ULL
 
 	//Mask for poly flags that impact texture object state
 	#define TEX_DYNAMIC_POLY_FLAGS_MASK		(PF_NoSmooth)
@@ -711,9 +710,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	// Updates the vertex colour of the quad buffer
 	inline void updateQuadBuffer(DWORD color);
 
-	//IsNear bits for detail texturing
-	DWORD DetailTextureIsNearArray[VERTEX_ARRAY_SIZE / 3];
-
 	DWORD m_csPolyCount;
 	INT m_csPtCount;
 
@@ -796,9 +792,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 
 	// Hardware constraints.
-	struct {
-		UBOOL SinglePassDetail;
-	} DCV;
 
 	FLOAT LODBias;
 	UBOOL OneXBlending;
@@ -814,10 +807,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	UBOOL UseVertexSpecular;
 	UBOOL UseS3TC;
 	UBOOL NoFiltering;
-	UBOOL UseDetailAlpha;
-	UBOOL ColorizeDetailTextures;
 	UBOOL SinglePassFog;
-	UBOOL SinglePassDetail;
 	UBOOL UseTexIdPool;
 	UBOOL UseTexPool;
 	INT DynamicTexIdRecycleLevel;
@@ -875,8 +865,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	INT PL_MaxAnisotropy;
 	UBOOL PL_SmoothMaskedTextures;
 	FLOAT PL_LODBias;
-	UBOOL PL_UseDetailAlpha;
-	UBOOL PL_SinglePassDetail;
 
 	DWORD m_numDepthBits;
 
@@ -910,8 +898,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	bool m_alphaTestEnabled;
 	DWORD m_curPolyFlags;
 
-	DWORD m_detailTextureColor4ub;
-
 	enum {
 		CF_COLOR_ARRAY		= 0x01,
 		CF_FOG_MODE			= 0x02,
@@ -936,7 +922,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void (FASTCALL *m_pBuffer3VertsProc)(UD3D9RenderDevice *, FTransTexture **);
 
 	IDirect3DTexture9 *m_pNoTexObj;
-	IDirect3DTexture9 *m_pAlphaTexObj;
 
 	// Static variables.
 	static INT NumDevices;
@@ -959,7 +944,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	bool m_dxt1TextureCap;
 	bool m_dxt3TextureCap;
 	bool m_dxt5TextureCap;
-	bool m_alphaTextureCap;
 
 	D3DPRESENT_PARAMETERS m_d3dpp;
 
@@ -1053,9 +1037,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	bool FASTCALL CheckDepthFormat(D3DFORMAT adapterFormat, D3DFORMAT backBufferFormat, D3DFORMAT depthBufferFormat);
 
-	void ConfigValidate_RefreshDCV(void);
 	void ConfigValidate_RequiredExtensions(void);
-	void ConfigValidate_Main(void);
 
 	void InitPermanentResourcesAndRenderingState(void);
 	void FreePermanentResources(void);
@@ -1119,7 +1101,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 #endif
 
 	void InitNoTextureSafe(void);
-	void InitAlphaTextureSafe(void);
 
 	void ScanForOldTextures(void);
 
@@ -1128,14 +1109,8 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 			SetNoTextureNoCheck(Multi);
 		}
 	}
-	inline void SetAlphaTexture(INT Multi) {
-		if (TexInfo[Multi].CurrentCacheID != TEX_CACHE_ID_ALPHA_TEX) {
-			SetAlphaTextureNoCheck(Multi);
-		}
-	}
 
 	void FASTCALL SetNoTextureNoCheck(INT Multi);
-	void FASTCALL SetAlphaTextureNoCheck(INT Multi);
 
 	// Reworked masked texture hack
 	// sets the last bit to 1 when a texture is masked this stops the same texture
@@ -1370,7 +1345,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void RenderPassesExec(void);
 
 	void RenderPassesNoCheckSetup(void);
-	void FASTCALL RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture(FTextureInfo &);
 
 	INT FASTCALL BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet, bool append = false);
 	INT FASTCALL BufferTriangleSurfaceGeometry(const std::vector<FTransTexture>& vertices);

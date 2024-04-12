@@ -283,26 +283,23 @@ void UD3D9RenderDevice::StaticConstructor() {
 #endif
 
 #define CPP_PROPERTY_LOCAL(_name) _name, CPP_PROPERTY(_name)
-#define CPP_PROPERTY_LOCAL_DCV(_name) DCV._name, CPP_PROPERTY(DCV._name)
 
 	//Set parameter defaults and add parameters
 	SC_AddFloatConfigParam(TEXT("LODBias"), CPP_PROPERTY_LOCAL(LODBias), 0.0f);
 	SC_AddBoolConfigParam(0,  TEXT("OneXBlending"), CPP_PROPERTY_LOCAL(OneXBlending), UTGLR_DEFAULT_OneXBlending);
 	SC_AddIntConfigParam(TEXT("MinLogTextureSize"), CPP_PROPERTY_LOCAL(MinLogTextureSize), 0);
 	SC_AddIntConfigParam(TEXT("MaxLogTextureSize"), CPP_PROPERTY_LOCAL(MaxLogTextureSize), 8);
-	SC_AddBoolConfigParam(4,  TEXT("UsePrecache"), CPP_PROPERTY_LOCAL(UsePrecache), 0);
-	SC_AddBoolConfigParam(3,  TEXT("UseTrilinear"), CPP_PROPERTY_LOCAL(UseTrilinear), 0);
-	SC_AddBoolConfigParam(2,  TEXT("UseS3TC"), CPP_PROPERTY_LOCAL(UseS3TC), UTGLR_DEFAULT_UseS3TC);
+	SC_AddBoolConfigParam(2,  TEXT("UsePrecache"), CPP_PROPERTY_LOCAL(UsePrecache), 0);
+	SC_AddBoolConfigParam(1,  TEXT("UseTrilinear"), CPP_PROPERTY_LOCAL(UseTrilinear), 0);
+	SC_AddBoolConfigParam(0,  TEXT("UseS3TC"), CPP_PROPERTY_LOCAL(UseS3TC), UTGLR_DEFAULT_UseS3TC);
 	SC_AddIntConfigParam(TEXT("MaxAnisotropy"), CPP_PROPERTY_LOCAL(MaxAnisotropy), 0);
-	SC_AddBoolConfigParam(0,  TEXT("NoFiltering"), CPP_PROPERTY_LOCAL(NoFiltering), 0);
 	SC_AddIntConfigParam(TEXT("RefreshRate"), CPP_PROPERTY_LOCAL(RefreshRate), 0);
-	SC_AddBoolConfigParam(7,  TEXT("ColorizeDetailTextures"), CPP_PROPERTY_LOCAL(ColorizeDetailTextures), 0);
-	SC_AddBoolConfigParam(6,  TEXT("SinglePassFog"), CPP_PROPERTY_LOCAL(SinglePassFog), 1);
-	SC_AddBoolConfigParam(5,  TEXT("SinglePassDetail"), CPP_PROPERTY_LOCAL_DCV(SinglePassDetail), 0);
-	SC_AddBoolConfigParam(2,  TEXT("UseTexIdPool"), CPP_PROPERTY_LOCAL(UseTexIdPool), 1);
-	SC_AddBoolConfigParam(1,  TEXT("UseTexPool"), CPP_PROPERTY_LOCAL(UseTexPool), 1);
+	SC_AddBoolConfigParam(3,  TEXT("NoFiltering"), CPP_PROPERTY_LOCAL(NoFiltering), 0);
+	SC_AddBoolConfigParam(2,  TEXT("SinglePassFog"), CPP_PROPERTY_LOCAL(SinglePassFog), 1);
+	SC_AddBoolConfigParam(1,  TEXT("UseTexIdPool"), CPP_PROPERTY_LOCAL(UseTexIdPool), 1);
+	SC_AddBoolConfigParam(0,  TEXT("UseTexPool"), CPP_PROPERTY_LOCAL(UseTexPool), 1);
 	SC_AddIntConfigParam(TEXT("DynamicTexIdRecycleLevel"), CPP_PROPERTY_LOCAL(DynamicTexIdRecycleLevel), 100);
-	SC_AddBoolConfigParam(1,  TEXT("TexDXT1ToDXT3"), CPP_PROPERTY_LOCAL(TexDXT1ToDXT3), 0);
+	SC_AddBoolConfigParam(0,  TEXT("TexDXT1ToDXT3"), CPP_PROPERTY_LOCAL(TexDXT1ToDXT3), 0);
 	SC_AddIntConfigParam(TEXT("FrameRateLimit"), CPP_PROPERTY_LOCAL(FrameRateLimit), 0);
 	SC_AddBoolConfigParam(2,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
 	SC_AddBoolConfigParam(1,  TEXT("UseTripleBuffering"), CPP_PROPERTY_LOCAL(UseTripleBuffering), 0);
@@ -317,7 +314,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	new(GetClass(), TEXT("SurfaceSelectionColor"), RF_Public)UStructProperty(CPP_PROPERTY(SurfaceSelectionColor), TEXT("Options"), CPF_Config, ColorStruct);
 
 #undef CPP_PROPERTY_LOCAL
-#undef CPP_PROPERTY_LOCAL_DCV
 
 	//Driver flags
 	SpanBased				= 0;
@@ -338,7 +334,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 
 	//Invalidate fixed texture ids
 	m_pNoTexObj = NULL;
-	m_pAlphaTexObj = NULL;
 
 	//Mark all vertex buffer objects as invalid
 	m_d3dVertexColorBuffer = NULL;
@@ -963,7 +958,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	//Debug parameter listing
 	if (DebugBit(DEBUG_BIT_BASIC)) {
 		#define UTGLR_DEBUG_SHOW_PARAM_REG(_name) DbgPrintInitParam(TEXT(#_name), _name)
-		#define UTGLR_DEBUG_SHOW_PARAM_DCV(_name) DbgPrintInitParam(TEXT(#_name), DCV._name)
 
 		UTGLR_DEBUG_SHOW_PARAM_REG(LODBias);
 		UTGLR_DEBUG_SHOW_PARAM_REG(OneXBlending);
@@ -976,9 +970,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTrilinear);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseS3TC);
 		UTGLR_DEBUG_SHOW_PARAM_REG(NoFiltering);
-		UTGLR_DEBUG_SHOW_PARAM_REG(ColorizeDetailTextures);
 		UTGLR_DEBUG_SHOW_PARAM_REG(SinglePassFog);
-		UTGLR_DEBUG_SHOW_PARAM_DCV(SinglePassDetail);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTexIdPool);
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTexPool);
 		UTGLR_DEBUG_SHOW_PARAM_REG(DynamicTexIdRecycleLevel);
@@ -988,7 +980,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		UTGLR_DEBUG_SHOW_PARAM_REG(UseTripleBuffering);
 
 		#undef UTGLR_DEBUG_SHOW_PARAM_REG
-		#undef UTGLR_DEBUG_SHOW_PARAM_DCV
 	}
 
 	//Restrict dynamic tex id recycle level range
@@ -998,9 +989,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	UseVertexSpecular = 1;
 
 	SupportsTC = UseS3TC;
-
-	UseDetailAlpha = 1;
-
 
 	//Set DXT texture capability flags
 	//Check for DXT1 support
@@ -1022,14 +1010,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		m_dxt5TextureCap = false;
 	}
 
-	//Set alpha texture capability flag
-	m_alphaTextureCap = true;
-	hResult = m_d3d9->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3ddm.Format, 0, D3DRTYPE_TEXTURE, D3DFMT_A8);
-	if (FAILED(hResult)) {
-		m_alphaTextureCap = false;
-	}
-
-
 	// Validate flags.
 
 	//Special extensions validation for init only config pass
@@ -1037,10 +1017,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 #ifdef UTGLR_UNREAL_227_BUILD
 	if (!m_dxt3TextureCap) SupportsTC = 0;
 	if (!m_dxt5TextureCap) SupportsTC = 0;
-#endif
-
-	//DCV refresh
-	ConfigValidate_RefreshDCV();
+#endif;
 
 	//Required extensions config validation pass
 	ConfigValidate_RequiredExtensions();
@@ -1050,10 +1027,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	if (TMUnits > MAX_TMUNITS) {
 		TMUnits = MAX_TMUNITS;
 	}
-
-
-	//Main config validation pass (after set TMUnits)
-	ConfigValidate_Main();
 
 
 	if (MaxAnisotropy < 0) {
@@ -1107,8 +1080,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	debugf(TEXT("MinLogTextureSize = %i"), MinLogTextureSize);
 	debugf(TEXT("MaxLogTextureSize = %i"), MaxLogTextureSize);
 
-	debugf(TEXT("UseDetailAlpha = %i"), UseDetailAlpha);
-
 
 	//Set pointers to aligned memory
 	MapDotArray = (FGLMapDot *)AlignMemPtr(m_MapDotArrayMem, VERTEX_ARRAY_ALIGN);
@@ -1128,7 +1099,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 
 	//Invalidate fixed texture ids
 	m_pNoTexObj = NULL;
-	m_pAlphaTexObj = NULL;
 
 	//Initialize permanent rendering state, including allocation of some resources
 	InitPermanentResourcesAndRenderingState();
@@ -1146,8 +1116,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	PL_MaxAnisotropy = MaxAnisotropy;
 	PL_SmoothMaskedTextures = SmoothMaskedTextures;
 	PL_LODBias = LODBias;
-	PL_UseDetailAlpha = UseDetailAlpha;
-	PL_SinglePassDetail = SinglePassDetail;
 
 
 	//Reset current frame count
@@ -1181,10 +1149,6 @@ void UD3D9RenderDevice::UnsetRes() {
 	if (m_pNoTexObj) {
 		m_pNoTexObj->Release();
 		m_pNoTexObj = NULL;
-	}
-	if (m_pAlphaTexObj) {
-		m_pAlphaTexObj->Release();
-		m_pAlphaTexObj = NULL;
 	}
 
 	//Free permanent resources
@@ -1220,23 +1184,10 @@ bool UD3D9RenderDevice::CheckDepthFormat(D3DFORMAT adapterFormat, D3DFORMAT back
 	return true;
 }
 
-
-void UD3D9RenderDevice::ConfigValidate_RefreshDCV(void) {
-	#define UTGLR_REFRESH_DCV(_name) _name = DCV._name
-
-	UTGLR_REFRESH_DCV(SinglePassDetail);
-
-	#undef UTGLR_REFRESH_DCV
-
-	return;
-}
-
 void UD3D9RenderDevice::ConfigValidate_RequiredExtensions(void) {
 #if !UNREAL_GOLD
 	if (!(m_d3dCaps.TextureOpCaps & D3DTEXOPCAPS_BLENDCURRENTALPHA)) DetailTextures = 0;
 #endif
-	if (!(m_d3dCaps.TextureOpCaps & D3DTEXOPCAPS_BLENDCURRENTALPHA)) UseDetailAlpha = 0;
-	if (!m_alphaTextureCap) UseDetailAlpha = 0;
 	if (!(m_d3dCaps.TextureFilterCaps & D3DPTFILTERCAPS_MINFANISOTROPIC)) MaxAnisotropy = 0;
 	if (!(m_d3dCaps.RasterCaps & D3DPRASTERCAPS_MIPMAPLODBIAS)) LODBias = 0;
 	if (!m_dxt3TextureCap) TexDXT1ToDXT3 = 0;
@@ -1245,18 +1196,6 @@ void UD3D9RenderDevice::ConfigValidate_RequiredExtensions(void) {
 
 	//Force 1X blending if no 2X modulation support
 	if (!(m_d3dCaps.TextureOpCaps & D3DTEXOPCAPS_MODULATE2X)) OneXBlending = 0x1;	//Must use proper bit offset for Bool param
-
-	return;
-}
-
-void UD3D9RenderDevice::ConfigValidate_Main(void) {
-	//Detail alpha requires at least two texture units
-	if (TMUnits < 2) UseDetailAlpha = 0;
-
-	//Single pass detail texturing requires at least 4 texture units
-	if (TMUnits < 4) SinglePassDetail = 0;
-	//Single pass detail texturing requires detail alpha
-	if (!UseDetailAlpha) SinglePassDetail = 0;
 
 	return;
 }
@@ -1325,10 +1264,6 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 
 	if (MaxAnisotropy) {
 		SetTexMaxAnisotropyState(TMUnits);
-	}
-
-	if (UseDetailAlpha) {	// vogel: alpha texture for better detail textures (no vertex alpha)
-		InitAlphaTextureSafe();
 	}
 
 	//Initialize texture environment state
@@ -1718,17 +1653,8 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 
 	bool flushTextures = false;
 
-
-	//DCV refresh
-	ConfigValidate_RefreshDCV();
-
 	//Required extensions config validation pass
 	ConfigValidate_RequiredExtensions();
-
-
-	//Main config validation pass
-	ConfigValidate_Main();
-
 
 	//Detect changes in 1X blending setting and force tex env flush if necessary
 	if (OneXBlending != PL_OneXBlending) {
@@ -1781,17 +1707,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 		SetTexLODBiasState(TMUnits);
 	}
 
-	if (UseDetailAlpha != PL_UseDetailAlpha) {
-		PL_UseDetailAlpha = UseDetailAlpha;
-		if (UseDetailAlpha) {
-			InitAlphaTextureSafe();
-		}
-	}
-
-	if (SinglePassDetail != PL_SinglePassDetail) {
-		PL_SinglePassDetail = SinglePassDetail;
-	}
-
 	//Smooth masked textures bit controls alpha blend for masked textures
 	m_smoothMaskedTexturesBit = 0;
 	if (SmoothMaskedTextures) {
@@ -1806,14 +1721,6 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 	m_pBuffer3FoggedVertsProc = Buffer3FoggedVerts;
 
 	m_pBuffer3VertsProc = NULL;
-
-	//Precalculate detail texture color
-	if (ColorizeDetailTextures) {
-		m_detailTextureColor4ub = 0x00408040;
-	}
-	else {
-		m_detailTextureColor4ub = 0x00808080;
-	}
 
 	// Remember stuff.
 	FlashScale = InFlashScale;
@@ -4539,45 +4446,6 @@ void UD3D9RenderDevice::InitNoTextureSafe(void) {
 	unguard;
 }
 
-//This function is safe to call multiple times to initialize once
-void UD3D9RenderDevice::InitAlphaTextureSafe(void) {
-	guard(UD3D9RenderDevice::InitAlphaTexture);
-	unsigned int u;
-	HRESULT hResult;
-	D3DLOCKED_RECT lockRect;
-	BYTE *pTex;
-
-	//Return early if already initialized
-	if (m_pAlphaTexObj != 0) {
-		return;
-	}
-
-	//Create the texture
-	hResult = m_d3dDevice->CreateTexture(256, 1, 1, 0, D3DFMT_A8, D3DPOOL_MANAGED, &m_pAlphaTexObj, NULL);
-	if (FAILED(hResult)) {
-		appErrorf(TEXT("CreateTexture (alpha) failed"));
-	}
-
-	//Lock texture level 0
-	if (FAILED(m_pAlphaTexObj->LockRect(0, &lockRect, NULL, D3DLOCK_NOSYSLOCK))) {
-		appErrorf(TEXT("Texture lock failed"));
-	}
-
-	//Write texture
-	pTex = (BYTE *)lockRect.pBits;
-	for (u = 0; u < 256; u++) {
-		pTex[u] = 255 - u;
-	}
-
-	//Unlock texture level 0
-	if (FAILED(m_pAlphaTexObj->UnlockRect(0))) {
-		appErrorf(TEXT("Texture unlock failed"));
-	}
-
-	return;
-	unguard;
-}
-
 void UD3D9RenderDevice::ScanForOldTextures(void) {
 	guard(UD3D9RenderDevice::ScanForOldTextures);
 
@@ -4696,26 +4564,6 @@ void UD3D9RenderDevice::SetNoTextureNoCheck(INT Multi) {
 	SetTexFilter(Multi, CT_MIN_FILTER_POINT | CT_MIP_FILTER_NONE);
 
 	TexInfo[Multi].CurrentCacheID = TEX_CACHE_ID_NO_TEX;
-	TexInfo[Multi].pBind = NULL;
-
-	unclockFast(BindCycles);
-
-	unguard;
-}
-
-void UD3D9RenderDevice::SetAlphaTextureNoCheck(INT Multi) {
-	guard(UD3D9RenderDevice::SetAlphaTexture);
-
-	// Set alpha gradient texture.
-	clockFast(BindCycles);
-
-	//Set texture
-	m_d3dDevice->SetTexture(Multi, m_pAlphaTexObj);
-
-	//Set filter
-	SetTexFilter(Multi, CT_MIN_FILTER_LINEAR | CT_MIP_FILTER_NONE | CT_MAG_FILTER_LINEAR_NOT_POINT_BIT | CT_ADDRESS_CLAMP_NOT_WRAP_BIT);
-
-	TexInfo[Multi].CurrentCacheID = TEX_CACHE_ID_ALPHA_TEX;
 	TexInfo[Multi].pBind = NULL;
 
 	unclockFast(BindCycles);
@@ -6233,115 +6081,6 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 		FLOAT UMult = TexInfo[t].UMult;
 		FLOAT VMult = TexInfo[t].VMult;
 		const FGLMapDot *pMapDot = MapDotArray;
-		FGLTexCoord *pTexCoord = m_pTexCoordArray[t];
-
-		INT ptCounter = m_csPtCount;
-		do {
-			pTexCoord->u = (pMapDot->u - UPan) * UMult;
-			pTexCoord->v = (pMapDot->v - VPan) * VMult;
-
-			pMapDot++;
-			pTexCoord++;
-		} while (--ptCounter != 0);
-	} while (++t < m_rpPassCount);
-
-	//Unlock vertexColor and texCoord buffers
-	UnlockVertexColorBuffer();
-	t = 0;
-	do {
-		UnlockTexCoordBuffer(t);
-	} while (++t < m_rpPassCount);
-
-	return;
-}
-
-//Must be called with (m_rpPassCount > 0)
-void UD3D9RenderDevice::RenderPassesNoCheckSetup_SingleOrDualTextureAndDetailTexture(FTextureInfo &DetailTextureInfo) {
-	INT i;
-	INT t;
-	FLOAT NearZ  = 380.0f;
-	FLOAT RNearZ = 1.0f / NearZ;
-
-	//Two extra texture units used for detail texture
-	m_rpPassCount += 2;
-
-	SetBlend(MultiPass.TMU[0].PolyFlags);
-
-	//Surface texture must be 2X blended
-	//Also force PF_Modulated for the TexEnv stage
-	MultiPass.TMU[0].PolyFlags |= (PF_Modulated | PF_FlatShaded);
-
-	//Detail texture uses first two texture units
-	//Other textures use last two texture units
-	i = 2;
-	do {
-		if (i != 0) {
-			SetTexEnv(i, MultiPass.TMU[i - 2].PolyFlags);
-		}
-
-		SetTexture(i, *MultiPass.TMU[i - 2].Info, MultiPass.TMU[i - 2].PolyFlags, MultiPass.TMU[i - 2].PanBias);
-	} while (++i < m_rpPassCount);
-
-	SetAlphaTexture(0);
-
-	SetTexEnv(1, PF_Memorized);
-	SetTextureNoPanBias(1, DetailTextureInfo, PF_Modulated);
-
-	//Set stream state based on number of texture units in use
-	SetStreamState(m_standardNTextureVertexDecl[m_rpPassCount - 1]);
-
-	//Check for additional enabled texture units that should be disabled
-	DisableSubsequentTextures(m_rpPassCount);
-
-	//Make sure at least m_csPtCount entries are left in the vertex buffers
-	if ((m_curVertexBufferPos + m_csPtCount) >= VERTEX_BUFFER_SIZE) {
-		FlushVertexBuffers();
-	}
-
-	//Lock vertexColor and texCoord buffers
-	LockVertexColorBuffer(m_csPtCount);
-	t = 0;
-	do {
-		LockTexCoordBuffer(t, m_csPtCount);
-	} while (++t < m_rpPassCount);
-
-	//Write vertex and color
-	const FGLVertex *pSrcVertexArray = m_csVertexArray;
-	FGLVertexColor *pVertexColorArray = m_pVertexColorArray;
-	DWORD detailColor = m_detailTextureColor4ub | 0xFF000000;
-	i = m_csPtCount;
-	do {
-		pVertexColorArray->x = pSrcVertexArray->x;
-		pVertexColorArray->y = pSrcVertexArray->y;
-		pVertexColorArray->z = pSrcVertexArray->z;
-		pVertexColorArray->color = detailColor;
-		pSrcVertexArray++;
-		pVertexColorArray++;
-	} while (--i != 0);
-
-	//Alpha texture for detail texture uses texture unit 0
-	{
-		const FGLVertex *pVertex = &m_csVertexArray[0];
-		FGLTexCoord *pTexCoord = m_pTexCoordArray[0];
-
-		INT ptCounter = m_csPtCount;
-		do {
-			pTexCoord->u = pVertex->z * RNearZ;
-			pTexCoord->v = 0.5f;
-
-			pVertex++;
-			pTexCoord++;
-		} while (--ptCounter != 0);
-	}
-	//Detail texture uses texture unit 1
-	//Remaining 1 or 2 textures use texture units 2 and 3
-	t = 1;
-	do {
-		FLOAT UPan = TexInfo[t].UPan;
-		FLOAT VPan = TexInfo[t].VPan;
-		FLOAT UMult = TexInfo[t].UMult;
-		FLOAT VMult = TexInfo[t].VMult;
-		const FGLMapDot *pMapDot = &MapDotArray[0];
 		FGLTexCoord *pTexCoord = m_pTexCoordArray[t];
 
 		INT ptCounter = m_csPtCount;
