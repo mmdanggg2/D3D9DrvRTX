@@ -90,7 +90,8 @@ static const D3DVERTEXELEMENT9 g_colorTexStreamDef[] = {
 
 static const D3DVERTEXELEMENT9 g_standardSingleTextureStreamDef[] = {
 	{ 0, 0,  D3DDECLTYPE_FLOAT3,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION,	0 },
-	{ 0, 12, D3DDECLTYPE_D3DCOLOR,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR,		0 },
+	{ 0, 12, D3DDECLTYPE_FLOAT3,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL,		0 },
+	{ 0, 24, D3DDECLTYPE_D3DCOLOR,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR,		0 },
 	{ 2, 0,  D3DDECLTYPE_FLOAT2,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD,	0 },
 	D3DDECL_END()
 };
@@ -6018,6 +6019,9 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 		pVertexColorArray->x = vert.vert.x;
 		pVertexColorArray->y = vert.vert.y;
 		pVertexColorArray->z = vert.vert.z;
+		pVertexColorArray->norm.x = vert.norm.x;
+		pVertexColorArray->norm.y = vert.norm.y;
+		pVertexColorArray->norm.z = vert.norm.z;
 		pVertexColorArray->color = rpColor;
 		pVertexColorArray++;
 	}

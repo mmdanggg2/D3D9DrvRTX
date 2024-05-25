@@ -294,11 +294,19 @@ struct FGLVertex {
 	FLOAT z;
 };
 
+//Normals
+struct FGLNormal {
+	FLOAT x;
+	FLOAT y;
+	FLOAT z;
+};
+
 //Vertex and primary color
 struct FGLVertexColor {
 	FLOAT x;
 	FLOAT y;
 	FLOAT z;
+	FGLNormal norm;
 	DWORD color;
 };
 
@@ -311,22 +319,10 @@ struct FGLVertexColorTex {
 	FLOAT v;
 };
 
-//Normals
-struct FGLNormal {
-	FLOAT x;
-	FLOAT y;
-	FLOAT z;
-};
-
 //Tex coords
 struct FGLTexCoord {
 	FLOAT u;
 	FLOAT v;
-};
-
-struct FGLVertexNorm {
-	FGLVertex vert;
-	FGLNormal norm;
 };
 
 struct FGLVertexNormTex {
