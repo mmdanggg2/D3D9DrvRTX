@@ -379,9 +379,8 @@ void UD3D9Render::ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSu
 	decalOffset += surfBase;
 	for (int i = 0; i < 4; i++) {
 		// Add the 4 decal points to start
-		FTransTexture pt{};
+		FTransTexture& pt = decalPts.emplace_back();
 		pt.Point = decal->Vertices[i] + decalOffset;
-		decalPts.push_back(std::move(pt));
 	}
 
 	int polyPrevIdx = poly->NumPts - 1;
