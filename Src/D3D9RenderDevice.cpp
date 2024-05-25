@@ -1058,10 +1058,6 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	debugf(TEXT("MaxLogTextureSize = %i"), MaxLogTextureSize);
 
 
-	//Set pointers to aligned memory
-	MapDotArray = (FGLMapDot *)AlignMemPtr(m_MapDotArrayMem, VERTEX_ARRAY_ALIGN);
-
-
 	// Verify hardware defaults.
 	check(MinLogTextureSize >= 0);
 	check(MaxLogTextureSize >= 0);
@@ -1258,6 +1254,7 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 
 	m_d3dTempVertexColorBuffer = nullptr;
 	m_vertexTempBufferSize = 0;
+	m_csVertexArray.clear();
 	//Vertex and primary color
 	hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColor) * VERTEX_BUFFER_SIZE, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dVertexColorBuffer, NULL);
 	if (FAILED(hResult)) {
@@ -2062,18 +2059,12 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	m_csVDot = Facet.MapCoords.YAxis | Facet.MapCoords.Origin;
 
 	//Buffer static geometry
-	//Sets m_csPolyCount
-	//m_csPtCount set later from return value
-	//Sets MultiDrawFirstArray and MultiDrawCountArray
 	INT numVerts = BufferStaticComplexSurfaceGeometry(Facet);
 
 	//Reject invalid surfaces early
 	if (numVerts == 0) {
 		return;
 	}
-
-	//Save number of points
-	m_csPtCount = numVerts;
 
 	DWORD PolyFlags = Surface.PolyFlags;
 
@@ -2215,19 +2206,13 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 		}
 
 		//Buffer static geometry
-		//Sets m_csPolyCount
-		//m_csPtCount set later from return value
-		//Sets MultiDrawFirstArray and MultiDrawCountArray
-		numVerts = BufferStaticComplexSurfaceGeometry(facet, numVerts);
+		numVerts = BufferStaticComplexSurfaceGeometry(facet, numVerts > 0);
 	}
 
 	//Reject invalid surfaces early
 	if (numVerts == 0) {
 		return;
 	}
-
-	//Save number of points
-	m_csPtCount = numVerts;
 
 	DWORD PolyFlags = surface.PolyFlags;
 
@@ -3698,7 +3683,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		FTextureInfo* texInfo = entry.first.first;
 		DWORD polyFlags = entry.first.second;
 
-		m_csPtCount = BufferTriangleSurfaceGeometry(entry.second);
+		BufferTriangleSurfaceGeometry(entry.second);
 
 		//Initialize render passes state information
 		m_rpPassCount = 0;
@@ -3792,7 +3777,7 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 		FTextureInfo* texInfo = entry.first.first;
 		DWORD flags = entry.first.second;
 
-		INT numVerts = 0;
+		bool append = false;
 		for (FPoly* poly : entry.second) {
 			FSavedPoly* sPoly = (FSavedPoly*)New<BYTE>(GDynMem, sizeof(FSavedPoly) + poly->NumVertices * sizeof(FTransform*));
 			sPoly->NumPts = poly->NumVertices;
@@ -3815,10 +3800,9 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
 			m_csUDot -= poly->PanU;
 			m_csVDot -= poly->PanV;
 			
-			numVerts = BufferStaticComplexSurfaceGeometry(facet, numVerts);
+			BufferStaticComplexSurfaceGeometry(facet, append);
+			append = true;
 		}
-
-		m_csPtCount = numVerts;
 
 		//Initialize render passes state information
 		m_rpPassCount = 0;
@@ -3985,7 +3969,7 @@ void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* l
 
 	DWORD polyFlags = PF_Occlude;
 
-	m_csPtCount = BufferTriangleSurfaceGeometry(verts);
+	BufferTriangleSurfaceGeometry(verts);
 
 	//Initialize render passes state information
 	m_rpPassCount = 0;
@@ -4004,12 +3988,9 @@ void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* l
 }
 
 INT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FTransTexture>& vertices) {
-	INT Index = 0;
-
 	// Buffer "static" geometry.
-	m_csPolyCount = 0;
-	FGLMapDot* pMapDot = &MapDotArray[0];
-	FGLVertex* pVertex = &m_csVertexArray[0];
+	m_csVertexArray.clear();
+	m_csVertexArray.reserve(vertices.size());
 
 	// I was promised to be given triangles
 	assert(vertices.size() % 3 == 0);
@@ -4017,29 +3998,21 @@ INT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FTransTex
 
 	for (int i = 0; i < tris; i++) {
 		INT numPts = 3;
-
-		m_csPolyCount++;
-
-		Index += numPts;
-		if (Index > VERTEX_ARRAY_SIZE) {
-			dout << L"Mesh has " << Index << L" points, which is larger than vert array size of " << VERTEX_ARRAY_SIZE << L"!" << std::endl;
-			return 0;
-		}
 		for (int j = 0; j < numPts; j++) {
 			const FTransTexture& vert = vertices[(i * 3) + j];
-
-			pMapDot->u = vert.U;
-			pMapDot->v = vert.V;
-			pMapDot++;
-
-			pVertex->x = vert.Point.X;
-			pVertex->y = vert.Point.Y;
-			pVertex->z = vert.Point.Z;
-			pVertex++;
+			FGLVertexNormTex* bufVert = &m_csVertexArray.emplace_back();
+			bufVert->vert.x = vert.Point.X;
+			bufVert->vert.y = vert.Point.Y;
+			bufVert->vert.z = vert.Point.Z;
+			bufVert->norm.x = vert.Normal.X;
+			bufVert->norm.y = vert.Normal.Y;
+			bufVert->norm.z = vert.Normal.Z;
+			bufVert->tex.u = vert.U;
+			bufVert->tex.v = vert.V;
 		};
 	}
 
-	return Index;
+	return m_csVertexArray.size();
 }
 
 void UD3D9RenderDevice::ClearZ(FSceneNode* Frame) {
@@ -5976,8 +5949,9 @@ void UD3D9RenderDevice::RenderPassesExec(void) {
 	//	assert(MultiDrawCountArray[PolyNum] == 3);
 	//	//m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos + MultiDrawFirstArray[PolyNum], MultiDrawCountArray[PolyNum] - 2);
 	//}
-	INT bufferPos = getVertBufferPos(m_csPtCount);
-	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, bufferPos, m_csPolyCount);
+	int ptCount = m_csVertexArray.size();
+	INT bufferPos = getVertBufferPos(ptCount);
+	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, bufferPos, ptCount / 3);
 
 #ifdef UTGLR_DEBUG_WORLD_WIREFRAME
 	m_d3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
@@ -6024,31 +5998,29 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 	//Check for additional enabled texture units that should be disabled
 	DisableSubsequentTextures(m_rpPassCount);
 
+	int ptCount = m_csVertexArray.size();
 	//Make sure at least m_csPtCount entries are left in the vertex buffers
-	if ((m_curVertexBufferPos + m_csPtCount) >= VERTEX_BUFFER_SIZE) {
+	if ((m_curVertexBufferPos + ptCount) >= VERTEX_BUFFER_SIZE) {
 		FlushVertexBuffers();
 	}
 
 	//Lock vertexColor and texCoord buffers
-	LockVertexColorBuffer(m_csPtCount);
+	LockVertexColorBuffer(ptCount);
 	t = 0;
 	do {
-		LockTexCoordBuffer(t, m_csPtCount);
+		LockTexCoordBuffer(t, ptCount);
 	} while (++t < m_rpPassCount);
 
 	//Write vertex and color
-	const FGLVertex *pSrcVertexArray = m_csVertexArray;
 	FGLVertexColor *pVertexColorArray = m_pVertexColorArray;
 	DWORD rpColor = m_rpColor;
-	i = m_csPtCount;
-	do {
-		pVertexColorArray->x = pSrcVertexArray->x;
-		pVertexColorArray->y = pSrcVertexArray->y;
-		pVertexColorArray->z = pSrcVertexArray->z;
+	for (FGLVertexNormTex& vert : m_csVertexArray) {
+		pVertexColorArray->x = vert.vert.x;
+		pVertexColorArray->y = vert.vert.y;
+		pVertexColorArray->z = vert.vert.z;
 		pVertexColorArray->color = rpColor;
-		pSrcVertexArray++;
 		pVertexColorArray++;
-	} while (--i != 0);
+	}
 
 	//Write texCoord
 	t = 0;
@@ -6057,15 +6029,13 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 		FLOAT VPan = TexInfo[t].VPan;
 		FLOAT UMult = TexInfo[t].UMult;
 		FLOAT VMult = TexInfo[t].VMult;
-		const FGLMapDot *pMapDot = MapDotArray;
 		FGLTexCoord *pTexCoord = m_pTexCoordArray[t];
 
-		INT ptCounter = m_csPtCount;
-		do {
-			pTexCoord->u = (pMapDot->u - UPan) * UMult;
-			pTexCoord->v = (pMapDot->v - VPan) * VMult;
+		INT ptCounter = ptCount;
+		for (FGLVertexNormTex& vert : m_csVertexArray) {
+			pTexCoord->u = (vert.tex.u - UPan) * UMult;
+			pTexCoord->v = (vert.tex.v - VPan) * VMult;
 
-			pMapDot++;
 			pTexCoord++;
 		} while (--ptCounter != 0);
 	} while (++t < m_rpPassCount);
@@ -6081,18 +6051,11 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 }
 
 INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet, bool append) {
-	int startIndex;
-	if (append) {
-		startIndex = m_csPolyCount * 3;
-	} else {
-		m_csPolyCount = 0;
-		startIndex = 0;
+	if (!append) {
+		m_csVertexArray.clear();
 	}
-	INT Index = startIndex;
 
 	// Buffer "static" geometry.
-	FGLMapDot* pMapDot = &MapDotArray[startIndex];
-	FGLVertex* pVertex = &m_csVertexArray[startIndex];
 	for (FSavedPoly* Poly = Facet.Polys; Poly; Poly = Poly->Next) {
 		//Skip if not enough points
 		INT NumPts = Poly->NumPts;
@@ -6101,51 +6064,48 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 		}
 		INT numPolys = NumPts - 2;
 
-		m_csPolyCount += numPolys;
+		m_csVertexArray.reserve(m_csVertexArray.size() + NumPts);
 
-		Index += numPolys * 3;
-		if (Index > VERTEX_ARRAY_SIZE) {
-			dout << L"Surface has " << Index << L" points, which is larger than vert array size of " << VERTEX_ARRAY_SIZE << L"!" << std::endl;
-			return 0;
-		}
 		FTransform** pPts = &Poly->Pts[0];
 		const FVector* hubPoint = &(*pPts++)->Point;
 		const FVector* secondPoint = &(*pPts++)->Point;
 		do {
 			const FVector* point = &(*pPts++)->Point;
+			FGLVertexNormTex* bufVert = &m_csVertexArray.emplace_back();
+			bufVert->vert.x = hubPoint->X;
+			bufVert->vert.y = hubPoint->Y;
+			bufVert->vert.z = hubPoint->Z;
+			bufVert->norm.x = 0;
+			bufVert->norm.y = 0;
+			bufVert->norm.z = 0;
+			bufVert->tex.u = (Facet.MapCoords.XAxis | *hubPoint) - m_csUDot;
+			bufVert->tex.v = (Facet.MapCoords.YAxis | *hubPoint) - m_csVDot;
 
-			pMapDot->u = (Facet.MapCoords.XAxis | *hubPoint) - m_csUDot;
-			pMapDot->v = (Facet.MapCoords.YAxis | *hubPoint) - m_csVDot;
-			pMapDot++;
+			bufVert = &m_csVertexArray.emplace_back();
+			bufVert->vert.x = secondPoint->X;
+			bufVert->vert.y = secondPoint->Y;
+			bufVert->vert.z = secondPoint->Z;
+			bufVert->norm.x = 0;
+			bufVert->norm.y = 0;
+			bufVert->norm.z = 0;
+			bufVert->tex.u = (Facet.MapCoords.XAxis | *secondPoint) - m_csUDot;
+			bufVert->tex.v = (Facet.MapCoords.YAxis | *secondPoint) - m_csVDot;
 
-			pVertex->x = hubPoint->X;
-			pVertex->y = hubPoint->Y;
-			pVertex->z = hubPoint->Z;
-			pVertex++;
-
-			pMapDot->u = (Facet.MapCoords.XAxis | *secondPoint) - m_csUDot;
-			pMapDot->v = (Facet.MapCoords.YAxis | *secondPoint) - m_csVDot;
-			pMapDot++;
-
-			pVertex->x = secondPoint->X;
-			pVertex->y = secondPoint->Y;
-			pVertex->z = secondPoint->Z;
-			pVertex++;
-
-			pMapDot->u = (Facet.MapCoords.XAxis | *point) - m_csUDot;
-			pMapDot->v = (Facet.MapCoords.YAxis | *point) - m_csVDot;
-			pMapDot++;
-
-			pVertex->x = point->X;
-			pVertex->y = point->Y;
-			pVertex->z = point->Z;
-			pVertex++;
+			bufVert = &m_csVertexArray.emplace_back();
+			bufVert->vert.x = point->X;
+			bufVert->vert.y = point->Y;
+			bufVert->vert.z = point->Z;
+			bufVert->norm.x = 0;
+			bufVert->norm.y = 0;
+			bufVert->norm.z = 0;
+			bufVert->tex.u = (Facet.MapCoords.XAxis | *point) - m_csUDot;
+			bufVert->tex.v = (Facet.MapCoords.YAxis | *point) - m_csVDot;
 
 			secondPoint = point;
 		} while (--numPolys != 0);
 	}
 
-	return Index;
+	return m_csVertexArray.size();
 }
 
 void UD3D9RenderDevice::EndBufferingNoCheck(void) {

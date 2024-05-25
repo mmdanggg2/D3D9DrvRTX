@@ -119,7 +119,6 @@ typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
 #define MAX_TMUNITS			4		// vogel: maximum number of texture mapping units supported
 
 //Must be at least 2000
-#define VERTEX_ARRAY_SIZE	75000	// big internal buffer for loading up larger meshes
 #define VERTEX_BUFFER_SIZE	1000	// permanent small draw call buffer
 
 
@@ -325,6 +324,17 @@ struct FGLTexCoord {
 	FLOAT v;
 };
 
+struct FGLVertexNorm {
+	FGLVertex vert;
+	FGLNormal norm;
+};
+
+struct FGLVertexNormTex {
+	FGLVertex vert;
+	FGLNormal norm;
+	FGLTexCoord tex;
+};
+
 //Secondary color
 struct FGLSecondaryColor {
 	DWORD specular;
@@ -459,12 +469,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		D3DLOCKED_RECT lockRect;
 	} m_texConvertCtx;
 
-#pragma warning(push)
-#pragma warning(disable : 4146)
-	inline void * FASTCALL AlignMemPtr(void *ptr, DWORD align) {
-		return (void *)(((DWORD)ptr + (align - 1)) & -align);
-	}
-#pragma warning(pop)
 	enum { VERTEX_ARRAY_ALIGN = 64 };	//Must be even multiple of 16B for SSE
 	enum { VERTEX_ARRAY_TAIL_PADDING = 72 };	//Must include 8B for half SSE tail
 
@@ -505,7 +509,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	//Current vertex declaration state tracking
 	IDirect3DVertexDeclaration9 *m_curVertexDecl;
 	//Vertex and primary color
-	FGLVertex m_csVertexArray[VERTEX_ARRAY_SIZE];
+	std::vector<FGLVertexNormTex> m_csVertexArray;
 	IDirect3DVertexBuffer9 *m_d3dVertexColorBuffer;
 	FGLVertexColor *m_pVertexColorArray;
 	INT m_vertexTempBufferSize;
@@ -526,9 +530,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	INT m_texTempBufferSize[MAX_TMUNITS];
 	IDirect3DVertexBuffer9* m_d3dTempTexCoordBuffer[MAX_TMUNITS];
 	IDirect3DVertexBuffer9* m_currentTexCoordBuffer[MAX_TMUNITS];
-
-	FGLMapDot *MapDotArray;
-	BYTE m_MapDotArrayMem[(sizeof(FGLMapDot) * VERTEX_ARRAY_SIZE) + VERTEX_ARRAY_ALIGN + VERTEX_ARRAY_TAIL_PADDING];
 
 	//Vertex buffer state flags
 	INT m_curVertexBufferPos;
@@ -709,9 +710,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	// Updates the vertex colour of the quad buffer
 	inline void updateQuadBuffer(DWORD color);
-
-	DWORD m_csPolyCount;
-	INT m_csPtCount;
 
 	FLOAT m_csUDot;
 	FLOAT m_csVDot;
