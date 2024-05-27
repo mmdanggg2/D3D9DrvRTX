@@ -29,9 +29,25 @@
 		#endif
 #elif defined(DEUS_EX)
 	#define UTGLR_VALID_BUILD_CONFIG 1
-#elif defined(UTGLR_RUNE_BUILD)
+	#define UTGLR_ALT_DECLARE_CLASS 1
+	#define UTGLR_DEFINE_FTIME 1
+#elif defined(NERF_ARENA)
+	#define UTGLR_VALID_BUILD_CONFIG 1
+	#define UTGLR_USES_ALPHABLEND 0
+	#define UTGLR_NO_DECALS 1
+	#define UTGLR_ALT_DECLARE_CLASS 1
+	#define UTGLR_DEFINE_FTIME 1
+	#define UTGLR_ALT_FLUSH 1
+	#define UTGLR_DEFINE_HACK_FLAGS 1
+	#define UTGLR_OLD_POLY_CLASSES 1
+	#define UTGLR_NO_DETAIL_TEX 1
+	#define UTGLR_NO_ALLOW_PRECACHE 1
+	#define UTGLR_NO_PLAYER_FLAG 1
+	#define UTGLR_NO_SUPER_EXEC 1
+#elif defined(RUNE)
 	#define UTGLR_VALID_BUILD_CONFIG 1
 	#define UTGLR_USES_ALPHABLEND 1
+	#define UTGLR_DEFINE_FTIME 1
 #elif defined(UTGLR_UNREAL_227_BUILD)
 	#define UTGLR_VALID_BUILD_CONFIG 1
 	#define UTGLR_USES_ALPHABLEND 1
@@ -39,6 +55,14 @@
 	#define UTGLR_VALID_BUILD_CONFIG 1
 	#define UTGLR_USES_ALPHABLEND 0
 	#define UTGLR_NO_DECALS 1
+	#define UTGLR_ALT_DECLARE_CLASS 1
+	#define UTGLR_DEFINE_FTIME 1
+	#define UTGLR_ALT_FLUSH 1
+	#define UTGLR_DEFINE_HACK_FLAGS 1
+	#define UTGLR_OLD_POLY_CLASSES 1
+	#define UTGLR_NO_DETAIL_TEX 1
+	#define UTGLR_NO_ALLOW_PRECACHE 1
+	#define UTGLR_NO_SUPER_EXEC 1
 #else
 	#define UTGLR_VALID_BUILD_CONFIG 0
 #endif
@@ -72,11 +96,11 @@
 typedef DWORD PTRINT;
 #endif
 
-#if defined DEUS_EX || defined UTGLR_RUNE_BUILD || UNREAL_GOLD
+#if UTGLR_DEFINE_FTIME
 typedef DOUBLE FTime;
 #endif
 
-#if UNREAL_GOLD
+#if UTGLR_DEFINE_HACK_FLAGS
 extern DWORD GUglyHackFlags;
 #endif
 
@@ -420,7 +444,7 @@ typedef URenderDevice RENDERDEVICE_SUPER;
 // A D3D9 rendering device attached to a viewport.
 //
 class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
-#if DEUS_EX || UNREAL_GOLD
+#if UTGLR_ALT_DECLARE_CLASS
 	DECLARE_CLASS(UD3D9RenderDevice, RENDERDEVICE_SUPER, CLASS_Config)
 #else
 	DECLARE_CLASS(UD3D9RenderDevice, RENDERDEVICE_SUPER, CLASS_Config, D3D9DrvRTX)
@@ -1045,7 +1069,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane ScreenClear, DWORD RenderLockFlags, BYTE* InHitData, INT* InHitSize);
 	void SetSceneNode(FSceneNode* Frame);
 	void Unlock(UBOOL Blit);
-#if UNREAL_GOLD
+#if UTGLR_ALT_FLUSH
 	void Flush() override;
 #else
 	void Flush(UBOOL AllowPrecache) override;
@@ -1054,7 +1078,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet);
 	// Takes a list of faces and draws them in batches
 	void drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surface, std::vector<FSurfaceFacet>& facets);
-#ifdef UTGLR_RUNE_BUILD
+#ifdef RUNE
 	void PreDrawFogSurface();
 	void PostDrawFogSurface();
 	void DrawFogSurface(FSceneNode* Frame, FFogSurf &FogSurf);

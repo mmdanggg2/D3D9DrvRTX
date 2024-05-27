@@ -66,7 +66,7 @@ static const char *g_d3d9DllName = "d3d9d.dll";
 static const char *g_d3d9DllName = "d3d9.dll";
 #endif
 
-#if UNREAL_GOLD
+#if UTGLR_DEFINE_HACK_FLAGS
 DWORD GUglyHackFlags;
 #endif
 
@@ -277,7 +277,7 @@ void UD3D9RenderDevice::StaticConstructor() {
 	const UBOOL UTGLR_DEFAULT_OneXBlending = 0;
 #endif
 
-#if defined DEUS_EX || defined UTGLR_RUNE_BUILD
+#if defined DEUS_EX || defined RUNE
 	const UBOOL UTGLR_DEFAULT_UseS3TC = 0;
 #else
 	const UBOOL UTGLR_DEFAULT_UseS3TC = 1;
@@ -318,7 +318,7 @@ void UD3D9RenderDevice::StaticConstructor() {
 	//Driver flags
 	SpanBased				= 0;
 	SupportsFogMaps			= 1;
-#ifdef UTGLR_RUNE_BUILD
+#ifdef RUNE
 	SupportsDistanceFog		= 1;
 #else
 	SupportsDistanceFog		= 0;
@@ -559,7 +559,7 @@ void UD3D9RenderDevice::BufferAdditionalClippedVerts(FTransTexture** Pts, INT Nu
 			m_pSecondaryColorArray[m_bufferedVerts].specular = FPlaneTo_BGR_A0(&P->Fog);
 		}
 		else if (m_requestedColorFlags & CF_COLOR_ARRAY) {
-#ifdef UTGLR_RUNE_BUILD
+#ifdef RUNE
 			pVertexColorArray->color = FPlaneTo_BGR_Aub(&P->Light, m_gpAlpha);
 #else
 			pVertexColorArray->color = FPlaneTo_BGRClamped_A255(&P->Light);
@@ -585,7 +585,7 @@ void UD3D9RenderDevice::BufferAdditionalClippedVerts(FTransTexture** Pts, INT Nu
 			m_pSecondaryColorArray[m_bufferedVerts].specular = FPlaneTo_BGR_A0(&P->Fog);
 		}
 		else if (m_requestedColorFlags & CF_COLOR_ARRAY) {
-#ifdef UTGLR_RUNE_BUILD
+#ifdef RUNE
 			pVertexColorArray->color = FPlaneTo_BGR_Aub(&P->Light, m_gpAlpha);
 #else
 			pVertexColorArray->color = FPlaneTo_BGRClamped_A255(&P->Light);
@@ -611,7 +611,7 @@ void UD3D9RenderDevice::BufferAdditionalClippedVerts(FTransTexture** Pts, INT Nu
 			m_pSecondaryColorArray[m_bufferedVerts].specular = FPlaneTo_BGR_A0(&P->Fog);
 		}
 		else if (m_requestedColorFlags & CF_COLOR_ARRAY) {
-#ifdef UTGLR_RUNE_BUILD
+#ifdef RUNE
 			pVertexColorArray->color = FPlaneTo_BGR_Aub(&P->Light, m_gpAlpha);
 #else
 			pVertexColorArray->color = FPlaneTo_BGRClamped_A255(&P->Light);
@@ -1065,7 +1065,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	check(MinLogTextureSize <= MaxLogTextureSize);
 
 	// Flush textures.
-#if UNREAL_GOLD
+#if UTGLR_ALT_FLUSH
 	Flush();
 #else
 	Flush(1);
@@ -1113,7 +1113,7 @@ void UD3D9RenderDevice::UnsetRes() {
 	check(m_d3dDevice);
 
 	//Flush textures
-#if UNREAL_GOLD
+#if UTGLR_ALT_FLUSH
 	Flush();
 #else
 	Flush(1);
@@ -1159,7 +1159,7 @@ bool UD3D9RenderDevice::CheckDepthFormat(D3DFORMAT adapterFormat, D3DFORMAT back
 }
 
 void UD3D9RenderDevice::ConfigValidate_RequiredExtensions(void) {
-#if !UNREAL_GOLD
+#if !UTGLR_NO_DETAIL_TEX
 	if (!(m_d3dCaps.TextureOpCaps & D3DTEXOPCAPS_BLENDCURRENTALPHA)) DetailTextures = 0;
 #endif
 	if (!(m_d3dCaps.TextureFilterCaps & D3DPTFILTERCAPS_MINFANISOTROPIC)) MaxAnisotropy = 0;
@@ -1213,7 +1213,7 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	m_d3dDevice->SetRenderState(D3DRS_SHADEMODE, D3DSHADE_GOURAUD);
 	m_d3dDevice->SetRenderState(D3DRS_DITHERENABLE, TRUE);
 
-#ifdef UTGLR_RUNE_BUILD
+#ifdef RUNE
 	m_d3dDevice->SetRenderState(D3DRS_FOGTABLEMODE, D3DFOG_LINEAR);
 	FLOAT fFogStart = 0.0f;
 	m_d3dDevice->SetRenderState(D3DRS_FOGSTART, *(DWORD *)&fFogStart);
@@ -1514,7 +1514,7 @@ UBOOL UD3D9RenderDevice::Init(UViewport* InViewport, INT NewX, INT NewY, INT New
 UBOOL UD3D9RenderDevice::Exec(const TCHAR* Cmd, FOutputDevice& Ar) {
 	guard(UD3D9RenderDevice::Exec);
 
-#if !UNREAL_GOLD
+#if !UTGLR_NO_SUPER_EXEC
 	if (Super::Exec(Cmd, Ar)) {
 		return 1;
 	}
@@ -1715,7 +1715,7 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 
 	//Flush textures if necessary due to config change
 	if (flushTextures) {
-#if UNREAL_GOLD
+#if UTGLR_ALT_FLUSH
 		Flush();
 #else
 		Flush(1);
@@ -1940,7 +1940,7 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 	unguard;
 }
 
-#if UNREAL_GOLD
+#if UTGLR_ALT_FLUSH
 void UD3D9RenderDevice::Flush() {
 #else
 void UD3D9RenderDevice::Flush(UBOOL AllowPrecache) {
@@ -1994,7 +1994,7 @@ void UD3D9RenderDevice::Flush(UBOOL AllowPrecache) {
 		TexInfo[u].pBind = NULL;
 	}
 
-#if UNREAL_GOLD
+#if UTGLR_NO_ALLOW_PRECACHE
 	if (UsePrecache && !GIsEditor) {
 #else
 	if (AllowPrecache && UsePrecache && !GIsEditor) {
@@ -2259,7 +2259,7 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 	unguard;
 }
 
-#ifdef UTGLR_RUNE_BUILD
+#ifdef RUNE
 void UD3D9RenderDevice::PreDrawFogSurface() {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 {
@@ -2271,8 +2271,6 @@ void UD3D9RenderDevice::PreDrawFogSurface() {
 
 	EndBuffering();
 
-	SetDefaultAAState();
-	SetDefaultProjectionState();
 	SetDefaultStreamState();
 	SetDefaultTextureState();
 
@@ -2321,13 +2319,13 @@ void UD3D9RenderDevice::DrawFogSurface(FSceneNode* Frame, FFogSurf &FogSurf) {
 		INT NumPts = Poly->NumPts;
 
 		//Make sure at least NumPts entries are left in the vertex buffers
-		if ((m_curVertexBufferPos + NumPts) >= VERTEX_ARRAY_SIZE) {
+		if ((m_curVertexBufferPos + NumPts) >= VERTEX_BUFFER_SIZE) {
 			FlushVertexBuffers();
 		}
 
 		//Lock vertexColor and texCoord0 buffers
-		LockVertexColorBuffer();
-		LockTexCoordBuffer(0);
+		LockVertexColorBuffer(NumPts);
+		LockTexCoordBuffer(0, NumPts);
 
 		INT Index = 0;
 		for (INT i = 0; i < NumPts; i++) {
@@ -2490,7 +2488,7 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 			m_pSecondaryColorArray[Index].specular = FPlaneTo_BGR_A0(&P->Fog);
 		}
 		else {
-#ifdef UTGLR_RUNE_BUILD
+#ifdef RUNE
 			destVertexColor.color = FPlaneTo_BGR_Aub(&P->Light, alpha);
 #else
 			destVertexColor.color = FPlaneTo_BGRClamped_A255(&P->Light);

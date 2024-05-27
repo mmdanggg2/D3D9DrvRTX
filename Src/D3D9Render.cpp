@@ -78,7 +78,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 				FLOAT panV = surf->PanV;
 				if (flags & PF_AutoUPan || flags & PF_AutoVPan) {
 					const AZoneInfo* zone = nullptr;
-#if !UNREAL_GOLD
+#if !UTGLR_OLD_POLY_CLASSES
 					for (int i = 0; i < surf->Nodes.Num(); i++) {
 						// Search for a zone actor on any part of the surface since this node may not have it linked.
 						const FBspNode& surfNode = model->Nodes(surf->Nodes(i));
@@ -117,7 +117,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 			FSavedPoly* poly = (FSavedPoly*)New<BYTE>(GDynMem, sizeof(FSavedPoly) + node.NumVertices * sizeof(FTransform*));
 			poly->Next = facet->Polys;
 			facet->Polys = poly;
-#if !UNREAL_GOLD
+#if !UTGLR_OLD_POLY_CLASSES
 			poly->iNode = iNode;
 #endif
 			poly->NumPts = node.NumVertices;
@@ -473,6 +473,7 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 		weapon->Mesh = origMesh;
 		weapon->DrawScale = origDrawScale;
 	}
+#if !UTGLR_NO_PLAYER_FLAG
 	if (pawn->PlayerReplicationInfo && pawn->PlayerReplicationInfo->HasFlag) {
 		AActor* flag = pawn->PlayerReplicationInfo->HasFlag;
 
@@ -485,6 +486,7 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 		flag->Location = origLoc;
 		flag->Rotation = origRot;
 	}
+#endif
 }
 
 void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor) {

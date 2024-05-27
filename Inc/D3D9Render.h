@@ -19,7 +19,7 @@ template <typename T>
 using TexFlagKeyMap = std::unordered_map<TexFlagKey, T, TexFlagKey_Hash>;
 
 class UD3D9Render : public URender {
-#if DEUS_EX || UNREAL_GOLD
+#if UTGLR_ALT_DECLARE_CLASS
 	DECLARE_CLASS(UD3D9Render, URender, CLASS_Config);
 #else
 	DECLARE_CLASS(UD3D9Render, URender, CLASS_Config, D3D9DrvRTX);
@@ -57,5 +57,9 @@ static_assert(sizeof(UD3D9Render) == sizeof(URender));
 #elif UNREAL_GOLD
 constexpr int UGold_size = 240;
 static_assert(sizeof(URender) == UGold_size);
+static_assert(sizeof(UD3D9Render) == sizeof(URender));
+#elif RUNE
+constexpr int Rune_size = 256;
+static_assert(sizeof(URender) == Rune_size);
 static_assert(sizeof(UD3D9Render) == sizeof(URender));
 #endif
