@@ -102,10 +102,12 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 						panV += fmod(levelTime * 35.0 * (zone ? zone->TexVPanSpeed : 1.0), 1024.0);
 					}
 				}
+#if !RUNE
 				if (flags & PF_SmallWavy) {
 					panU += 8.0 * sin(levelTime) + 4.0 * cos(2.3 * levelTime);
 					panV += 8.0 * cos(levelTime) + 4.0 * sin(2.3 * levelTime);
 				}
+#endif
 				if (panU != 0 || panV != 0) {
 					FVector* pan = New<FVector>(GDynMem);
 					*pan = FVector(panU, panV, 0);
@@ -430,6 +432,7 @@ void UD3D9Render::ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSu
 #endif
 
 void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord) {
+#if !RUNE
 	AInventory* weapon = pawn->Weapon;
 	if (specialCoord.exists && weapon && weapon->ThirdPersonMesh) {
 		specialCoord.enabled = true;
@@ -473,6 +476,7 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 		weapon->Mesh = origMesh;
 		weapon->DrawScale = origDrawScale;
 	}
+#endif
 #if !UTGLR_NO_PLAYER_FLAG
 	if (pawn->PlayerReplicationInfo && pawn->PlayerReplicationInfo->HasFlag) {
 		AActor* flag = pawn->PlayerReplicationInfo->HasFlag;
