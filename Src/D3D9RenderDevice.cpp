@@ -302,8 +302,9 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddIntConfigParam(TEXT("DynamicTexIdRecycleLevel"), CPP_PROPERTY_LOCAL(DynamicTexIdRecycleLevel), 100);
 	SC_AddBoolConfigParam(0,  TEXT("TexDXT1ToDXT3"), CPP_PROPERTY_LOCAL(TexDXT1ToDXT3), 0);
 	SC_AddIntConfigParam(TEXT("FrameRateLimit"), CPP_PROPERTY_LOCAL(FrameRateLimit), 0);
-	SC_AddBoolConfigParam(1,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
-	SC_AddBoolConfigParam(0, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 1);
+	SC_AddBoolConfigParam(2,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
+	SC_AddBoolConfigParam(1, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 1);
+	SC_AddBoolConfigParam(0, TEXT("EnableHashTextures"), CPP_PROPERTY_LOCAL(EnableHashTextures), 1);
 
 	SurfaceSelectionColor = FColor(0, 0, 31, 31);
 	//new(GetClass(), TEXT("SurfaceSelectionColor"), RF_Public)UStructProperty(CPP_PROPERTY(SurfaceSelectionColor), TEXT("Options"), CPF_Config, FindObjectChecked<UStruct>(NULL, TEXT("Core.Object.Color"), 1));
@@ -4520,6 +4521,32 @@ void UD3D9RenderDevice::SetNoTextureNoCheck(INT Multi) {
 	unguard;
 }
 
+bool UD3D9RenderDevice::shouldGenHashTexture(const FTextureInfo& tex) {
+	if (!EnableHashTextures) {
+		return false;
+	}
+	return tex.bRealtime;
+}
+
+void UD3D9RenderDevice::fillHashTexture(FTexConvertCtx convertContext, FTextureInfo& tex) {
+	const FString name = tex.Texture->GetPathNameSafe();
+	debugf(NAME_DevGraphics, TEXT("Generating magic hash texture for '%s'"), *name);
+	const unsigned int nameLen = name.Len();
+	uint8_t* pTex = (uint8_t*) convertContext.lockRect.pBits;
+	unsigned int nameIdx = 0;
+	for (int y = 0; y < convertContext.texHeightPow2; y++) {
+		for (int x = 0; x < convertContext.texWidthPow2; x++) {
+			*pTex++ = 0xFF;
+			*pTex++ = name[nameIdx++];
+			if (nameIdx > nameLen) nameIdx = 0;
+			*pTex++ = name[nameIdx++];
+			if (nameIdx > nameLen) nameIdx = 0;
+			*pTex++ = name[nameIdx++];
+			if (nameIdx > nameLen) nameIdx = 0;
+		}
+	}
+}
+
 bool UD3D9RenderDevice::BindTexture(DWORD texNum, FTexInfo& Tex, FTextureInfo& Info, DWORD PolyFlags, FCachedTexture*& Bind)
 {
 	const bool isZeroPrefixCacheID = ((Tex.CurrentCacheID & 0xFFFFFFFF00000000ULL) == 0) ? true : false;
@@ -4772,7 +4799,7 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 #endif
 
 	// Upload if needed.
-	if (!existingBind || Info.bRealtimeChanged) {
+	if (!existingBind || (Info.bRealtimeChanged && !shouldGenHashTexture(Info))) {
 		FColor paletteIndex0;
 
 		// Cleanup texture flags.
@@ -4923,6 +4950,10 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 						}
 						unguard;
 					}
+					break;
+
+				case TEX_TYPE_CACHE_GEN:
+					fillHashTexture(m_texConvertCtx, Info);
 					break;
 
 				default:
@@ -5167,6 +5198,10 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 			pBind->pConvertBGRA8 = &UD3D9RenderDevice::ConvertBGRA8_BGRA8888;
 			pBind->pConvertRGBA8 = &UD3D9RenderDevice::ConvertRGBA8_BGRA8888;
 		}
+		pBind->texFormat = D3DFMT_A8R8G8B8;
+	}
+	if (shouldGenHashTexture(Info)) {
+		pBind->texType = TEX_TYPE_CACHE_GEN;
 		pBind->texFormat = D3DFMT_A8R8G8B8;
 	}
 

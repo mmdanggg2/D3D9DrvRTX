@@ -477,7 +477,8 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		TEX_TYPE_COMPRESSED_DXT5,
 		TEX_TYPE_PALETTED,
 		TEX_TYPE_HAS_PALETTE,
-		TEX_TYPE_NORMAL
+		TEX_TYPE_NORMAL,
+		TEX_TYPE_CACHE_GEN,
 	};
 	#define TEX_FLAG_NO_CLAMP	0x00000001
 
@@ -835,6 +836,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	UBOOL SmoothMaskedTextures;
 
 	UBOOL EnableSkyBoxAnchors;
+	UBOOL EnableHashTextures;
 
 	FColor SurfaceSelectionColor;
 
@@ -1212,6 +1214,9 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void FASTCALL ConvertBGRA8_BGRA8888_NoClamp(const FMipmapBase *Mip, INT Level);
 	void FASTCALL ConvertRGBA8_BGRA8888(const FMipmapBase *Mip, INT Level);
 	void FASTCALL ConvertRGBA8_BGRA8888_NoClamp(const FMipmapBase *Mip, INT Level);
+	
+	void fillHashTexture(FTexConvertCtx convertContext, FTextureInfo& tex);
+	bool shouldGenHashTexture(const FTextureInfo& tex);
 
 	inline void FASTCALL SetBlend(DWORD PolyFlags, bool isUI = false) {
 #if UTGLR_USES_ALPHABLEND
