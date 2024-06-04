@@ -4543,16 +4543,16 @@ bool UD3D9RenderDevice::shouldGenHashTexture(const FTextureInfo& tex) {
 		return false;
 	}
 	if (tex.bRealtime) {
-		std::wstring name(*tex.Texture->GetPathNameSafe());
+		std::wstring name(tex.Texture->GetPathName());
 		return !hashTexBlacklist.count(name);
 	}
 	return false;
 }
 
 void UD3D9RenderDevice::fillHashTexture(FTexConvertCtx convertContext, FTextureInfo& tex) {
-	const FString name = tex.Texture->GetPathNameSafe();
-	debugf(NAME_DevGraphics, TEXT("Generating magic hash texture for '%s'"), *name);
-	const unsigned int nameLen = name.Len();
+	const TCHAR* name = tex.Texture->GetPathName();
+	debugf(NAME_Dev, TEXT("Generating magic hash texture for '%s'"), name);
+	const unsigned int nameLen = FString(name).Len();
 	uint8_t* pTex = (uint8_t*) convertContext.lockRect.pBits;
 	unsigned int nameIdx = 0;
 	for (int y = 0; y < convertContext.texHeightPow2; y++) {
@@ -4974,7 +4974,9 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 					break;
 
 				case TEX_TYPE_CACHE_GEN:
+					guard(fillHashTexture);
 					fillHashTexture(m_texConvertCtx, Info);
+					unguard;
 					break;
 
 				default:
