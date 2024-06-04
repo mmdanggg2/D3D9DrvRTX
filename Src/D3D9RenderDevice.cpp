@@ -4536,13 +4536,13 @@ void UD3D9RenderDevice::fillHashTexture(FTexConvertCtx convertContext, FTextureI
 	unsigned int nameIdx = 0;
 	for (int y = 0; y < convertContext.texHeightPow2; y++) {
 		for (int x = 0; x < convertContext.texWidthPow2; x++) {
-			*pTex++ = 0xFF;
-			*pTex++ = name[nameIdx++];
-			if (nameIdx > nameLen) nameIdx = 0;
-			*pTex++ = name[nameIdx++];
-			if (nameIdx > nameLen) nameIdx = 0;
-			*pTex++ = name[nameIdx++];
-			if (nameIdx > nameLen) nameIdx = 0;
+			*pTex++ = name[nameIdx++] ^ 0x80; // B
+			if (nameIdx >= nameLen) nameIdx = 0;
+			*pTex++ = name[nameIdx++]; // G
+			if (nameIdx >= nameLen) nameIdx = 0;
+			*pTex++ = name[nameIdx++] ^ 0x80; // R
+			if (nameIdx >= nameLen) nameIdx = 0;
+			*pTex++ = 0xFF; // A
 		}
 	}
 }
