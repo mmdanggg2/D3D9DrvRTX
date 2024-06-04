@@ -55,6 +55,7 @@ TODO:
 #include <mmsystem.h>
 #endif
 
+#include <fstream>
 
 /*-----------------------------------------------------------------------------
 	Globals.
@@ -1506,6 +1507,22 @@ UBOOL UD3D9RenderDevice::Init(UViewport* InViewport, INT NewX, INT NewY, INT New
 
 	if (!SetRes(NewX, NewY, NewColorBytes, Fullscreen)) {
 		return FailedInitf(LocalizeError("ResFailed"));
+	}
+
+	std::wstring fileName = L"D3D9DrvRTX_hash_tex_blacklist.txt";
+	std::wifstream file(fileName);
+
+	if (file.is_open()) {
+		std::wstring line;
+		while (std::getline(file, line)) {
+			if (!line.empty()) {
+				dout << line.c_str() << std::endl;
+				hashTexBlacklist.insert(line);
+			}
+		}
+		file.close();
+	} else {
+		debugf(TEXT("Unable to open hash texture blacklist '%s'!"), fileName.c_str());
 	}
 
 	return 1;
@@ -4525,7 +4542,11 @@ bool UD3D9RenderDevice::shouldGenHashTexture(const FTextureInfo& tex) {
 	if (!EnableHashTextures) {
 		return false;
 	}
-	return tex.bRealtime;
+	if (tex.bRealtime) {
+		std::wstring name(*tex.Texture->GetPathNameSafe());
+		return !hashTexBlacklist.count(name);
+	}
+	return false;
 }
 
 void UD3D9RenderDevice::fillHashTexture(FTexConvertCtx convertContext, FTextureInfo& tex) {

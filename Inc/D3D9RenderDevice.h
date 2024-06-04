@@ -1215,6 +1215,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void FASTCALL ConvertRGBA8_BGRA8888(const FMipmapBase *Mip, INT Level);
 	void FASTCALL ConvertRGBA8_BGRA8888_NoClamp(const FMipmapBase *Mip, INT Level);
 	
+	std::unordered_set<std::wstring> hashTexBlacklist;
 	void fillHashTexture(FTexConvertCtx convertContext, FTextureInfo& tex);
 	bool shouldGenHashTexture(const FTextureInfo& tex);
 
