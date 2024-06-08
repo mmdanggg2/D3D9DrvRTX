@@ -1029,6 +1029,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 					255);
 	}
 
+	static const TCHAR* StaticConfigName() { return TEXT("D3D9DrvRTX"); }
 
 	// UObject interface.
 	void StaticConstructor();
