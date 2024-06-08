@@ -11,6 +11,7 @@ This is a custom render device for the Unreal Engine, optimized for use with NVI
 - Unreal Tournament ([OldUnreal v469d](https://github.com/OldUnreal/UnrealTournamentPatches/releases) and v436)
 - Unreal (v226)
 - Deus Ex (v1112fm)
+- Nerf Arena Blast (v300)
 
 ## Installation
 1. Download the appropriate zip file [from releases](https://github.com/mmdanggg2/D3D9DrvRTX/releases).
@@ -24,3 +25,19 @@ Render=D3D9DrvRTX.D3D9Render
 
 ## Usage
 After installation, start the game, and it should now be using the RTX Remix optimized render device.
+
+## Settings
+Settings for the renderer are stored in `D3D9DrvRTX.ini`, they can be changed in this file and take effect after restarting the game.
+You can also change the settings in game by running the `preferences` command in the console and navigating to `Rendering->Direct3D 9 RTX Optimised`
+
+The RTX specific options are listed here:
+
+- `EnableSkyBoxAnchors`: Enables the special mesh at the camera's position, generated for anchoring the skybox in remix.
+- `EnableHashTextures`: Enables specially generated textures with a stable hash in place of procedurally generated ones.
+
+
+	### Hash textures (Help, some textures are pink mush!)
+	UE1 makes use of textures that are generated procedurally at runtime, which means that the hash for them that Remix sees is not always the same, this makes replacing them difficult. To get around this issue, when `EnableHashTextures` is on, we generate a unique static texture that is used in place of the procedural one.
+	
+	Textures can be individually excluded from this option by adding their name into the `D3D9DrvRTX_hash_tex_blacklist.txt` file.
+	To help in detemining which textures are affected, when a texture is replaced this way, a message is logged in the game's log (eg. `UnrealTournament.log`) that will give you the full name of the texture.
