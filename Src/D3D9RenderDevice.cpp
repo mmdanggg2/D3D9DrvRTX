@@ -3512,11 +3512,17 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	actor->DrawScale = origScale;
 
 	FTime currentTime = frame->Viewport->CurrentTime;
+	DWORD baseFlags = getBasePolyFlags(actor);
 
 	if (actor->bParticles) {
+		FLOAT lux = Clamp(actor->ScaleGlow * 0.5f + actor->AmbientGlow / 256.f, 0.f, 1.f);
+		FPlane color = FVector(lux, lux, lux);
+		if (GIsEditor && (baseFlags & PF_Selected)) {
+			color = color * 0.4 + FVector(0.0, 0.6, 0.0);
+		}
+		UTexture* tex = actor->Texture->Get(currentTime);
 		for (INT i = 0; i < numVerts; i++) {
 			FTransTexture& sample = samples[i];
-			UTexture* tex = actor->Texture->Get(currentTime);
 			if (actor->bRandomFrame) {
 				tex = actor->MultiSkins[appCeil((&sample - samples) / 3.f) % 8];
 				if (tex) {
@@ -3524,12 +3530,6 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 				}
 			}
 			if (tex) {
-				DWORD baseFlags = getBasePolyFlags(actor);
-				FLOAT lux = Clamp(actor->ScaleGlow * 0.5f + actor->AmbientGlow / 256.f, 0.f, 1.f);
-				FPlane color = FVector(lux, lux, lux);
-				if (GIsEditor && (baseFlags & PF_Selected)) {
-					color = color * 0.4 + FVector(0.0, 0.6, 0.0);
-				}
 
 				// Transform the local-space point into world-space
 				FVector point = sample.Point;
@@ -3644,7 +3644,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 			polyFlags = tri.PolyFlags;
 		}
 
-		polyFlags |= getBasePolyFlags(actor);
+		polyFlags |= baseFlags;
 
 		bool environMapped = polyFlags & PF_Environment;
 		FTextureInfo* texInfo = &envTexInfo;
