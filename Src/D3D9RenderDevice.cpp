@@ -3378,6 +3378,9 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 	FVector camLoc = frame->Coords.Origin;
 	FVector camUp = FVector(0.0f, -1.0f, 0.0f).TransformVectorBy(frame->Uncoords);
 	XMVECTOR direction = XMVector3Normalize(FVecToDXVec(camLoc - location));
+	if (XMVector3Equal(direction, XMVectorZero())) {
+		return;
+	}
 
 	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(location));
 	XMMATRIX matRot = XMMatrixIdentity();
