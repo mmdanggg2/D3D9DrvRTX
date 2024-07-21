@@ -243,9 +243,9 @@ static inline FVector DXVecToFVec(DirectX::XMVECTOR& vec) {
 static DirectX::XMMATRIX FCoordToDXMat(const FCoords& coord) {
 	using namespace DirectX;
 	XMMATRIX mat = {
-		coord.XAxis.X, coord.YAxis.X, coord.ZAxis.X, 0,
-		coord.XAxis.Y, coord.YAxis.Y, coord.ZAxis.Y, 0,
-		coord.XAxis.Z, coord.YAxis.Z, coord.ZAxis.Z, 0,
+		coord.XAxis.X, coord.XAxis.Y, coord.XAxis.Z, 0,
+		coord.YAxis.X, coord.YAxis.Y, coord.YAxis.Z, 0,
+		coord.ZAxis.X, coord.ZAxis.Y, coord.ZAxis.Z, 0,
 		coord.Origin.X, coord.Origin.Y, coord.Origin.Z, 1.0f
 	};
 	return mat;
@@ -254,7 +254,7 @@ static DirectX::XMMATRIX FCoordToDXMat(const FCoords& coord) {
 static DirectX::XMMATRIX FRotToDXRotMat(const FRotator& rot) {
 	using namespace DirectX;
 	FCoords coords = GMath.UnitCoords;
-	coords *= rot;
+	coords /= rot;
 	return FCoordToDXMat(coords);
 }
 
@@ -3490,13 +3490,11 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 			FTransTexture& v1 = allSamples[1];
 			FTransTexture& v2 = allSamples[2];
 			FCoords coord;
-			coord.Origin = FVector(0, 0, 0);
+			coord.Origin = (v0.Point + v2.Point) * 0.5f;
 			coord.XAxis = (v1.Point - v0.Point).SafeNormal();
 			coord.YAxis = ((v0.Point - v2.Point) ^ coord.XAxis).SafeNormal();
 			coord.ZAxis = coord.XAxis ^ coord.YAxis;
-			FVector mid = (v0.Point + v2.Point) * 0.5f;
-			specialCoord->coord = GMath.UnitCoords * coord;
-			specialCoord->coord.Origin = mid;
+			specialCoord->coord = coord;
 			specialCoord->baseMatrix = ToD3DMATRIX(actorMatrix);
 			specialCoord->exists = true;
 		}
