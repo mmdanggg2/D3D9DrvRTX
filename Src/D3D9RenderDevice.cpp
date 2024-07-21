@@ -3729,7 +3729,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	unguard;
 }
 
-void UD3D9RenderDevice::renderMover(FSceneNode* frame, AMover* mover) {
+void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 	{
 		static int si;

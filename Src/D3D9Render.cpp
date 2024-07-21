@@ -156,6 +156,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		appErrorf(TEXT("D3D9DrvRTX for UT v436 is not compatible with v469.\nInstall D3D9DrvRTX for v469 instead!"));
 	}
 #endif
+
+	UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
+
 	FMemMark sceneMark(GSceneMem);
 	FMemMark memMark(GMem);
 	FMemMark dynMark(GDynMem);
@@ -163,8 +166,6 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 	if (Engine->Audio && !GIsEditor)
 		Engine->Audio->RenderAudioGeometry(frame);
-
-	UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
 
 	const UViewport* viewport = frame->Viewport;
 	AActor* playerActor = NULL;
@@ -174,13 +175,11 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 	//dout << "Starting frame" << std::endl;
 
-	d3d9Dev->startWorldDraw(frame);
-
 	std::vector<AActor*> lightActors;
 	lightActors.reserve(frame->Level->Actors.Num());
 	std::vector<AActor*> viableActors;
 	viableActors.reserve(frame->Level->Actors.Num());
-	std::vector<AMover*> visibleMovers;
+	std::vector<ABrush*> visibleMovers;
 	std::vector<ASkyZoneInfo*> skyZones;
 
 	// Sort through all actors and put them in the appropriate pile
@@ -202,9 +201,18 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		isVisible &= !isOwned || !actor->bOwnerNoSee || (isOwned && frame->Viewport->Actor->bBehindView);
 		if (isVisible) {
 			if (actor->IsA(AMover::StaticClass())) {
-				visibleMovers.push_back((AMover*)actor);
+				visibleMovers.push_back((ABrush*)actor);
 				continue;
 			}
+#if RUNE
+			else if (actor->IsA(APolyobj::StaticClass())) {
+				visibleMovers.push_back((ABrush*)actor);
+				continue;
+			}
+			if (actor->bSpecialRender || actor->bCarriedItem) {
+				continue;
+			}
+#endif
 			viableActors.push_back(actor);
 		}
 	}
@@ -232,6 +240,8 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 	ModelFacets modelFacets;
 	getLevelModelFacets(frame, modelFacets);
+
+	d3d9Dev->startWorldDraw(frame);
 
 	std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
 	for (RPASS pass : {SOLID, NONSOLID}) {
@@ -278,7 +288,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			}
 		}
 		if (pass == RPASS::SOLID) {
-			for (AMover* mover : visibleMovers) {
+			for (ABrush* mover : visibleMovers) {
 				d3d9Dev->renderMover(frame, mover);
 			}
 		}
@@ -310,9 +320,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	d3d9Dev->endWorldDraw(frame);
 
 	// Render view model actor and extra HUD stuff
-	if (!GIsEditor && playerActor && (frame->Viewport->Actor->ShowFlags & SHOW_Actors)) {
+	if (!GIsEditor && playerActor && (viewport->Actor->ShowFlags & SHOW_Actors)) {
 		GUglyHackFlags |= 1;
-		playerActor->eventRenderOverlays(frame->Viewport->Canvas);
+		playerActor->eventRenderOverlays(viewport->Canvas);
 		GUglyHackFlags &= ~1;
 	}
 

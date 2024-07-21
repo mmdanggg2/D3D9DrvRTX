@@ -1102,7 +1102,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	// Renders a mesh actor
 	void renderMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord = nullptr);
 	// Renders a mover brush
-	void renderMover(FSceneNode* frame, AMover* mover);
+	void renderMover(FSceneNode* frame, ABrush* mover);
 	// Updates and sends the given lights to dx
 	void renderLights(std::vector<AActor*> lightActors);
 	// Renders a magic shape for anchoring stuff to the sky box
