@@ -44,10 +44,18 @@ private:
 	struct ModelFacets {
 		TexFlagKeyMap<std::vector<FSurfaceFacet>> facetPairs[RPASS_MAX];
 	};
+	struct ParentCoord {
+		FCoords worldCoord;
+		FCoords localCoord;
+	};
 	typedef std::unordered_map<FTextureInfo*, std::vector<std::vector<FTransTexture>>> DecalMap;
 	void getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets);
+	void drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, ParentCoord* parentCoord = nullptr);
 	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord);
 	void getFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures);
+#if RUNE
+	void drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, const ParentCoord* parentCoord);
+#endif
 };
 
 #if UNREAL_TOURNAMENT && !UNREAL_TOURNAMENT_OLDUNREAL

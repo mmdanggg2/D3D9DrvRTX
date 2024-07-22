@@ -1098,9 +1098,18 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	// Render a sprite actor
 	void renderSprite(FSceneNode* frame, AActor* actor);
 	// Renders a sprite at the given location
-	void renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScale, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color);
+	void renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScaleU, FLOAT drawScaleV, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color);
+	inline void renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScale, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color) {
+		renderSpriteGeo(frame, location, drawScale, drawScale, texInfo, basePolyFlags, color);
+	}
 	// Renders a mesh actor
 	void renderMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord = nullptr);
+#if RUNE
+	// Renders a skeletal mesh actor
+	void renderSkeletalMeshActor(FSceneNode* frame, AActor* actor, const FCoords* parentCoord = nullptr);
+	// Renders a particleSystem actor
+	void renderParticleSystemActor(FSceneNode* frame, AParticleSystem* actor, const FCoords& parentCoord);
+#endif
 	// Renders a mover brush
 	void renderMover(FSceneNode* frame, ABrush* mover);
 	// Updates and sends the given lights to dx

@@ -295,15 +295,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		for (AActor* actor : visibleActors) {
 			UBOOL bTranslucent = actor->Style == STY_Translucent;
 			if ((pass == RPASS::NONSOLID && bTranslucent) || (pass == RPASS::SOLID && !bTranslucent)) {
-				SpecialCoord specialCoord;
-				if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
-					d3d9Dev->renderSprite(frame, actor);
-				} else if (actor->DrawType == DT_Mesh) {
-					d3d9Dev->renderMeshActor(frame, actor, &specialCoord);
-				}
-				if (actor->IsA(APawn::StaticClass())) {
-					drawPawnExtras(frame, d3d9Dev, (APawn*)actor, specialCoord);
-				}
+				drawActorSwitch(frame, d3d9Dev, actor);
 			}
 		}
 	}
@@ -331,6 +323,29 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	sceneMark.Pop();
 	vectorMark.Pop();
 	unguard;
+}
+
+void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, ParentCoord* parentCoord)
+{
+	SpecialCoord specialCoord;
+	if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (frame->Viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
+		d3d9Dev->renderSprite(frame, actor);
+	}
+	else if (actor->DrawType == DT_Mesh) {
+		d3d9Dev->renderMeshActor(frame, actor, &specialCoord);
+	}
+#if RUNE
+	else if (actor->DrawType == DT_SkeletalMesh) {
+		drawSkeletalActor(frame, d3d9Dev, actor, parentCoord);
+	}
+	else if (actor->DrawType == DT_ParticleSystem && actor->IsA(AParticleSystem::StaticClass())) {
+		//DrawParticleSystem(frame, actor, nullptr, parentCoord ? parentCoord->localCoord : GMath.UnitCoords);
+		d3d9Dev->renderParticleSystemActor(frame, (AParticleSystem*)actor, parentCoord ? parentCoord->localCoord : GMath.UnitCoords);
+	}
+#endif
+	if (actor->IsA(APawn::StaticClass())) {
+		drawPawnExtras(frame, d3d9Dev, (APawn*)actor, specialCoord);
+	}
 }
 
 #if !UTGLR_NO_DECALS
@@ -502,6 +517,42 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 	}
 #endif
 }
+
+#if RUNE
+void UD3D9Render::drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, const ParentCoord* parentCoord) {
+	d3d9Dev->renderSkeletalMeshActor(frame, actor, parentCoord ? &parentCoord->worldCoord : nullptr);
+	USkelModel* skel = actor->Skeletal;
+	if (!skel) return;
+	skel->GetFrame(actor, parentCoord ? parentCoord->localCoord : GMath.UnitCoords, 0, nullptr); // Updates the skel position with the real actor coords
+	for (int i = 0; i < MAX_JOINTS; i++) {
+		AActor* child = actor->JointChild[i];
+		if (!child) continue;
+		FCacheItem* cacheItem = nullptr;
+		DynSkel* dynSkel = skel->LockDSkel(actor, cacheItem);
+		DynJoint* dynJoint = &dynSkel->joint[i];
+		FCoords coords = dynJoint->coords;
+		skel->UnlockDSkel(cacheItem);
+		//FString childName = FString(child->GetName());
+		//if (childName != L"torch1" && childName != L"torchfire1") {
+		//	continue;
+		//}
+		//dout << L"Parent: " << actor->GetName() << L", Child: " << child->GetName() << std::endl;
+		ParentCoord childCoords;
+		childCoords.worldCoord = coords;
+		coords /= child->Rotation;
+		if (child->DrawType == DT_Sprite || child->IsA(AParticleSystem::StaticClass())) {
+			FVector particleLoc(0, 0, 0);
+			particleLoc = particleLoc.TransformPointBy(coords);
+			child->XLevel->FarMoveActor(child, particleLoc, 1, 1);
+		}
+		coords /= child->Location;
+		childCoords.localCoord = coords;
+		drawActorSwitch(frame, d3d9Dev, child, &childCoords);
+		//FDynamicSprite sprite(child);
+		//DrawActorSprite(frame, &sprite, coords);
+	}
+}
+#endif
 
 void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor) {
 	guard(UD3D9Render::DrawActor);
