@@ -3748,7 +3748,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 
 	USkelModel* usedSkel = actor->SubstituteMesh ? actor->SubstituteMesh : skelModel;
 	INT meshIdx = actor->SkelMesh;
-	meshIdx = meshIdx <= usedSkel->nummeshes ? meshIdx : usedSkel->nummeshes;
+	meshIdx = meshIdx < usedSkel->nummeshes ? meshIdx : usedSkel->nummeshes -1;
 
 	Mesh* mesh = &usedSkel->meshes(meshIdx);
 
@@ -4086,6 +4086,11 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 #endif
 	using namespace DirectX;
 	guard(UD3D9RenderDevice::renderMover);
+
+	if (!mover->Brush) {
+		return;
+	}
+
 	EndBuffering();
 
 	XMMATRIX matPrePiv = XMMatrixTranslationFromVector(FVecToDXVec(-mover->PrePivot));
