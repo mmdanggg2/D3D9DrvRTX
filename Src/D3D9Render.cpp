@@ -59,6 +59,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		surfaceMap.reserve(texNodePair.second.size());
 		for (INT iNode : texNodePair.second) {
 			const FBspNode& node = model->Nodes(iNode);
+			if (node.NumVertices < 3) continue;
 			FSurfaceFacet*& facet = surfaceMap[node.iSurf];
 			if (!facet) {
 				const FBspSurf* surf = &model->Surfs(node.iSurf);
@@ -373,15 +374,14 @@ void UD3D9Render::getFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, 
 
 		for (FSavedPoly* poly = facet.Polys; poly; poly = poly->Next) {
 			INT findIndex;
-			if (!decal->Nodes.FindItem(poly->iNode, findIndex)) {
+			if (!decal->Nodes.FindItem(poly->iNode, findIndex) && decal->Nodes.Num() > 0) {
 				continue;
 			}
-			std::vector<FTransTexture>& points = decalPoints.emplace_back();
+			std::vector<FTransTexture> points;
 
 			ClipDecal(frame, decal, &surf, poly, points);
 
-			int numPts = points.size();
-			if (numPts < 3) continue;
+			if (points.size() < 3) continue;
 
 			// Calculate the normal from the cross of first point and the second and third points
 			FVector v1 = points[1].Point - points[0].Point;
@@ -391,6 +391,8 @@ void UD3D9Render::getFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, 
 			if ((normal | model->Vectors(surf.vNormal)) < 0) {
 				std::reverse(points.begin(), points.end()); // Reverse the face so it points the correct way
 			}
+
+			decalPoints.push_back(points);
 		}
 	}
 }
