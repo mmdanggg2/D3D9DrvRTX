@@ -210,6 +210,12 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				visibleMovers.push_back((ABrush*)actor);
 				continue;
 			}
+			else if (actor->IsA(ATrigger::StaticClass())) {
+				// "Draw" triggers because for some unholy reason trigger logic is in the render module
+				FDynamicSprite sprite(actor);
+				DrawActorSprite(frame, &sprite, GMath.UnitCoords);
+				continue;
+			}
 			if (actor->bSpecialRender || actor->bCarriedItem) {
 				continue;
 			}
