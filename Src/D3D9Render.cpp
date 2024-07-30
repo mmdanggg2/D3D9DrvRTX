@@ -276,7 +276,8 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		}
 		// Render all the decals
 		for (const auto& decalsPair : decalMap) {
-			FTextureInfo *const& texInfo = decalsPair.first;
+			const TexInfoFlagKey& decalInfo = decalsPair.first;
+			FTextureInfo *const& texInfo = decalInfo.first;
 			const std::vector<std::vector<FTransTexture>>& decals = decalsPair.second;
 			for (std::vector<FTransTexture> decal : decals) {
 				int numPts = decal.size();
@@ -284,7 +285,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				for (int i = 0; i < numPts; i++) {
 					pointsPtrs[i] = &decal[i];
 				}
-				d3d9Dev->DrawGouraudPolygon(frame, *texInfo, pointsPtrs, numPts, PF_Modulated, NULL);
+				d3d9Dev->DrawGouraudPolygon(frame, *texInfo, pointsPtrs, numPts, decalInfo.second, NULL);
 				delete[] pointsPtrs;
 			}
 		}
@@ -370,7 +371,23 @@ void UD3D9Render::getFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, 
 			texInfo = &lockedTextures[texture];
 		}
 
-		std::vector<std::vector<FTransTexture>>& decalPoints = decals[texInfo];
+		DWORD polyFlags = PF_Modulated;
+#ifdef RUNE
+		switch (decal->Actor->Style) {
+		case STY_Masked:
+			polyFlags = PF_Masked; break;
+		case STY_Translucent:
+			polyFlags = PF_Translucent; break;
+		case STY_Modulated:
+			polyFlags = PF_Modulated; break;
+		case STY_AlphaBlend:
+			polyFlags = PF_AlphaBlend; break;
+		default:
+			break;
+		}
+#endif // RUNE
+
+		std::vector<std::vector<FTransTexture>>& decalPoints = decals[TexInfoFlagKey(texInfo, polyFlags)];
 
 		for (FSavedPoly* poly = facet.Polys; poly; poly = poly->Next) {
 			INT findIndex;

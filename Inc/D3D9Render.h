@@ -18,6 +18,16 @@ struct TexFlagKey_Hash {
 template <typename T>
 using TexFlagKeyMap = std::unordered_map<TexFlagKey, T, TexFlagKey_Hash>;
 
+typedef const std::pair<FTextureInfo* const, const DWORD> TexInfoFlagKey;
+struct TexInfoFlagKey_Hash {
+	inline std::size_t operator () (const TexInfoFlagKey& p) const {
+		uint64_t combined = (reinterpret_cast<uint64_t>(p.first) << 32) | p.second;
+		return std::hash<uint64_t>{}(combined);
+	}
+};
+template <typename T>
+using TexInfoFlagKeyMap = std::unordered_map<TexInfoFlagKey, T, TexInfoFlagKey_Hash>;
+
 class UD3D9Render : public URender {
 #if UTGLR_ALT_DECLARE_CLASS
 	DECLARE_CLASS(UD3D9Render, URender, CLASS_Config);
@@ -48,7 +58,7 @@ private:
 		FCoords worldCoord;
 		FCoords localCoord;
 	};
-	typedef std::unordered_map<FTextureInfo*, std::vector<std::vector<FTransTexture>>> DecalMap;
+	typedef TexInfoFlagKeyMap<std::vector<std::vector<FTransTexture>>> DecalMap;
 	void getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets);
 	void drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, ParentCoord* parentCoord = nullptr);
 	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord);
