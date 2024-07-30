@@ -347,8 +347,14 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 		drawSkeletalActor(frame, d3d9Dev, actor, parentCoord);
 	}
 	else if (actor->DrawType == DT_ParticleSystem && actor->IsA(AParticleSystem::StaticClass())) {
-		//DrawParticleSystem(frame, actor, nullptr, parentCoord ? parentCoord->localCoord : GMath.UnitCoords);
-		d3d9Dev->renderParticleSystemActor(frame, (AParticleSystem*)actor, parentCoord ? parentCoord->localCoord : GMath.UnitCoords);
+		AParticleSystem* particle = static_cast<AParticleSystem*>(actor);
+		if (particle->ParticleSpriteType == PSPRITE_Normal) {
+			d3d9Dev->renderParticleSystemActor(frame, (AParticleSystem*)actor, parentCoord ? parentCoord->localCoord : GMath.UnitCoords);
+		}
+		else {
+			d3d9Dev->startWorldDraw(frame);
+			DrawParticleSystem(frame, actor, nullptr, parentCoord ? parentCoord->localCoord : GMath.UnitCoords);
+		}
 	}
 #endif
 	if (actor->IsA(APawn::StaticClass())) {
