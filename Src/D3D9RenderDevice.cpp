@@ -4038,12 +4038,13 @@ void UD3D9RenderDevice::renderParticleSystemActor(FSceneNode* frame, AParticleSy
 			}
 		}
 	}
+	actor->LastTime = actor->CurrentTime;
 	FTime curTime = frame->Viewport->CurrentTime;
 	for (int i = 0; i < actor->ParticleCount; i++) {
 		const FParticle& particle = actor->ParticleArray[i];
-		if (!particle.Valid) continue;
+		if (!particle.Valid || !actor->ParticleTexture[particle.TextureIndex]) continue;
 		FVector location = particle.Location;
-		if (actor->bRelativeToSystem) {
+		if (actor->bRelativeToSystem && !actor->bCarriedItem) {
 			location += actor->Location;
 		}
 		UTexture* tex = actor->ParticleTexture[particle.TextureIndex]->Get(curTime);
@@ -4061,15 +4062,13 @@ void UD3D9RenderDevice::renderParticleSystemActor(FSceneNode* frame, AParticleSy
 			break;
 		case STY_AlphaBlend:
 			polyFlags = PF_AlphaBlend;
+			tex->Alpha = particle.Alpha.X;
 			break;
 		default:
 			polyFlags = 0;
 		}
 		polyFlags |= PF_TwoSided;
 		tex->Lock(texInfo, curTime, -1, this);
-		if (polyFlags & PF_AlphaBlend) {
-			tex->Alpha = particle.Alpha.X;
-		}
 		renderSpriteGeo(frame, location, particle.XScale, particle.YScale, texInfo, polyFlags, FPlane(1, 1, 1, 1));
 		tex->Unlock(texInfo);
 	}
