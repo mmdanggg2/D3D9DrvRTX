@@ -3783,13 +3783,10 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	int numVerts = mesh->numverts;
 	int numTris = mesh->numtris;
 
-	FVector* deformed = NewZeroed<FVector>(GMem, numVerts);
-	FTransTexture* samples = NewZeroed<FTransTexture>(GMem, numVerts);
+	FVector* deformed = New<FVector>(GMem, numVerts);
 
 	skelModel->GetFrame(actor, GMath.UnitCoords, 0.0f, deformed);
-	for (int i = 0; i < numVerts; i++) {
-		samples[i].Point = deformed[i];
-	}
+
 	actor->Location = origLoc;
 	actor->PrePivot = origPrePiv;
 	actor->Rotation = origRot;
@@ -3812,9 +3809,9 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 			color *= actor->ScaleGlow;
 		}
 		for (INT i = 0; i < numVerts; i++) {
-			FTransTexture& sample = samples[i];
+			FVector& sample = deformed[i];
 			if (actor->bRandomFrame) {
-				tex = actor->MultiSkins[appCeil((&sample - samples) / 3.f) % 8];
+				tex = actor->MultiSkins[appCeil((&sample - deformed) / 3.f) % 8];
 				if (tex) {
 					tex = getTextureWithoutNext(tex, currentTime, actor->LifeFraction());
 				}
@@ -3822,10 +3819,9 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 			if (tex) {
 
 				// Transform the local-space point into world-space
-				FVector point = sample.Point;
-				XMVECTOR xpoint = FVecToDXVec(point);
+				XMVECTOR xpoint = FVecToDXVec(sample);
 				xpoint = XMVector3Transform(xpoint, actorMatrix);
-				point = DXVecToFVec(xpoint);
+				FVector point = DXVecToFVec(xpoint);
 
 				FTextureInfo texInfo;
 				tex->Lock(texInfo, currentTime, -1, this);
@@ -3890,26 +3886,28 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	bool fatten = actor->Fatness != 128;
 	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
 
+	FVector* normals = New<FVector>(GMem, numVerts);
+
 	// Calculate normals
 	for (int i = 0; i < numVerts; i++) {
-		samples[i].Normal = FPlane(0, 0, 0, 0);
+		normals[i] = FVector(0, 0, 0);
 	}
 	for (int i = 0; i < numTris; i++) {
-		FTransTexture* points[3];
+		FVector* points[3];
 		Triangle& tri = mesh->tris(i);
 		bool mirror = actor->bMirrored;
-		points[0] = &samples[tri.vIndex[mirror ? 2 : 0]];
-		points[1] = &samples[tri.vIndex[1]];
-		points[2] = &samples[tri.vIndex[mirror ? 0 : 2]];
-		FVector fNorm = (points[1]->Point - points[0]->Point) ^ (points[2]->Point - points[0]->Point);
+		points[0] = &deformed[tri.vIndex[mirror ? 2 : 0]];
+		points[1] = &deformed[tri.vIndex[1]];
+		points[2] = &deformed[tri.vIndex[mirror ? 0 : 2]];
+		FVector fNorm = (*points[1] - *points[0]) ^ (*points[2] - *points[0]);
 		for (int j = 0; j < 3; j++) {
-			points[j]->Normal += fNorm;
+			normals[tri.vIndex[j]] += fNorm;
 		}
 	}
 	for (int i = 0; i < numVerts; i++) {
-		XMVECTOR normal = FVecToDXVec(samples[i].Normal);
+		XMVECTOR normal = FVecToDXVec(normals[i]);
 		normal = XMVector3Normalize(normal);
-		samples[i].Normal = DXVecToFVec(normal);
+		normals[i] = DXVecToFVec(normal);
 	}
 
 	SurfKeyMap<std::vector<FTransTexture>> surfaceMap;
@@ -3917,13 +3915,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	
 	// Process all triangles on the mesh
 	for (INT i = 0; i < numTris; i++) {
-		FTransTexture* points[3];
-		TriUV_t triUV[3];
 		Triangle& tri = mesh->tris(i);
-		for (int j = 0; j < 3; j++) {
-			points[j] = &samples[tri.vIndex[j]];
-			triUV[j] = tri.tex[j];
-		}
 		INT texIdx = tri.polygroup;
 		DWORD polyFlags = actor->SkelGroupFlags[tri.polygroup];
 
@@ -3942,18 +3934,16 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 		float scaleU = texInfo->UScale * texInfo->USize / 256.0;
 		float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
 
-		if (actor->bMirrored) {
-			Exchange(points[0], points[2]);
-			Exchange(triUV[0], triUV[2]);
-		}
-
 		// Sort triangles into surface/flag groups
 		std::vector<FTransTexture>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
 		pointsVec.reserve(numTris * 3);
 		for (INT j = 0; j < 3; j++) {
-			FTransTexture& vert = pointsVec.emplace_back(*points[j]);
-			vert.U = triUV[j].u * scaleU;
-			vert.V = triUV[j].v * scaleV;
+			const INT idx = actor->bMirrored ? 2 - j : j;
+			FTransTexture& vert = pointsVec.emplace_back();
+			vert.Point = deformed[tri.vIndex[idx]];
+			vert.Normal = normals[tri.vIndex[idx]];
+			vert.U = tri.tex[idx].u * scaleU;
+			vert.V = tri.tex[idx].v * scaleV;
 			if (fatten) {
 				vert.Point += vert.Normal * fatness;
 			}
