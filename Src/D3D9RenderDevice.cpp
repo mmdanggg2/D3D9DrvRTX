@@ -3746,6 +3746,8 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	if (!skelModel)
 		return;
 
+	STAT(clockFast(GStat.SkelGetFrameTime));
+
 	USkelModel* usedSkel = actor->SubstituteMesh ? actor->SubstituteMesh : skelModel;
 	INT meshIdx = actor->SkelMesh;
 	meshIdx = meshIdx < usedSkel->nummeshes ? meshIdx : usedSkel->nummeshes -1;
@@ -3795,6 +3797,8 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	FTime currentTime = frame->Viewport->CurrentTime;
 	DWORD baseFlags = getBasePolyFlags(actor);
 
+	STAT(unclockFast(GStat.SkelGetFrameTime));
+
 	if (actor->bParticles) {
 		if (!actor->Texture) {
 			return;
@@ -3832,6 +3836,9 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 		return;
 	}
 	
+	STAT(clockFast(GStat.SkelRenderTime));
+	STAT(clockFast(GStat.SkelSetupTime));
+
 	UniqueValueArray<UTexture*> textures;
 	UniqueValueArray<FTextureInfo> texInfos;
 	UTexture* envTex = nullptr;
@@ -3886,6 +3893,9 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	bool fatten = actor->Fatness != 128;
 	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
 
+	STAT(unclockFast(GStat.SkelSetupTime));
+	STAT(clockFast(GStat.SkelDecimateTime));
+
 	FVector* normals = New<FVector>(GMem, numVerts);
 
 	// Calculate normals
@@ -3909,6 +3919,9 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 		normal = XMVector3Normalize(normal);
 		normals[i] = DXVecToFVec(normal);
 	}
+
+	STAT(unclockFast(GStat.SkelDecimateTime));
+	STAT(clockFast(GStat.SkelClipTime));
 
 	SurfKeyMap<std::vector<FTransTexture>> surfaceMap;
 	surfaceMap.reserve(numTris);
@@ -3937,6 +3950,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 		// Sort triangles into surface/flag groups
 		std::vector<FTransTexture>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
 		pointsVec.reserve(numTris * 3);
+		STAT(clockFast(GStat.SkelLightTime))
 		for (INT j = 0; j < 3; j++) {
 			const INT idx = actor->bMirrored ? 2 - j : j;
 			FTransTexture& vert = pointsVec.emplace_back();
@@ -3958,7 +3972,10 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 				vert.V = (XMVectorGetY(envNorm) + 1.0) * 0.5 * 256.0 * scaleV;
 			}
 		}
+		STAT(unclockFast(GStat.SkelLightTime));
 	}
+
+	STAT(unclockFast(GStat.SkelClipTime));
 
 	D3DMATRIX d3dMatrix = ToD3DMATRIX(actorMatrix);
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &d3dMatrix);
@@ -3972,6 +3989,8 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 		vp.MaxZ = 0.1f;// Remix can pick this up for view model detection
 		m_d3dDevice->SetViewport(&vp);
 	}
+
+	STAT(clockFast(GStat.SkelRasterTime));
 
 	// Batch render each group of tris
 	for (const std::pair<const SurfKey, std::vector<FTransTexture>>& entry : surfaceMap) {
@@ -3992,6 +4011,8 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 		RenderPasses();
 	}
 
+	STAT(unclockFast(GStat.SkelRasterTime));
+
 	if (isViewModel) {
 		m_d3dDevice->SetViewport(&vpPrev);
 		m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
@@ -4003,6 +4024,8 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 		tex->Unlock(texInfos.at(textures.getIndex(tex)));
 	}
 	envTex->Unlock(envTexInfo);
+
+	STAT(unclockFast(GStat.SkelRenderTime));
 
 	unguard;
 }
