@@ -3617,7 +3617,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		samples[i].Normal = DXVecToFVec(normal);
 	}
 
-	SurfKeyMap<std::vector<FTransTexture>> surfaceMap;
+	SurfKeyMap<std::vector<FRenderVert>> surfaceMap;
 	surfaceMap.reserve(numTris);
 
 	// Process all triangles on the mesh
@@ -3661,10 +3661,10 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
 
 		// Sort triangles into surface/flag groups
-		std::vector<FTransTexture>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
+		std::vector<FRenderVert>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
 		pointsVec.reserve(numTris*3);
 		for (INT j = 0; j < 3; j++) {
-			FTransTexture& vert = pointsVec.emplace_back(*points[j]);
+			FRenderVert& vert = pointsVec.emplace_back(*points[j]);
 			vert.U = triUV[j].U * scaleU;
 			vert.V = triUV[j].V * scaleV;
 			if (fatten) {
@@ -3697,7 +3697,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	}
 	
 	// Batch render each group of tris
-	for (const std::pair<const SurfKey, std::vector<FTransTexture>>& entry : surfaceMap) {
+	for (const std::pair<const SurfKey, std::vector<FRenderVert>>& entry : surfaceMap) {
 		FTextureInfo* texInfo = entry.first.first;
 		DWORD polyFlags = entry.first.second;
 
@@ -3923,7 +3923,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	STAT(unclockFast(GStat.SkelDecimateTime));
 	STAT(clockFast(GStat.SkelClipTime));
 
-	SurfKeyMap<std::vector<FTransTexture>> surfaceMap;
+	SurfKeyMap<std::vector<FRenderVert>> surfaceMap;
 	surfaceMap.reserve(numTris);
 	
 	// Process all triangles on the mesh
@@ -3948,12 +3948,12 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 		float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
 
 		// Sort triangles into surface/flag groups
-		std::vector<FTransTexture>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
+		std::vector<FRenderVert>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
 		pointsVec.reserve(numTris * 3);
 		STAT(clockFast(GStat.SkelLightTime))
 		for (INT j = 0; j < 3; j++) {
 			const INT idx = actor->bMirrored ? 2 - j : j;
-			FTransTexture& vert = pointsVec.emplace_back();
+			FRenderVert& vert = pointsVec.emplace_back();
 			vert.Point = deformed[tri.vIndex[idx]];
 			vert.Normal = normals[tri.vIndex[idx]];
 			vert.U = tri.tex[idx].u * scaleU;
@@ -3993,7 +3993,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	STAT(clockFast(GStat.SkelRasterTime));
 
 	// Batch render each group of tris
-	for (const std::pair<const SurfKey, std::vector<FTransTexture>>& entry : surfaceMap) {
+	for (const std::pair<const SurfKey, std::vector<FRenderVert>>& entry : surfaceMap) {
 		FTextureInfo* texInfo = entry.first.first;
 		DWORD polyFlags = entry.first.second;
 
@@ -4319,24 +4319,24 @@ void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* l
 	FTextureInfo texInfo;
 	tex->Lock(texInfo, 0.0, -1, this);
 
-	FTransTexture v1{};
+	FRenderVert v1{};
 	v1.Point = FVector(0, 0, 5) + hashToNormalVector(locHash);
 	v1.U = 0.5 * texInfo.USize;
 	v1.V = 1.0 * texInfo.VSize;
-	FTransTexture v2{};
+	FRenderVert v2{};
 	v2.Point = FVector(5, 0, 0);
 	v2.U = 0.5 * texInfo.USize;
 	v2.V = 0.25 * texInfo.VSize;
-	FTransTexture v3{};
+	FRenderVert v3{};
 	v3.Point = FVector(0, 5, 0) + hashToNormalVector(rotHash);
 	v3.U = 1.0 * texInfo.USize;
 	v3.V = 0.0 * texInfo.VSize;
-	FTransTexture v4{};
+	FRenderVert v4{};
 	v4.Point = FVector(0, -5, 0);
 	v4.U = 0.0 * texInfo.USize;
 	v4.V = 0.0 * texInfo.VSize;
 
-	std::vector<FTransTexture> verts;
+	std::vector<FRenderVert> verts;
 	verts.push_back(v1);
 	verts.push_back(v2);
 	verts.push_back(v3);
@@ -4369,7 +4369,7 @@ void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* l
 	unguard;
 }
 
-INT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FTransTexture>& vertices) {
+INT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FRenderVert>& vertices) {
 	// Buffer "static" geometry.
 	m_csVertexArray.clear();
 	m_csVertexArray.reserve(vertices.size());
@@ -4381,7 +4381,7 @@ INT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FTransTex
 	for (int i = 0; i < tris; i++) {
 		INT numPts = 3;
 		for (int j = 0; j < numPts; j++) {
-			const FTransTexture& vert = vertices[(i * 3) + j];
+			const FRenderVert& vert = vertices[(i * 3) + j];
 			FGLVertexNormTex* bufVert = &m_csVertexArray.emplace_back();
 			bufVert->vert.x = vert.Point.X;
 			bufVert->vert.y = vert.Point.Y;

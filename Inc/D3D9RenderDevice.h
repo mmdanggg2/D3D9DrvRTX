@@ -365,6 +365,14 @@ struct FGLMapDot {
 	FLOAT v;
 };
 
+struct FRenderVert {
+	FRenderVert() {};
+	FRenderVert(const FTransTexture& tt) : Point(tt.Point), Normal(tt.Normal), U(tt.U), V(tt.V) {}
+	FVector Point{};
+	FVector Normal{};
+	FLOAT U{}, V{};
+};
+
 // https://stackoverflow.com/a/57595105/5233018
 template <typename T, typename... Rest>
 void hash_combine(std::size_t& seed, const T& v, const Rest&... rest) {
@@ -1379,7 +1387,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void RenderPassesNoCheckSetup(void);
 
 	INT FASTCALL BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet, bool append = false);
-	INT FASTCALL BufferTriangleSurfaceGeometry(const std::vector<FTransTexture>& vertices);
+	INT FASTCALL BufferTriangleSurfaceGeometry(const std::vector<FRenderVert>& vertices);
 
 	void FASTCALL BufferAdditionalClippedVerts(FTransTexture** Pts, INT NumPts);
 
