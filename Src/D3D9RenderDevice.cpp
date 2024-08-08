@@ -3938,7 +3938,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 
 		bool environMapped = polyFlags & PF_Environment;
 		FTextureInfo* texInfo = &envTexInfo;
-		if (!environMapped && texInfos.has(texIdx)) {
+		if (!environMapped && actor->SkelGroupSkins[texIdx]) {
 			texInfo = &texInfos.at(texIdx);
 		}
 		if (!texInfo->Texture) {
