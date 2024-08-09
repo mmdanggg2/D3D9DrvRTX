@@ -6459,13 +6459,12 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 		FLOAT VMult = TexInfo[t].VMult;
 		FGLTexCoord *pTexCoord = m_pTexCoordArray[t];
 
-		INT ptCounter = ptCount;
 		for (FGLVertexNormTex& vert : m_csVertexArray) {
 			pTexCoord->u = (vert.tex.u - UPan) * UMult;
 			pTexCoord->v = (vert.tex.v - VPan) * VMult;
 
 			pTexCoord++;
-		} while (--ptCounter != 0);
+		};
 	} while (++t < m_rpPassCount);
 
 	//Unlock vertexColor and texCoord buffers
