@@ -3617,8 +3617,8 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		samples[i].Normal = DXVecToFVec(normal);
 	}
 
-	SurfKeyMap<std::vector<FRenderVert>> surfaceMap;
-	surfaceMap.reserve(numTris);
+	SurfKeyBucketVector<FRenderVert> surfaceBuckets;
+	surfaceBuckets.reserve(numTris);
 
 	// Process all triangles on the mesh
 	for (INT i = 0; i < numTris; i++) {
@@ -3661,7 +3661,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
 
 		// Sort triangles into surface/flag groups
-		std::vector<FRenderVert>& pointsVec = surfaceMap[SurfKey(texInfo, polyFlags)];
+		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(texInfo, polyFlags);
 		pointsVec.reserve(numTris*3);
 		for (INT j = 0; j < 3; j++) {
 			FRenderVert& vert = pointsVec.emplace_back(*points[j]);
@@ -3697,11 +3697,11 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	}
 	
 	// Batch render each group of tris
-	for (const std::pair<const SurfKey, std::vector<FRenderVert>>& entry : surfaceMap) {
-		FTextureInfo* texInfo = entry.first.first;
-		DWORD polyFlags = entry.first.second;
+	for (const SurfKeyBucket<FRenderVert>& entry : surfaceBuckets) {
+		FTextureInfo* texInfo = entry.tex;
+		DWORD polyFlags = entry.flags;
 
-		BufferTriangleSurfaceGeometry(entry.second);
+		BufferTriangleSurfaceGeometry(entry.bucket);
 
 		//Initialize render passes state information
 		m_rpPassCount = 0;
