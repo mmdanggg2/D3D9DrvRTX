@@ -143,27 +143,42 @@ static const D3DVERTEXELEMENT9 g_twoColorSingleTextureStreamDef[] = {
 template <typename T>
 class UniqueValueArray {
 public:
+	UniqueValueArray(int reserve) {
+		value_map.reserve(reserve);
+		unique_values.reserve(reserve);
+	}
+
 	bool insert(int index, T value) {
 		auto result = unique_values.insert(value);
-		value_map[index] = const_cast<T*>(&(*result.first));
+		for (auto& entry : value_map) {
+			if (entry.first == index) {
+				entry.second = const_cast<T*>(&(*result.first));
+			}
+		}
+		value_map.push_back(std::make_pair(index, const_cast<T*>(&(*result.first))));
 		return result.second;
 	}
 
 	T& at(int index) {
-		auto it = value_map.find(index);
-		if (it == value_map.end()) {
-			throw std::out_of_range("Invalid index");
-		} else {
-			return *it->second;
+		for (auto& entry : value_map) {
+			if (entry.first == index) {
+				return *entry.second;
+			}
 		}
+		throw std::out_of_range("Invalid index");
 	}
 
 	bool has(int index) {
-		return value_map.count(index) > 0;
+		for (auto& entry : value_map) {
+			if (entry.first == index) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	int getIndex(T value) {
-		for (auto pair : value_map) {
+		for (auto& pair : value_map) {
 			if (*pair.second == value) {
 				return pair.first;
 			}
@@ -180,7 +195,7 @@ public:
 	}
 
 private:
-	std::unordered_map<int, T*> value_map;
+	std::vector<std::pair<int, T*>> value_map;
 	std::unordered_set<T> unique_values;
 };
 
@@ -3548,8 +3563,8 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		return;
 	}
 
-	UniqueValueArray<UTexture*> textures;
-	UniqueValueArray<FTextureInfo> texInfos;
+	UniqueValueArray<UTexture*> textures(mesh->Textures.Num());
+	UniqueValueArray<FTextureInfo> texInfos(mesh->Textures.Num());
 	UTexture* envTex = nullptr;
 	FTextureInfo envTexInfo;
 
@@ -3842,8 +3857,8 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	STAT(clockFast(GStat.SkelRenderTime));
 	STAT(clockFast(GStat.SkelSetupTime));
 
-	UniqueValueArray<UTexture*> textures;
-	UniqueValueArray<FTextureInfo> texInfos;
+	UniqueValueArray<UTexture*> textures(NUM_POLYGROUPS);
+	UniqueValueArray<FTextureInfo> texInfos(NUM_POLYGROUPS);
 	UTexture* envTex = nullptr;
 	FTextureInfo envTexInfo;
 
