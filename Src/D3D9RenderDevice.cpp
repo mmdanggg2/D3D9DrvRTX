@@ -3475,27 +3475,27 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 	int numVerts;
 	int numTris;
-	FTransTexture* samples;
+	FVector* samples;
 	bool isLod;
 
 	if (mesh->IsA(ULodMesh::StaticClass())) {
 		isLod = true;
 		ULodMesh* meshLod = (ULodMesh*)mesh;
-		FTransTexture* allSamples = NewZeroed<FTransTexture>(GMem, meshLod->ModelVerts + meshLod->SpecialVerts);
+		FVector* allSamples = New<FVector>(GMem, meshLod->ModelVerts + meshLod->SpecialVerts);
 		// First samples are special coordinates
 		samples = &allSamples[meshLod->SpecialVerts];
 		numVerts = meshLod->ModelVerts;
-		meshLod->GetFrame(&allSamples->Point, sizeof(samples[0]), GMath.UnitCoords, actor, numVerts);
+		meshLod->GetFrame(allSamples, sizeof(samples[0]), GMath.UnitCoords, actor, numVerts);
 		numTris = meshLod->Faces.Num();
 		if (specialCoord && !specialCoord->enabled && meshLod->SpecialFaces.Num() > 0) {
 			// Setup special coordinate (attachment point)
-			FTransTexture& v0 = allSamples[0];
-			FTransTexture& v1 = allSamples[1];
-			FTransTexture& v2 = allSamples[2];
+			FVector& v0 = allSamples[0];
+			FVector& v1 = allSamples[1];
+			FVector& v2 = allSamples[2];
 			FCoords coord;
-			coord.Origin = (v0.Point + v2.Point) * 0.5f;
-			coord.XAxis = (v1.Point - v0.Point).SafeNormal();
-			coord.YAxis = ((v0.Point - v2.Point) ^ coord.XAxis).SafeNormal();
+			coord.Origin = (v0 + v2) * 0.5f;
+			coord.XAxis = (v1 - v0).SafeNormal();
+			coord.YAxis = ((v0 - v2) ^ coord.XAxis).SafeNormal();
 			coord.ZAxis = coord.XAxis ^ coord.YAxis;
 			specialCoord->coord = coord;
 			specialCoord->baseMatrix = ToD3DMATRIX(actorMatrix);
@@ -3504,8 +3504,8 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	} else {
 		isLod = false;
 		numVerts = mesh->FrameVerts;
-		samples = NewZeroed<FTransTexture>(GMem, numVerts);
-		mesh->GetFrame(&samples->Point, sizeof(samples[0]), GMath.UnitCoords, actor);
+		samples = New<FVector>(GMem, numVerts);
+		mesh->GetFrame(samples, sizeof(samples[0]), GMath.UnitCoords, actor);
 		numTris = mesh->Tris.Num();
 	}
 
@@ -3525,7 +3525,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		}
 		UTexture* tex = actor->Texture->Get(currentTime);
 		for (INT i = 0; i < numVerts; i++) {
-			FTransTexture& sample = samples[i];
+			FVector& sample = samples[i];
 			if (actor->bRandomFrame) {
 				tex = actor->MultiSkins[appCeil((&sample - samples) / 3.f) % 8];
 				if (tex) {
@@ -3535,10 +3535,9 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 			if (tex) {
 
 				// Transform the local-space point into world-space
-				FVector point = sample.Point;
-				XMVECTOR xpoint = FVecToDXVec(point);
+				XMVECTOR xpoint = FVecToDXVec(sample);
 				xpoint = XMVector3Transform(xpoint, actorMatrix);
-				point = DXVecToFVec(xpoint);
+				FVector point = DXVecToFVec(xpoint);
 
 				FTextureInfo texInfo;
 				tex->Lock(texInfo, currentTime, -1, this);
@@ -3587,12 +3586,14 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	bool fatten = actor->Fatness != 128;
 	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
 
+	FVector* normals = New<FVector>(GMem, numVerts);
+
 	// Calculate normals
 	for (int i = 0; i < numVerts; i++) {
-		samples[i].Normal = FPlane(0, 0, 0, 0);
+		normals[i] = FVector(0, 0, 0);
 	}
 	for (int i = 0; i < numTris; i++) {
-		FTransTexture* points[3];
+		FVector* points[3];
 		if (isLod) {
 			ULodMesh* meshLod = (ULodMesh*)mesh;
 			FMeshFace& face = meshLod->Faces(i);
@@ -3606,15 +3607,15 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 				points[j] = &samples[tri.iVertex[j]];
 			}
 		}
-		FVector fNorm = (points[1]->Point - points[0]->Point) ^ (points[2]->Point - points[0]->Point);
+		FVector fNorm = (*points[1] - *points[0]) ^ (*points[2] - *points[0]);
 		for (int j = 0; j < 3; j++) {
-			points[j]->Normal += fNorm;
+			normals[j] += fNorm;
 		}
 	}
 	for (int i = 0; i < numVerts; i++) {
-		XMVECTOR normal = FVecToDXVec(samples[i].Normal);
+		XMVECTOR normal = FVecToDXVec(normals[i]);
 		normal = XMVector3Normalize(normal);
-		samples[i].Normal = DXVecToFVec(normal);
+		normals[i] = DXVecToFVec(normal);
 	}
 
 	SurfKeyBucketVector<FRenderVert> surfaceBuckets;
@@ -3622,7 +3623,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 	// Process all triangles on the mesh
 	for (INT i = 0; i < numTris; i++) {
-		FTransTexture* points[3];
+		INT sampleIdx[3];
 		DWORD polyFlags;
 		INT texIdx;
 		FMeshUV triUV[3];
@@ -3631,7 +3632,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 			FMeshFace& face = meshLod->Faces(i);
 			for (int j = 0; j < 3; j++) {
 				FMeshWedge& wedge = meshLod->Wedges(face.iWedge[j]);
-				points[j] = &samples[wedge.iVertex];
+				sampleIdx[j] = wedge.iVertex;
 				triUV[j] = wedge.TexUV;
 			}
 			FMeshMaterial& mat = meshLod->Materials(face.MaterialIndex);
@@ -3640,7 +3641,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		} else {
 			FMeshTri& tri = mesh->Tris(i);
 			for (int j = 0; j < 3; j++) {
-				points[j] = &samples[tri.iVertex[j]];
+				sampleIdx[j] = tri.iVertex[j];
 				triUV[j] = tri.Tex[j];
 			}
 			texIdx = tri.TextureIndex;
@@ -3664,7 +3665,9 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(texInfo, polyFlags);
 		pointsVec.reserve(numTris*3);
 		for (INT j = 0; j < 3; j++) {
-			FRenderVert& vert = pointsVec.emplace_back(*points[j]);
+			FRenderVert& vert = pointsVec.emplace_back();
+			vert.Point = samples[sampleIdx[j]];
+			vert.Normal = normals[sampleIdx[j]];
 			vert.U = triUV[j].U * scaleU;
 			vert.V = triUV[j].V * scaleV;
 			if (fatten) {
