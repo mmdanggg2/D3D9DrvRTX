@@ -22,14 +22,24 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 	const FLOAT levelTime = frame->Level->GetLevelInfo()->TimeSeconds;
 	const UViewport* viewport = frame->Viewport;
 
-	TexFlagKeyMap<std::vector<INT>> texNodes;
+	// Create an array of all surfaces to hold their facets and any nodes of each surface
+	std::vector<std::vector<INT>> surfaceNodes(model->Surfs.Num());
+
+	for (INT iNode = 0; iNode < model->Nodes.Num(); iNode++) {
+		const FBspNode& node = model->Nodes(iNode);
+		if (node.NumVertices < 3) continue;
+		const INT& iSurf = node.iSurf;
+		std::vector<INT>& surfNodes= surfaceNodes[iSurf];
+#if !UTGLR_OLD_POLY_CLASSES
+		surfNodes.reserve(model->Surfs(iSurf).Nodes.Num());
+#endif
+		surfNodes.push_back(iNode);
+	}
 
 	DWORD flagMask = (viewport->Actor->ShowFlags & SHOW_PlayerCtrl) ? ~PF_FlatShaded : ~PF_Invisible;
 	flagMask &= ~PF_Highlighted;
-	// Prepass to sort all nodes into texture/flag groups
-	for (INT iNode = 0; iNode < model->Nodes.Num(); iNode++) {
-		const FBspNode* node = &model->Nodes(iNode);
-		INT iSurf = node->iSurf;
+	// Prepass to sort all surfs into texture/flag groups
+	for (INT iSurf = 0; iSurf < model->Surfs.Num(); iSurf++) {
 		const FBspSurf* surf = &model->Surfs(iSurf);
 		if (frame->Level->BrushTracker && frame->Level->BrushTracker->SurfIsDynamic(iSurf)) { // It's a mover, skip it!
 			//dout << L"Surf " << iSurf << L" has no nodes!" << std::endl;
@@ -48,21 +58,19 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 			continue;
 		}
 
-		texNodes[TexFlagKey(texture, flags)].push_back(iNode);
+		// Sort into opaque and non passes
+		RPASS pass = (flags & PF_NoOcclude) ? RPASS::NONSOLID : RPASS::SOLID;
+		SurfaceData& surfData = modelFacets.facetPairs[pass].get(texture, flags).emplace_back();
+		surfData.surf = surf;
+		surfData.nodes = std::move(surfaceNodes[iSurf]);
 	}
 
-	std::unordered_map<INT, FSurfaceFacet*> surfaceMap;
-	for (const std::pair<const TexFlagKey, std::vector<INT>>& texNodePair : texNodes) {
-		const TexFlagKey& tfKey = texNodePair.first;
-		DWORD flags = tfKey.second;
-
-		surfaceMap.reserve(texNodePair.second.size());
-		for (INT iNode : texNodePair.second) {
-			const FBspNode& node = model->Nodes(iNode);
-			if (node.NumVertices < 3) continue;
-			FSurfaceFacet*& facet = surfaceMap[node.iSurf];
-			if (!facet) {
-				const FBspSurf* surf = &model->Surfs(node.iSurf);
+	for (RPASS pass : {SOLID, NONSOLID}) {
+		for (TexFlagBucket<SurfaceData>& texSurfBucket : modelFacets.facetPairs[pass]) {
+			const DWORD flags = texSurfBucket.flags;
+			for (SurfaceData& surfData : texSurfBucket.bucket) {
+				const FBspSurf*& surf = surfData.surf;
+				FSurfaceFacet*& facet = surfData.facet;
 				// New surface, setup...
 				facet = New<FSurfaceFacet>(GDynMem);
 				facet->Polys = NULL;
@@ -73,7 +81,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 					model->Vectors(surf->vTextureV),
 					model->Vectors(surf->vNormal)
 				);
-				facet->MapUncoords = facet->MapCoords.Inverse();
+				//facet->MapUncoords = facet->MapCoords.Inverse(); unused
 
 				FLOAT panU = surf->PanU;
 				FLOAT panV = surf->PanV;
@@ -115,33 +123,27 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 					// Hide this away in the span coz we're not using it
 					facet->Span = (FSpanBuffer*)pan;
 				}
-			}
 
-			FSavedPoly* poly = (FSavedPoly*)New<BYTE>(GDynMem, sizeof(FSavedPoly) + node.NumVertices * sizeof(FTransform*));
-			poly->Next = facet->Polys;
-			facet->Polys = poly;
+				for (const INT& iNode : surfData.nodes) {
+					const FBspNode& node = model->Nodes(iNode);
+					FSavedPoly* poly = (FSavedPoly*)New<BYTE>(GDynMem, sizeof(FSavedPoly) + node.NumVertices * sizeof(FTransform*));
+					poly->Next = facet->Polys;
+					facet->Polys = poly;
 #if !UTGLR_OLD_POLY_CLASSES
-			poly->iNode = iNode;
+					poly->iNode = iNode;
 #endif
-			poly->NumPts = node.NumVertices;
+					poly->NumPts = node.NumVertices;
 
-			// Allocate and store each point
-			for (int i = 0; i < poly->NumPts; i++) {
-				FVert vert = model->Verts(node.iVertPool + i);
-				FTransform* trans = New<FTransform>(VectorMem);
-				trans->Point = model->Points(vert.pVertex);
-				poly->Pts[i] = trans;
+					// Allocate and store each point
+					for (int i = 0; i < poly->NumPts; i++) {
+						FVert vert = model->Verts(node.iVertPool + i);
+						FTransform* trans = New<FTransform>(VectorMem);
+						trans->Point = model->Points(vert.pVertex);
+						poly->Pts[i] = trans;
+					}
+				}
 			}
 		}
-
-		for (std::pair<const INT, FSurfaceFacet*>& facetPair : surfaceMap) {
-			// Sort into opaque and non passes
-			RPASS pass = (flags & PF_NoOcclude) ? RPASS::NONSOLID : RPASS::SOLID;
-			std::vector<FSurfaceFacet>& facets = modelFacets.facetPairs[pass][tfKey];
-			facets.reserve(surfaceMap.size());
-			facets.push_back(*facetPair.second);
-		}
-		surfaceMap.clear();
 	}
 }
 
@@ -250,10 +252,10 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
 	for (RPASS pass : {SOLID, NONSOLID}) {
 		DecalMap decalMap;
-		for (std::pair<const TexFlagKey, std::vector<FSurfaceFacet>>& facetPair : modelFacets.facetPairs[pass]) {
-			UTexture* texture = facetPair.first.first;
-			DWORD flags = facetPair.first.second;
-			std::vector<FSurfaceFacet>& facets = facetPair.second;
+		for (TexFlagBucket<SurfaceData>& facetPair : modelFacets.facetPairs[pass]) {
+			UTexture* texture = facetPair.tex;
+			DWORD flags = facetPair.flags;
+			std::vector<SurfaceData>& surfaces = facetPair.bucket;
 
 			FTextureInfo* texInfo;
 			if (!lockedTextures.count(texture)) {
@@ -263,32 +265,36 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				texInfo = &lockedTextures[texture];
 			}
 
-			FSurfaceInfo surface{};
-			surface.Level = frame->Level;
-			surface.PolyFlags = flags;
-			surface.Texture = texInfo;
+			FSurfaceInfo surfaceInfo{};
+			surfaceInfo.Level = frame->Level;
+			surfaceInfo.PolyFlags = flags;
+			surfaceInfo.Texture = texInfo;
 
-			d3d9Dev->drawLevelSurfaces(frame, surface, facets);
+			std::vector<FSurfaceFacet*> facets;
+			facets.reserve(surfaces.size());
+			for (const SurfaceData& surface : surfaces) {
+				facets.push_back(surface.facet);
+			}
+
+			d3d9Dev->drawLevelSurfaces(frame, surfaceInfo, facets);
 #if !UTGLR_NO_DECALS
 			if (viewport->GetOuterUClient()->Decals) {
-				for (FSurfaceFacet& facet : facets) {
-					getFacetDecals(frame, facet, decalMap, lockedTextures);
+				for (const SurfaceData& surface : surfaces) {
+					getSurfaceDecals(frame, surface, decalMap, lockedTextures);
 				}
 			}
 #endif
 		}
 		// Render all the decals
 		for (const auto& decalsPair : decalMap) {
-			const TexInfoFlagKey& decalInfo = decalsPair.first;
-			FTextureInfo *const& texInfo = decalInfo.first;
-			const std::vector<std::vector<FTransTexture>>& decals = decalsPair.second;
-			for (std::vector<FTransTexture> decal : decals) {
+			FTextureInfo *const& texInfo = decalsPair.tex;
+			for (std::vector<FTransTexture> decal : decalsPair.bucket) {
 				int numPts = decal.size();
 				FTransTexture** pointsPtrs = new FTransTexture * [numPts];
 				for (int i = 0; i < numPts; i++) {
 					pointsPtrs[i] = &decal[i];
 				}
-				d3d9Dev->DrawGouraudPolygon(frame, *texInfo, pointsPtrs, numPts, decalInfo.second, NULL);
+				d3d9Dev->DrawGouraudPolygon(frame, *texInfo, pointsPtrs, numPts, decalsPair.flags, NULL);
 				delete[] pointsPtrs;
 			}
 		}
@@ -299,7 +305,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		}
 		for (AActor* actor : visibleActors) {
 			UBOOL bTranslucent = actor->Style == STY_Translucent;
-#if UTGLR_USES_ALPHABLEND
+#if RUNE
 			bTranslucent |= actor->Style == STY_AlphaBlend;
 #endif
 			if ((pass == RPASS::NONSOLID && bTranslucent) || (pass == RPASS::SOLID && !bTranslucent)) {
@@ -374,10 +380,10 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 }
 
 #if !UTGLR_NO_DECALS
-void UD3D9Render::getFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures) {
+void UD3D9Render::getSurfaceDecals(FSceneNode* frame, const SurfaceData& surfaceData, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures) {
 	const UViewport* viewport = frame->Viewport;
 	const UModel* model = frame->Level->Model;
-	const FBspSurf& surf = model->Surfs(model->Nodes(facet.Polys->iNode).iSurf);
+	const FBspSurf& surf = *surfaceData.surf;
 	for (int i = 0; i < surf.Decals.Num(); i++) {
 		const FDecal* decal = &surf.Decals(i);
 		UTexture* texture;
@@ -411,9 +417,9 @@ void UD3D9Render::getFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, 
 		}
 #endif // RUNE
 
-		std::vector<std::vector<FTransTexture>>& decalPoints = decals[TexInfoFlagKey(texInfo, polyFlags)];
+		std::vector<std::vector<FTransTexture>>& decalPoints = decals.get(texInfo, polyFlags);
 
-		for (FSavedPoly* poly = facet.Polys; poly; poly = poly->Next) {
+		for (FSavedPoly* poly = surfaceData.facet->Polys; poly; poly = poly->Next) {
 			INT findIndex;
 			if (!decal->Nodes.FindItem(poly->iNode, findIndex) && decal->Nodes.Num() > 0) {
 				continue;

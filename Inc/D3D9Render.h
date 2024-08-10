@@ -8,25 +8,29 @@
 #include <vector>
 #include <unordered_map>
 
-typedef const std::pair<UTexture* const, const DWORD> TexFlagKey;
-struct TexFlagKey_Hash {
-	inline std::size_t operator () (const TexFlagKey& p) const {
-		uint64_t combined = (reinterpret_cast<uint64_t>(p.first) << 32) | p.second;
-		return std::hash<uint64_t>{}(combined);
-	}
-};
 template <typename T>
-using TexFlagKeyMap = std::unordered_map<TexFlagKey, T, TexFlagKey_Hash>;
+struct TexFlagBucket {
+	UTexture* tex;
+	DWORD flags;
+	std::vector<T> bucket;
+};
 
-typedef const std::pair<FTextureInfo* const, const DWORD> TexInfoFlagKey;
-struct TexInfoFlagKey_Hash {
-	inline std::size_t operator () (const TexInfoFlagKey& p) const {
-		uint64_t combined = (reinterpret_cast<uint64_t>(p.first) << 32) | p.second;
-		return std::hash<uint64_t>{}(combined);
+template <typename T>
+class TexFlagBucketVector : public std::vector<TexFlagBucket<T>> {
+public:
+	inline std::vector<T>& get(UTexture* tex, DWORD flags) {
+		for (auto& entry : *this) {
+			if (entry.tex == tex && entry.flags == flags) {
+				return entry.bucket;
+			}
+		}
+		// fell through, new entry
+		auto* entry = &this->emplace_back();
+		entry->tex = tex;
+		entry->flags = flags;
+		return entry->bucket;
 	}
 };
-template <typename T>
-using TexInfoFlagKeyMap = std::unordered_map<TexInfoFlagKey, T, TexInfoFlagKey_Hash>;
 
 class UD3D9Render : public URender {
 #if UTGLR_ALT_DECLARE_CLASS
@@ -51,18 +55,23 @@ private:
 	enum RPASS {
 		SOLID, NONSOLID, RPASS_MAX
 	};
+	struct SurfaceData {
+		std::vector<INT> nodes;
+		const FBspSurf* surf;
+		FSurfaceFacet* facet = nullptr;
+	};
 	struct ModelFacets {
-		TexFlagKeyMap<std::vector<FSurfaceFacet>> facetPairs[RPASS_MAX];
+		TexFlagBucketVector<SurfaceData> facetPairs[RPASS_MAX];
 	};
 	struct ParentCoord {
 		FCoords worldCoord;
 		FCoords localCoord;
 	};
-	typedef TexInfoFlagKeyMap<std::vector<std::vector<FTransTexture>>> DecalMap;
+	typedef SurfKeyBucketVector<std::vector<FTransTexture>> DecalMap;
 	void getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets);
 	void drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, ParentCoord* parentCoord = nullptr);
 	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord);
-	void getFacetDecals(FSceneNode* frame, const FSurfaceFacet& facet, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures);
+	void getSurfaceDecals(FSceneNode* frame, const SurfaceData& surfaceData, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures);
 #if RUNE
 	void drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, const ParentCoord* parentCoord);
 #endif

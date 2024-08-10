@@ -1112,7 +1112,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	void DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet);
 	// Takes a list of faces and draws them in batches
-	void drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surface, std::vector<FSurfaceFacet>& facets);
+	void drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surface, std::vector<FSurfaceFacet*>& facets);
 #ifdef RUNE
 	void PreDrawFogSurface();
 	void PostDrawFogSurface();

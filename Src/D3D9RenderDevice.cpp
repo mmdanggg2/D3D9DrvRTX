@@ -2205,7 +2205,7 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	unguard;
 }
 
-void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surface, std::vector<FSurfaceFacet>& facets) {
+void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surface, std::vector<FSurfaceFacet*>& facets) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 	{
 		static int si;
@@ -2227,20 +2227,20 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 	clockFast(ComplexCycles);
 
 	INT numVerts = 0;
-	for (const FSurfaceFacet& facet : facets) {
+	for (FSurfaceFacet*& facet : facets) {
 		//Calculate UDot and VDot intermediates for complex surface
-		m_csUDot = facet.MapCoords.XAxis | facet.MapCoords.Origin;
-		m_csVDot = facet.MapCoords.YAxis | facet.MapCoords.Origin;
+		m_csUDot = facet->MapCoords.XAxis | facet->MapCoords.Origin;
+		m_csVDot = facet->MapCoords.YAxis | facet->MapCoords.Origin;
 
-		if (facet.Span) {
+		if (facet->Span) {
 			// Unpack our hidden treasure, shit it onto the cs UDot stuff
-			FVector* realPan= (FVector*)facet.Span;
+			FVector* realPan= (FVector*)facet->Span;
 			m_csUDot -= realPan->X;
 			m_csVDot -= realPan->Y;
 		}
 
 		//Buffer static geometry
-		numVerts = BufferStaticComplexSurfaceGeometry(facet, numVerts > 0);
+		numVerts = BufferStaticComplexSurfaceGeometry(*facet, numVerts > 0);
 	}
 
 	//Reject invalid surfaces early
