@@ -3608,23 +3608,23 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		normals[i] = FVector(0, 0, 0);
 	}
 	for (int i = 0; i < numTris; i++) {
-		FVector* points[3];
+		int sampleIdx[3];
 		if (isLod) {
 			ULodMesh* meshLod = (ULodMesh*)mesh;
 			FMeshFace& face = meshLod->Faces(i);
 			for (int j = 0; j < 3; j++) {
 				FMeshWedge& wedge = meshLod->Wedges(face.iWedge[j]);
-				points[j] = &samples[wedge.iVertex];
+				sampleIdx[j] = wedge.iVertex;
 			}
 		} else {
 			FMeshTri& tri = mesh->Tris(i);
 			for (int j = 0; j < 3; j++) {
-				points[j] = &samples[tri.iVertex[j]];
+				sampleIdx[j] = tri.iVertex[j];
 			}
 		}
-		FVector fNorm = (*points[1] - *points[0]) ^ (*points[2] - *points[0]);
+		FVector fNorm = (samples[sampleIdx[1]] - samples[sampleIdx[0]]) ^ (samples[sampleIdx[2]] - samples[sampleIdx[0]]);
 		for (int j = 0; j < 3; j++) {
-			normals[j] += fNorm;
+			normals[sampleIdx[j]] += fNorm;
 		}
 	}
 	for (int i = 0; i < numVerts; i++) {
