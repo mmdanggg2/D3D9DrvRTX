@@ -436,17 +436,18 @@ struct SurfKey_Hash {
 template <typename T>
 using SurfKeyMap = std::unordered_map<SurfKey, T, SurfKey_Hash>;
 
-template <typename T>
+template <typename K, typename T>
 struct SurfKeyBucket {
-	FTextureInfo* tex;
+	K tex;
 	DWORD flags;
 	std::vector<T> bucket;
 };
 
-template <typename T>
-class SurfKeyBucketVector : public std::vector<SurfKeyBucket<T>> {
+template <typename K, typename T>
+class SurfKeyBucketVector : public std::vector<SurfKeyBucket<K, T>> {
 public:
-	inline std::vector<T>& get(FTextureInfo* tex, DWORD flags) {
+
+	inline std::vector<T>& get(K tex, DWORD flags) {
 		for (auto& entry : *this) {
 			if (entry.tex == tex && entry.flags == flags) {
 				return entry.bucket;

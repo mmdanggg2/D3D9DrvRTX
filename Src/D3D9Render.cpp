@@ -66,7 +66,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 	}
 
 	for (RPASS pass : {SOLID, NONSOLID}) {
-		for (TexFlagBucket<SurfaceData>& texSurfBucket : modelFacets.facetPairs[pass]) {
+		for (auto& texSurfBucket : modelFacets.facetPairs[pass]) {
 			const DWORD flags = texSurfBucket.flags;
 			for (SurfaceData& surfData : texSurfBucket.bucket) {
 				const FBspSurf*& surf = surfData.surf;
@@ -252,7 +252,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
 	for (RPASS pass : {SOLID, NONSOLID}) {
 		DecalMap decalMap;
-		for (TexFlagBucket<SurfaceData>& facetPair : modelFacets.facetPairs[pass]) {
+		for (auto& facetPair : modelFacets.facetPairs[pass]) {
 			UTexture* texture = facetPair.tex;
 			DWORD flags = facetPair.flags;
 			std::vector<SurfaceData>& surfaces = facetPair.bucket;

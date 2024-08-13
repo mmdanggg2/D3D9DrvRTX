@@ -8,30 +8,6 @@
 #include <vector>
 #include <unordered_map>
 
-template <typename T>
-struct TexFlagBucket {
-	UTexture* tex;
-	DWORD flags;
-	std::vector<T> bucket;
-};
-
-template <typename T>
-class TexFlagBucketVector : public std::vector<TexFlagBucket<T>> {
-public:
-	inline std::vector<T>& get(UTexture* tex, DWORD flags) {
-		for (auto& entry : *this) {
-			if (entry.tex == tex && entry.flags == flags) {
-				return entry.bucket;
-			}
-		}
-		// fell through, new entry
-		auto* entry = &this->emplace_back();
-		entry->tex = tex;
-		entry->flags = flags;
-		return entry->bucket;
-	}
-};
-
 class UD3D9Render : public URender {
 #if UTGLR_ALT_DECLARE_CLASS
 	DECLARE_CLASS(UD3D9Render, URender, CLASS_Config);
@@ -61,13 +37,13 @@ private:
 		FSurfaceFacet* facet = nullptr;
 	};
 	struct ModelFacets {
-		TexFlagBucketVector<SurfaceData> facetPairs[RPASS_MAX];
+		SurfKeyBucketVector<UTexture*, SurfaceData> facetPairs[RPASS_MAX];
 	};
 	struct ParentCoord {
 		FCoords worldCoord;
 		FCoords localCoord;
 	};
-	typedef SurfKeyBucketVector<std::vector<FTransTexture>> DecalMap;
+	typedef SurfKeyBucketVector<FTextureInfo*, std::vector<FTransTexture>> DecalMap;
 	void getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets);
 	void drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, ParentCoord* parentCoord = nullptr);
 	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord);

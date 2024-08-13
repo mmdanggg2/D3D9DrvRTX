@@ -3633,7 +3633,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		normals[i] = DXVecToFVec(normal);
 	}
 
-	SurfKeyBucketVector<FRenderVert> surfaceBuckets;
+	SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets;
 	surfaceBuckets.reserve(numTris);
 
 	// Process all triangles on the mesh
@@ -3715,7 +3715,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	}
 	
 	// Batch render each group of tris
-	for (const SurfKeyBucket<FRenderVert>& entry : surfaceBuckets) {
+	for (const auto& entry : surfaceBuckets) {
 		FTextureInfo* texInfo = entry.tex;
 		DWORD polyFlags = entry.flags;
 
