@@ -1420,6 +1420,8 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void startWorldDraw(FSceneNode* frame);
 	// Sets up the projections ready for drawing UI elements
 	void endWorldDraw(FSceneNode* frame);
+
+	void setProjection(float aspect, float fovAngle);
 };
 
 #if __STATIC_LINK

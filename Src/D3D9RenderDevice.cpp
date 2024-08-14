@@ -6658,6 +6658,17 @@ void UD3D9RenderDevice::EndPointBufferingNoCheck(void) {
 	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, getVertBufferPos(m_bufferedVerts), m_bufferedVerts / 3);
 }
 
+void UD3D9RenderDevice::setProjection(float aspect, float fovAngle) {
+	using namespace DirectX;
+	float fov = fovAngle * PI / 180.0f;
+	fov = 2.0 * atan(tan(fov * 0.5) / aspect);
+	D3DMATRIX proj = ToD3DMATRIX(
+		DirectX::XMMatrixPerspectiveFovLH(fov, aspect, 0.5f, 65536.0f)
+	);
+
+	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &proj);
+}
+
 void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 	{
@@ -6674,13 +6685,7 @@ void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 #else
 	float aspect = frame->FX / frame->FY;
 #endif
-	float fov = Viewport->Actor->FovAngle * PI / 180.0f;
-	fov = 2.0 * atan(tan(fov * 0.5) / aspect);
-	D3DMATRIX proj = ToD3DMATRIX(
-		XMMatrixPerspectiveFovLH(fov, aspect, 0.5f, 65536.0f)
-		);
-
-	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &proj);
+	setProjection(aspect, frame->Viewport->Actor->FovAngle);
 
 	FVector origin = frame->Coords.Origin;
 	FVector forward = frame->Coords.ZAxis;
