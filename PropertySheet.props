@@ -3,7 +3,7 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
     <UNREAL_SDK_DIR>..\sdk</UNREAL_SDK_DIR>
-    <UNREAL_SYSTEM_DIR>..\Install\System</UNREAL_SYSTEM_DIR>
+    <UNREAL_SYSTEM_DIR>..\install\System</UNREAL_SYSTEM_DIR>
   </PropertyGroup>
   <PropertyGroup>
     <IncludePath>$(DXSDK_DIR)Include;$(IncludePath)</IncludePath>
