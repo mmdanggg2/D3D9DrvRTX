@@ -1445,6 +1445,10 @@ void UD3D9RenderDevice::FreePermanentResources(void) {
 			m_d3dTempTexCoordBuffer[u] = NULL;
 		}
 	}
+	if (m_d3dQuadBuffer) {
+		m_d3dQuadBuffer->Release();
+		m_d3dQuadBuffer = NULL;
+	}
 
 
 	//Set vertex declaration to something else so that it isn't using a current vertex declaration
@@ -1467,6 +1471,10 @@ void UD3D9RenderDevice::FreePermanentResources(void) {
 	if (m_twoColorSingleTextureVertexDecl) {
 		m_twoColorSingleTextureVertexDecl->Release();
 		m_twoColorSingleTextureVertexDecl = NULL;
+	}
+	if (m_ColorTexVertexDecl) {
+		m_ColorTexVertexDecl->Release();
+		m_ColorTexVertexDecl = NULL;
 	}
 
 	unguard;
