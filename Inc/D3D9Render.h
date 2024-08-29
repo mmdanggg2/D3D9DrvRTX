@@ -56,13 +56,11 @@ private:
 #if UNREAL_TOURNAMENT && !UNREAL_TOURNAMENT_OLDUNREAL
 constexpr int UT436_size = 264;
 static_assert(sizeof(URender) == UT436_size);
-static_assert(sizeof(UD3D9Render) == sizeof(URender));
 #elif UNREAL_GOLD
 constexpr int UGold_size = 240;
 static_assert(sizeof(URender) == UGold_size);
-static_assert(sizeof(UD3D9Render) == sizeof(URender));
 #elif RUNE
 constexpr int Rune_size = 256;
 static_assert(sizeof(URender) == Rune_size);
-static_assert(sizeof(UD3D9Render) == sizeof(URender));
 #endif
+static_assert(sizeof(UD3D9Render) == sizeof(URender));
