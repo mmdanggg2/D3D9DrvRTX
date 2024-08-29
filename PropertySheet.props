@@ -31,7 +31,7 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
       <ForceConformanceInForLoopScope>false</ForceConformanceInForLoopScope>
-      <PreprocessorDefinitions>NO_APP_MALLOC;NO_UNICODE_OS_SUPPORT;_WINDOWS;WIN32;UNICODE;WIN32_LEAN_AND_MEAN;NOMINMAX;_SECURE_SCL=0;WINDOWS_IGNORE_PACKING_MISMATCH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NO_UNICODE_OS_SUPPORT;_WINDOWS;WIN32;UNICODE;WIN32_LEAN_AND_MEAN;NOMINMAX;_SECURE_SCL=0;WINDOWS_IGNORE_PACKING_MISMATCH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <OutputFile>$(UNREAL_SYSTEM_DIR)\D3D9DrvRTX.dll</OutputFile>
