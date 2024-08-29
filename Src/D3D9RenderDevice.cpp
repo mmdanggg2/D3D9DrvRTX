@@ -3949,7 +3949,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	STAT(unclockFast(GStat.SkelDecimateTime));
 	STAT(clockFast(GStat.SkelClipTime));
 
-	SurfKeyBucketVector<FRenderVert> surfaceBuckets;
+	SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets;
 	surfaceBuckets.reserve(numTris);
 	
 	// Process all triangles on the mesh
@@ -4019,7 +4019,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	STAT(clockFast(GStat.SkelRasterTime));
 
 	// Batch render each group of tris
-	for (const SurfKeyBucket<FRenderVert>& entry : surfaceBuckets) {
+	for (const SurfKeyBucket<FTextureInfo*, FRenderVert>& entry : surfaceBuckets) {
 		FTextureInfo* texInfo = entry.tex;
 		DWORD polyFlags = entry.flags;
 
