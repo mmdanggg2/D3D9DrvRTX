@@ -11,6 +11,7 @@
     <OutDir>$(UNREAL_SYSTEM_DIR)\</OutDir>
     <TargetName>D3D9DrvRTX</TargetName>
     <TargetExt>.dll</TargetExt>
+    <IntDir>Build\$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
