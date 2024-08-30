@@ -1,0 +1,3 @@
+[submodule "sdks"]
+	path = sdks
+	url = https://github.com/mmdanggg2/UE1-sdks.git
