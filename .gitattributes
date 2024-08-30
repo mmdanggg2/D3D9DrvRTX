@@ -1,5 +1,5 @@
 *.sln	eol=crlf
 *.vcxproj*	eol=crlf
-*.rc	eol=crlf
+*.rc	eol=crlf working-tree-encoding=UTF-16LE-BOM
 *.props	eol=crlf
 *.bat	eol=crlf
