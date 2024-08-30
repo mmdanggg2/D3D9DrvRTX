@@ -2,8 +2,8 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
-    <UNREAL_SDK_DIR>..\sdk</UNREAL_SDK_DIR>
-    <UNREAL_SYSTEM_DIR>..\install\System</UNREAL_SYSTEM_DIR>
+    <UNREAL_SDK_DIR>.\sdk</UNREAL_SDK_DIR>
+    <UNREAL_SYSTEM_DIR>.\install\System</UNREAL_SYSTEM_DIR>
   </PropertyGroup>
   <PropertyGroup>
     <IncludePath>$(DXSDK_DIR)Include;$(IncludePath)</IncludePath>

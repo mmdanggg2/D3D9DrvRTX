@@ -2,3 +2,7 @@
 /Build
 /Lib
 /*.aps
+/sdk
+/installs
+/install
+/Releases

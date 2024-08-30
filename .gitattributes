@@ -2,3 +2,4 @@
 *.vcxproj*	eol=crlf
 *.rc	eol=crlf
 *.props	eol=crlf
+*.bat	eol=crlf
