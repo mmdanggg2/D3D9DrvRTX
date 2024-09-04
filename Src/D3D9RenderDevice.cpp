@@ -1797,16 +1797,6 @@ void UD3D9RenderDevice::SetSceneNode(FSceneNode* Frame) {
 	m_sceneNodeX = Frame->X;
 	m_sceneNodeY = Frame->Y;
 
-	// Set viewport.
-	D3DVIEWPORT9 d3dViewport;
-	d3dViewport.X = Frame->XB;
-	d3dViewport.Y = Frame->YB;
-	d3dViewport.Width = Frame->X;
-	d3dViewport.Height = Frame->Y;
-	d3dViewport.MinZ = 0.0f;
-	d3dViewport.MaxZ = 1.0f;
-	m_d3dDevice->SetViewport(&d3dViewport);
-
 	//Set clip planes if doing selection
 	if (m_HitData) {
 		if (Frame->Viewport->IsOrtho()) {
@@ -2736,10 +2726,10 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 
 	EndBufferingExcept(BV_TYPE_TILES);
 
-	FLOAT RPX1 = X;
-	FLOAT RPX2 = X + XL;
-	FLOAT RPY1 = Y;
-	FLOAT RPY2 = Y + YL;
+	FLOAT RPX1 = X + Frame->XB;
+	FLOAT RPX2 = RPX1 + XL;
+	FLOAT RPY1 = Y + Frame->YB;
+	FLOAT RPY2 = RPY1 + YL;
 
 	Z = 0.5f;
 
@@ -6687,6 +6677,16 @@ void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 #endif
 	setProjection(aspect, frame->Viewport->Actor->FovAngle);
 
+	// Set viewport.
+	D3DVIEWPORT9 d3dViewport;
+	d3dViewport.X = frame->XB;
+	d3dViewport.Y = frame->YB;
+	d3dViewport.Width = frame->X;
+	d3dViewport.Height = frame->Y;
+	d3dViewport.MinZ = 0.0f;
+	d3dViewport.MaxZ = 1.0f;
+	m_d3dDevice->SetViewport(&d3dViewport);
+
 	FVector origin = frame->Coords.Origin;
 	FVector forward = frame->Coords.ZAxis;
 	FVector up = frame->Coords.YAxis * -1.0f; // Yeah I don't get it.
@@ -6707,7 +6707,6 @@ void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 	unguard;
 }
 
-
 void UD3D9RenderDevice::endWorldDraw(FSceneNode* frame) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 	{
@@ -6720,6 +6719,16 @@ void UD3D9RenderDevice::endWorldDraw(FSceneNode* frame) {
 
 	EndBuffering();
 	SetBlend(0);
+
+	// Set viewport.
+	D3DVIEWPORT9 d3dViewport;
+	d3dViewport.X = 0;
+	d3dViewport.Y = 0;
+	d3dViewport.Width = m_SetRes_NewX;
+	d3dViewport.Height = m_SetRes_NewY;
+	d3dViewport.MinZ = 0.0f;
+	d3dViewport.MaxZ = 1.0f;
+	m_d3dDevice->SetViewport(&d3dViewport);
 
 	// World drawing finished, setup for ui
 	D3DMATRIX proj = ToD3DMATRIX(
