@@ -234,10 +234,14 @@
     <ResourceCompile Include="D3D9DrvRTX.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Config\D3D9DrvRTX.ini" />
     <None Include="Config\D3D9DrvRTX.int" />
     <None Include="Config\dxvk.conf" />
     <None Include="Config\rtx.conf" />
     <None Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Config\D3D9DrvRTX_hash_tex_blacklist.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

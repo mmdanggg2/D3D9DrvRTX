@@ -49,6 +49,9 @@
     <None Include="Config\D3D9DrvRTX.int">
       <Filter>Conf</Filter>
     </None>
+    <None Include="Config\D3D9DrvRTX.ini">
+      <Filter>Conf</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Src">
@@ -60,5 +63,10 @@
     <Filter Include="Conf">
       <UniqueIdentifier>{ce0f73d3-66ca-402d-99ce-eca7486cc528}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Config\D3D9DrvRTX_hash_tex_blacklist.txt">
+      <Filter>Conf</Filter>
+    </Text>
   </ItemGroup>
 </Project>
