@@ -287,6 +287,27 @@ void UD3D9RenderDevice::StaticConstructor() {
 
 	guard(UD3D9RenderDevice::StaticConstructor);
 
+	if (
+		FString(GConfig->GetStr(TEXT("Engine.Engine"), TEXT("Render"))) != TEXT("D3D9DrvRTX.D3D9Render") &&
+		FString(GConfig->GetStr(TEXT("Engine.Engine"), TEXT("GameRenderDevice"))) == TEXT("D3D9DrvRTX.D3D9RenderDevice")
+	) {
+		if (
+			MessageBox(
+				NULL,
+				TEXT(
+					"D3D9DrvRTX was selected as the renderer but 'Render' was not set to 'D3D9DrvRTX.D3D9Render' in the game's .ini!"
+					"\n\n"
+					"Do you want to attempt setting this automatically and restart the game?"
+				),
+				TEXT("D3D9DrvRTX Setup"),
+				MB_YESNO | MB_TASKMODAL | MB_DEFAULT_DESKTOP_ONLY
+			) == IDYES
+		) {
+			GConfig->SetString(TEXT("Engine.Engine"), TEXT("Render"), TEXT("D3D9DrvRTX.D3D9Render"));
+			appRequestExit(0);
+		}
+	}
+
 #ifdef DEUS_EX
 	const UBOOL UTGLR_DEFAULT_OneXBlending = 1;
 #else
