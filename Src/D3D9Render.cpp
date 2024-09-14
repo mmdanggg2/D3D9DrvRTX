@@ -136,7 +136,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 
 					// Allocate and store each point
 					for (int i = 0; i < poly->NumPts; i++) {
-						FVert vert = model->Verts(node.iVertPool + i);
+						FVert& vert = model->Verts(node.iVertPool + i);
 						FTransform* trans = New<FTransform>(VectorMem);
 						trans->Point = model->Points(vert.pVertex);
 						poly->Pts[i] = trans;
