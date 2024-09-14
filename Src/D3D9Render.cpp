@@ -150,7 +150,9 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	guard(UD3D9Render::DrawWorld);
 	if (!GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
+#ifndef NDEBUG
 		dout << "Not using D3D9DrvRTX Device! " << GRenderDevice->GetName() << std::endl;
+#endif
 		Super::DrawWorld(frame);
 		return;
 	}
