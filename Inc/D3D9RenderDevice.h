@@ -447,16 +447,18 @@ class SurfKeyBucketVector : public std::vector<SurfKeyBucket<K, T>> {
 public:
 
 	inline std::vector<T>& get(K tex, DWORD flags) {
-		for (auto& entry : *this) {
+		const int size = this->size();
+		for (int i = 0; i < size; i++) {
+			auto& entry = (*this)[i];
 			if (entry.tex == tex && entry.flags == flags) {
 				return entry.bucket;
 			}
 		}
 		// fell through, new entry
-		auto* entry = &this->emplace_back();
-		entry->tex = tex;
-		entry->flags = flags;
-		return entry->bucket;
+		auto& entry = this->emplace_back();
+		entry.tex = tex;
+		entry.flags = flags;
+		return entry.bucket;
 	}
 };
 
