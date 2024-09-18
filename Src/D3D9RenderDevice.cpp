@@ -56,6 +56,7 @@ TODO:
 #endif
 
 #include <fstream>
+#include <set>
 
 /*-----------------------------------------------------------------------------
 	Globals.
@@ -4263,7 +4264,11 @@ std::unordered_set<int> UD3D9RenderDevice::LightSlots::updateActors(const std::v
 		if (!actorSlots.count(actor)) {
 			// This is a new actor
 			if (availableSlots.empty()) {
-				dout << "No light slots left! Needed " << actors.size() << " lights" << std::endl;
+				static std::set<int> loggedLightOversizes;
+				if (loggedLightOversizes.insert(actors.size()).second) {
+					debugf(NAME_Warning, TEXT("No light slots left! Needed %d lights"), actors.size());
+					dout << "No light slots left! Needed " << actors.size() << " lights" << std::endl;
+				}
 				break;
 				//throw std::runtime_error("No available slots");
 			}
