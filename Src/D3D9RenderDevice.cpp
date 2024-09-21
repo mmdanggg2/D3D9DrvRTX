@@ -3436,9 +3436,12 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 	if (color.Y > 1.0) color.Y = 1.0;
 	if (color.Z > 1.0) color.Z = 1.0;
 
-	updateQuadBuffer(D3DCOLOR_COLORVALUE(color.X, color.Y, color.Z, 1.0f));
+	DWORD flags = basePolyFlags | PF_TwoSided | (texInfo.Texture->PolyFlags & PF_Masked);
 
-	DWORD flags = basePolyFlags | PF_TwoSided | (texInfo.Texture->PolyFlags & PF_Masked);//PF_Modulated;
+	// Modulated seems to need white vert colours
+	DWORD d3dColor = flags & PF_Modulated ? 0xFFFFFFFF : D3DCOLOR_COLORVALUE(color.X, color.Y, color.Z, 1.0f);
+
+	updateQuadBuffer(d3dColor);
 
 	//Initialize render passes state information
 	m_rpPassCount = 0;
