@@ -455,19 +455,22 @@ void UD3D9Render::ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSu
 	decalOffset.Normalize();
 	decalOffset = decalOffset * 0.4; // offset from wall
 	decalOffset += surfBase;
+	decalPts.reserve(6);
 	for (int i = 0; i < 4; i++) {
 		// Add the 4 decal points to start
 		FTransTexture& pt = decalPts.emplace_back();
 		pt.Point = decal->Vertices[i] + decalOffset;
 	}
 
+	std::vector<bool> isInside;
+	isInside.reserve(6);
 	int polyPrevIdx = poly->NumPts - 1;
 	for (int polyIdx = 0; polyIdx < poly->NumPts; polyIdx++) {
 		FVector edgeVector = poly->Pts[polyPrevIdx]->Point - poly->Pts[polyIdx]->Point;
 		FVector clipNorm = edgeVector ^ surfNormal;
 		FPlane clipPlane = FPlane(poly->Pts[polyIdx]->Point, clipNorm);
 
-		std::vector<bool> isInside;
+		isInside.clear();
 		// Calculate if the point is isInside or outside the clip plane
 		for (FTransTexture& point : decalPts) {
 			isInside.push_back(clipPlane.PlaneDot(point.Point) >= 0);

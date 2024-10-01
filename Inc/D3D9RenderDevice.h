@@ -447,8 +447,8 @@ class SurfKeyBucketVector : public std::vector<SurfKeyBucket<K, T>> {
 public:
 
 	inline std::vector<T>& get(K tex, DWORD flags) {
-		const int size = this->size();
-		for (int i = 0; i < size; i++) {
+		const unsigned int size = this->size();
+		for (unsigned int i = 0; i < size; i++) {
 			auto& entry = (*this)[i];
 			if (entry.tex == tex && entry.flags == flags) {
 				return entry.bucket;
