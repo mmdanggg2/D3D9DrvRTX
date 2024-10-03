@@ -20,7 +20,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/permissive /Zc:implicitNoexcept- %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>false</ConformanceMode>
       <DisableSpecificWarnings>4121;4324;4458;%(DisableSpecificWarnings)</DisableSpecificWarnings>
