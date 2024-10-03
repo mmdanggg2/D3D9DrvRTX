@@ -15,7 +15,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>Inc;$(UNREAL_SDK_DIR)\Core\Inc;$(UNREAL_SDK_DIR)\Render\Inc;$(UNREAL_SDK_DIR)\Engine\Inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>Inc;$(UNREAL_SDK_DIR)\Core\Inc;$(UNREAL_SDK_DIR)\Render\Inc;$(UNREAL_SDK_DIR)\Engine\Inc;bridge-remix\public\include;bridge-remix\ext;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup>

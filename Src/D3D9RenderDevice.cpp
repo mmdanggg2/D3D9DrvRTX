@@ -251,6 +251,10 @@ static inline DirectX::XMVECTOR FVecToDXVec(const FVector& vec) {
 	return DirectX::XMVectorSet(vec.X, vec.Y, vec.Z, 0.0f);
 }
 
+static inline remixapi_Float3D toRemixFloat3D(const FVector& vec) {
+	return remixapi_Float3D{ .x = vec.X, .y = vec.Y, .z = vec.Z };
+}
+
 static inline FVector DXVecToFVec(DirectX::XMVECTOR& vec) {
 	using namespace DirectX;
 	return FVector(XMVectorGetX(vec), XMVectorGetY(vec), XMVectorGetZ(vec));
@@ -827,9 +831,9 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 
 
 	//Create main D3D9 object
-	m_d3d9 = pDirect3DCreate9(D3D_SDK_VERSION);
-	if (!m_d3d9) {
-		appErrorf(TEXT("Direct3DCreate9 failed"));
+	hResult = pDirect3DCreate9Ex(D3D_SDK_VERSION, &m_d3d9);
+	if (FAILED(hResult) || !m_d3d9) {
+		appErrorf(TEXT("Direct3DCreate9Ex failed"));
 	}
 
 
@@ -843,8 +847,9 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	//Create D3D device
 
 	//Get current display mode
-	D3DDISPLAYMODE d3ddm;
-	hResult = m_d3d9->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
+	D3DDISPLAYMODEEX d3ddm;
+	D3DDISPLAYROTATION d3ddr;
+	hResult = m_d3d9->GetAdapterDisplayModeEx(D3DADAPTER_DEFAULT, &d3ddm, &d3ddr);
 	if (FAILED(hResult)) {
 		appErrorf(TEXT("Failed to get current display mode (0x%08X)"), hResult);
 	}
@@ -901,6 +906,8 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		}
 	}
 
+	D3DDISPLAYMODEEX* d3ddmPtr = Fullscreen ? &d3ddm : NULL;
+
 	bool doSoftwareVertexInit = false;
 	//Try HW vertex init if not forcing SW vertex init
 	if (!doSoftwareVertexInit) {
@@ -913,7 +920,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		if (!m_d3dpp.Windowed && (RefreshRate > 0)) {
 			//Attempt to create with specific refresh rate
 			m_d3dpp.FullScreen_RefreshRateInHz = RefreshRate;
-			hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
+			hResult = m_d3d9->CreateDeviceEx(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, d3ddmPtr, &m_d3dDevice);
 			if (FAILED(hResult)) {
 			}
 			else {
@@ -924,7 +931,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		if (tryDefaultRefreshRate) {
 			//Attempt to create with default refresh rate
 			m_d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
-			hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
+			hResult = m_d3d9->CreateDeviceEx(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, d3ddmPtr, &m_d3dDevice);
 			if (FAILED(hResult)) {
 				debugf(NAME_Init, TEXT("Failed to create D3D device with hardware vertex processing (0x%08X)"), hResult);
 				doSoftwareVertexInit = true;
@@ -940,7 +947,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		if (!m_d3dpp.Windowed && (RefreshRate > 0)) {
 			//Attempt to create with specific refresh rate
 			m_d3dpp.FullScreen_RefreshRateInHz = RefreshRate;
-			hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
+			hResult = m_d3d9->CreateDeviceEx(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, d3ddmPtr, &m_d3dDevice);
 			if (FAILED(hResult)) {
 				debugf(NAME_Init, TEXT("Failed to create D3D device with software vertex processing (0x%08X)"), hResult);
 			}
@@ -952,7 +959,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		if (tryDefaultRefreshRate) {
 			//Attempt to create with default refresh rate
 			m_d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
-			hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
+			hResult = m_d3d9->CreateDeviceEx(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, d3ddmPtr, &m_d3dDevice);
 			if (FAILED(hResult)) {
 				// stijn: on win10, we also see devices getting lost here...
 				if (hResult == D3DERR_DEVICELOST) {
@@ -966,6 +973,14 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		}
 	}
 
+	remixapi_ErrorCode remixCode = remixapi::bridge_initRemixApi(&m_remixInterface);
+	if (remixCode != REMIXAPI_ERROR_CODE_SUCCESS) {
+		appErrorf(TEXT("RTX Remix bridge_initRemixApi failed with code '0x%x'"), remixCode);
+	}
+	/*remixCode = m_remixInterface.dxvk_RegisterD3D9Device(m_d3dDevice);
+	if (remixCode != REMIXAPI_ERROR_CODE_SUCCESS) {
+		appErrorf(TEXT("RTX Remix dxvk_RegisterD3D9Device failed with code '0x%x'"), remixCode);
+	}*/// Currently unsupported?
 
 	//Reset previous SwapBuffers status to okay
 	m_prevSwapBuffersStatus = true;
@@ -1407,16 +1422,11 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	//Initialize color flags
 	m_requestedColorFlags = 0;
 
-	lightSlots = new LightSlots(m_d3dCaps.MaxActiveLights);
-
 	unguard;
 }
 
 void UD3D9RenderDevice::FreePermanentResources(void) {
 	guard(FreePermanentResources);
-
-	delete lightSlots;
-	lightSlots = nullptr;
 
 	unsigned int u;
 	HRESULT hResult;
@@ -1526,8 +1536,8 @@ UBOOL UD3D9RenderDevice::Init(UViewport* InViewport, INT NewX, INT NewY, INT New
 			debugf(NAME_Init, TEXT("Failed to load %s"), appFromAnsi(g_d3d9DllName));
 			return 0;
 		}
-		pDirect3DCreate9 = (LPDIRECT3DCREATE9)GetProcAddress(hModuleD3d9, "Direct3DCreate9");
-		if (!pDirect3DCreate9) {
+		pDirect3DCreate9Ex = (LPDIRECT3DCREATE9EX)GetProcAddress(hModuleD3d9, "Direct3DCreate9Ex");
+		if (!pDirect3DCreate9Ex) {
 			debugf(NAME_Init, TEXT("Failed to load function from %s"), appFromAnsi(g_d3d9DllName));
 			return 0;
 		}
@@ -4246,75 +4256,54 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 	unguard;
 }
 
-std::unordered_set<int> UD3D9RenderDevice::LightSlots::updateActors(const std::vector<AActor*>& actors) {
-	std::unordered_set<int> unsetSlots;
-	// First, deactivate the slots of any actors that have been removed
-	for (auto it = actorSlots.begin(); it != actorSlots.end(); ) {
-		if (!std::count(actors.begin(), actors.end(), it->first)) {
-			// This actor has been removed
-			const int slot = it->second;
-			availableSlots.push_front(slot);
-			unsetSlots.insert(slot);
-			//dout << L"Slot " << slot << L" actor deleted" << std::endl;
-			it = actorSlots.erase(it);
-		} else {
-			++it;
-		}
-	}
-
-	// Now, add any new actors
-	for (AActor* actor : actors) {
-		if (!actorSlots.count(actor)) {
-			// This is a new actor
-			if (availableSlots.empty()) {
-				static std::set<int> loggedLightOversizes;
-				if (loggedLightOversizes.insert(actors.size()).second) {
-					debugf(NAME_Warning, TEXT("No light slots left! Needed %d lights"), actors.size());
-					dout << "No light slots left! Needed " << actors.size() << " lights" << std::endl;
-				}
-				break;
-				//throw std::runtime_error("No available slots");
-			}
-			int slot = availableSlots.front();
-			availableSlots.pop_front();
-			actorSlots[actor] = slot;
-			unsetSlots.erase(slot);
-			//dout << L"Slot " << slot << L" actor added " << actor->GetName() << std::endl;
-		}
-	}
-	return unsetSlots;
-}
-
 void UD3D9RenderDevice::renderLights(std::vector<AActor*> lightActors) {
 	guard(UD3D9RenderDevice::renderLights);
+	remixapi_ErrorCode remixCode;
 
-	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, TRUE);
-
-	std::unordered_set<int> nowEmptySlots = lightSlots->updateActors(lightActors);
-
-	// Disable lights that no longer exist
-	for (int slot : nowEmptySlots) {
-		//dout << L"Disabling slot " << slot << std::endl;
-		D3DLIGHT9 lightInfo{ D3DLIGHT_POINT };
-		HRESULT res = m_d3dDevice->SetLight(slot, &lightInfo);
-		assert(res == D3D_OK);
-		res = m_d3dDevice->LightEnable(slot, false);
-		assert(res == D3D_OK);
+	for (auto it = actorLightHandles.cbegin(); it != actorLightHandles.cend();) {
+		//if (!std::count(lightActors.begin(), lightActors.end(), it->first)) {
+			// Actor no longer a light
+			remixCode = m_remixInterface.DestroyLight(it->second);
+			if (remixCode != REMIXAPI_ERROR_CODE_SUCCESS) {
+				appErrorf(TEXT("RTX Remix DestroyLight failed with code '0x%x'"), remixCode);
+			}
+			actorLightHandles.erase(it++);
+		/*}
+		else {
+			it++;
+		}*/
 	}
 
-	for (auto pair : lightSlots->slotMap()) {
-		AActor* actor = pair.first;
-		int slot = pair.second;
-		D3DLIGHT9 lightInfo = D3DLIGHT9();
-		lightInfo.Type = D3DLIGHT_POINT;
-		lightInfo.Position = D3DVECTOR{ actor->Location.X, actor->Location.Y, actor->Location.Z };
-		lightInfo.Diffuse = hsvToRgb(actor->LightHue, 0xFFu - actor->LightSaturation, actor->LightBrightness);
-		lightInfo.Specular = lightInfo.Diffuse;
-		lightInfo.Range = 1000;
-		HRESULT res = m_d3dDevice->SetLight(slot, &lightInfo);
-		assert(res == D3D_OK);
-		res = m_d3dDevice->LightEnable(slot, true);
-		assert(res == D3D_OK);
+	for (AActor* actor : lightActors) {
+		if (!actorLightHandles.count(actor)) {
+			D3DCOLORVALUE rgb = hsvToRgb(actor->LightHue, 0xFFu - actor->LightSaturation, actor->LightBrightness);
+			std::hash<FString> fstringHash{};
+			uint64_t hash = fstringHash(actor->XLevel->URL.Map);
+			hash = hash << 32 | fstringHash(FString(actor->GetName()));
+			remixapi_LightInfoSphereEXT sphereInfo = {
+				.sType = REMIXAPI_STRUCT_TYPE_LIGHT_INFO_SPHERE_EXT,
+				.pNext = nullptr,
+				.position = toRemixFloat3D(actor->Location),
+				.radius = 4,
+				.shaping_hasvalue = false,
+				.shaping_value = {},
+			};
+			remixapi_LightInfo lightInfo = {
+				.sType = REMIXAPI_STRUCT_TYPE_LIGHT_INFO,
+				.pNext = &sphereInfo,
+				.hash = hash,
+				.radiance = {.x = rgb.r*500, .y = rgb.g*500, .z = rgb.b*500},
+			};
+			remixapi_LightHandle& handle = actorLightHandles[actor];
+			remixCode = m_remixInterface.CreateLight(&lightInfo, &handle);
+			if (remixCode != REMIXAPI_ERROR_CODE_SUCCESS) {
+				appErrorf(TEXT("RTX Remix CreateLight failed with code '0x%x'"), remixCode);
+			}
+		}
+		remixCode = m_remixInterface.DrawLightInstance(actorLightHandles[actor]);
+		if (remixCode != REMIXAPI_ERROR_CODE_SUCCESS) {
+			appErrorf(TEXT("RTX Remix DrawLightInstance failed with code '0x%x'"), remixCode);
+		}
 	}
 
 	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, FALSE);
@@ -6776,7 +6765,7 @@ INT UD3D9RenderDevice::NumDevices = 0;
 INT UD3D9RenderDevice::LockCount = 0;
 
 HMODULE UD3D9RenderDevice::hModuleD3d9 = NULL;
-LPDIRECT3DCREATE9 UD3D9RenderDevice::pDirect3DCreate9 = NULL;
+LPDIRECT3DCREATE9EX UD3D9RenderDevice::pDirect3DCreate9Ex = NULL;
 
 /*-----------------------------------------------------------------------------
 	The End.

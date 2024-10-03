@@ -10,6 +10,8 @@
 #define DIRECT3D_VERSION 0x0900
 #include <d3d9.h>
 
+#include <remixapi/bridge_remix_api.h>
+
 #include <stdlib.h>
 
 #include "Render.h"
@@ -103,7 +105,7 @@ typedef DOUBLE FTime;
 extern DWORD GUglyHackFlags;
 #endif
 
-typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
+typedef HRESULT (WINAPI * LPDIRECT3DCREATE9EX)(UINT SDKVersion, IDirect3D9Ex**);
 
 
 //Use debug D3D9 DLL
@@ -372,6 +374,13 @@ struct FRenderVert {
 	FLOAT U{}, V{};
 };
 
+template <>
+struct std::hash<FString> {
+	std::size_t operator()(const FString& x) const noexcept	{
+		return std::hash<std::string_view>{}({ reinterpret_cast<const char*>(*x), static_cast<size_t>(x.Len()*2) });
+	}
+};
+
 // https://stackoverflow.com/a/57595105/5233018
 template <typename T, typename... Rest>
 void hash_combine(std::size_t& seed, const T& v, const Rest&... rest) {
@@ -527,33 +536,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	enum { VERTEX_ARRAY_ALIGN = 64 };	//Must be even multiple of 16B for SSE
 	enum { VERTEX_ARRAY_TAIL_PADDING = 72 };	//Must include 8B for half SSE tail
 
-	class LightSlots {
-	private:
-		std::unordered_map<AActor*, int> actorSlots;
-		std::deque<int> availableSlots;
-		ods_stream dout;
-
-	public:
-		LightSlots(int numSlots) {
-			actorSlots.reserve(numSlots);
-			for (int i = 0; i < numSlots; ++i) {
-				availableSlots.push_back(i);
-			}
-		}
-
-		// Updates which actors are in the slots, returns a set of slots that are no longer used
-		std::unordered_set<int> updateActors(const std::vector<AActor*>& actors);
-
-		const std::deque<int> unusedSlots() {
-			return availableSlots;
-		}
-
-		const std::unordered_map<AActor*, int> slotMap() {
-			return actorSlots;
-		}
-	};
-
-	LightSlots* lightSlots;
+	std::unordered_map<AActor*, remixapi_LightHandle> actorLightHandles;
 
 	//Vertex declarations
 	IDirect3DVertexDeclaration9 *m_oneColorVertexDecl;
@@ -980,11 +963,13 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	static INT LockCount;
 
 	static HMODULE hModuleD3d9;
-	static LPDIRECT3DCREATE9 pDirect3DCreate9;
+	static LPDIRECT3DCREATE9EX pDirect3DCreate9Ex;
 
 
-	IDirect3D9 *m_d3d9;
-	IDirect3DDevice9 *m_d3dDevice;
+	IDirect3D9Ex *m_d3d9;
+	IDirect3DDevice9Ex *m_d3dDevice;
+
+	remixapi_Interface m_remixInterface;
 
 	INT m_SetRes_NewX;
 	INT m_SetRes_NewY;
