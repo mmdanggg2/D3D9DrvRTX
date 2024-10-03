@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="FString">
+    <DisplayString>{(TCHAR*)Data,su}</DisplayString>
+  </Type>
+  <Type Name="FName">
+    <DisplayString>{dereferenceFName(*this),su}</DisplayString>
+  </Type>
+  <Type Name="UObject">
+    <DisplayString>{{Class={Class->Name,su} Name={Name,su}}}</DisplayString>
+  </Type>
+  <Type Name="TArray&lt;*&gt;">
+    <DisplayString>{{Num={ArrayNum,d}}}</DisplayString>
+    <Expand>
+      <Item Name="[size]">ArrayNum,d</Item>
+      <Item Name="[capacity]">ArrayMax,d</Item>
+      <ArrayItems>
+        <Size>ArrayNum</Size>
+        <ValuePointer>($T1*)Data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+</AutoVisualizer>

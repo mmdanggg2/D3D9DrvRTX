@@ -69,4 +69,7 @@
       <Filter>Conf</Filter>
     </Text>
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="NatvisFile.natvis" />
+  </ItemGroup>
 </Project>

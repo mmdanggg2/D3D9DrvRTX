@@ -1,5 +1,5 @@
 #include "D3D9DebugUtils.h"
-
+#include "Core.h"
 
 ods_buf::~ods_buf() {
 	sync();
@@ -37,4 +37,8 @@ std::basic_string<TCHAR> HexString(DWORD data, DWORD numBits) {
 	strHexNum << data;
 
 	return strHexNum.str();
+}
+
+const TCHAR* dereferenceFName(const FName& name) {
+	return name.operator*();
 }
