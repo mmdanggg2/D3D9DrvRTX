@@ -20,4 +20,20 @@
       </ArrayItems>
     </Expand>
   </Type>
+  <Type Name="FSavedPoly">
+    <DisplayString>{{NumPts={NumPts,d} iNode={iNode,d} Next={Next,x}}}</DisplayString>
+    <Expand>
+      <Item Name="iNode">iNode,d</Item>
+      <Item Name="NumPts">NumPts,d</Item>
+      <ArrayItems>
+        <Size>NumPts</Size>
+        <ValuePointer>Pts</ValuePointer>
+      </ArrayItems>
+      <LinkedListItems>
+        <HeadPointer>Next</HeadPointer>
+        <NextPointer>Next</NextPointer>
+        <ValueNode>*this</ValueNode>
+      </LinkedListItems>
+    </Expand>
+  </Type>
 </AutoVisualizer>
