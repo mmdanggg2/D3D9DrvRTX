@@ -19,7 +19,6 @@ void UD3D9Render::StaticConstructor() {
 
 void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets) {
 	UModel* model = frame->Level->Model;
-	const FLOAT levelTime = frame->Level->GetLevelInfo()->TimeSeconds;
 	const UViewport* viewport = frame->Viewport;
 
 	// Create an array of all surfaces to hold their facets and any nodes of each surface
@@ -63,86 +62,84 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		SurfaceData& surfData = modelFacets.facetPairs[pass].get(texture, flags).emplace_back();
 		surfData.surf = surf;
 		surfData.nodes = std::move(surfaceNodes[iSurf]);
+		surfData.calculateSurfaceFacet(frame->Level, flags);
+	}
+}
+
+void UD3D9Render::SurfaceData::calculateSurfaceFacet(ULevel* level, const DWORD flags) {
+	UModel* model = level->Model;
+	const FLOAT levelTime = level->GetLevelInfo()->TimeSeconds;
+	const FBspSurf* const& surf = this->surf;
+	FSurfaceFacet*& facet = this->facet;
+	// New surface, setup...
+	facet = New<FSurfaceFacet>(GDynMem);
+	facet->Polys = NULL;
+	facet->Span = NULL;
+	facet->MapCoords = FCoords(
+		model->Points(surf->pBase),
+		model->Vectors(surf->vTextureU),
+		model->Vectors(surf->vTextureV),
+		model->Vectors(surf->vNormal)
+	);
+	//facet->MapUncoords = facet->MapCoords.Inverse(); unused
+
+	FLOAT panU = surf->PanU;
+	FLOAT panV = surf->PanV;
+	if (flags & PF_AutoUPan || flags & PF_AutoVPan) {
+		const AZoneInfo* zone = nullptr;
+#if !UTGLR_OLD_POLY_CLASSES
+		for (int i = 0; i < surf->Nodes.Num(); i++) {
+			// Search for a zone actor on any part of the surface since this node may not have it linked.
+			const FBspNode& surfNode = model->Nodes(surf->Nodes(i));
+			const FZoneProperties* zoneProps = &model->Zones[surfNode.iZone[1]];
+			if (zoneProps->ZoneActor) {
+				zone = zoneProps->ZoneActor;
+				break;
+			}
+			zoneProps = &model->Zones[surfNode.iZone[0]];
+			if (!zone && zoneProps->ZoneActor) {
+				zone = zoneProps->ZoneActor;
+				break;
+			}
+		}
+#endif
+
+		if (flags & PF_AutoUPan) {
+			panU += fmod(levelTime * 35.0 * (zone ? zone->TexUPanSpeed : 1.0), 1024.0);
+		}
+		if (flags & PF_AutoVPan) {
+			panV += fmod(levelTime * 35.0 * (zone ? zone->TexVPanSpeed : 1.0), 1024.0);
+		}
+	}
+#if !RUNE
+	if (flags & PF_SmallWavy) {
+		panU += 8.0 * sin(levelTime) + 4.0 * cos(2.3 * levelTime);
+		panV += 8.0 * cos(levelTime) + 4.0 * sin(2.3 * levelTime);
+	}
+#endif
+	if (panU != 0 || panV != 0) {
+		FVector* pan = New<FVector>(GDynMem);
+		*pan = FVector(panU, panV, 0);
+		// Hide this away in the span coz we're not using it
+		facet->Span = (FSpanBuffer*)pan;
 	}
 
-	for (RPASS pass : {SOLID, NONSOLID}) {
-		for (auto& texSurfBucket : modelFacets.facetPairs[pass]) {
-			const DWORD flags = texSurfBucket.flags;
-			for (SurfaceData& surfData : texSurfBucket.bucket) {
-				const FBspSurf*& surf = surfData.surf;
-				FSurfaceFacet*& facet = surfData.facet;
-				// New surface, setup...
-				facet = New<FSurfaceFacet>(GDynMem);
-				facet->Polys = NULL;
-				facet->Span = NULL;
-				facet->MapCoords = FCoords(
-					model->Points(surf->pBase),
-					model->Vectors(surf->vTextureU),
-					model->Vectors(surf->vTextureV),
-					model->Vectors(surf->vNormal)
-				);
-				//facet->MapUncoords = facet->MapCoords.Inverse(); unused
-
-				FLOAT panU = surf->PanU;
-				FLOAT panV = surf->PanV;
-				if (flags & PF_AutoUPan || flags & PF_AutoVPan) {
-					const AZoneInfo* zone = nullptr;
+	for (const INT& iNode : this->nodes) {
+		const FBspNode& node = model->Nodes(iNode);
+		FSavedPoly* poly = (FSavedPoly*)New<BYTE>(GDynMem, sizeof(FSavedPoly) + node.NumVertices * sizeof(FTransform*));
+		poly->Next = facet->Polys;
+		facet->Polys = poly;
 #if !UTGLR_OLD_POLY_CLASSES
-					for (int i = 0; i < surf->Nodes.Num(); i++) {
-						// Search for a zone actor on any part of the surface since this node may not have it linked.
-						const FBspNode& surfNode = model->Nodes(surf->Nodes(i));
-						const FZoneProperties* zoneProps = &model->Zones[surfNode.iZone[1]];
-						if (zoneProps->ZoneActor) {
-							zone = zoneProps->ZoneActor;
-							break;
-						}
-						zoneProps = &model->Zones[surfNode.iZone[0]];
-						if (!zone && zoneProps->ZoneActor) {
-							zone = zoneProps->ZoneActor;
-							break;
-						}
-					}
+		poly->iNode = iNode;
 #endif
+		poly->NumPts = node.NumVertices;
 
-					if (flags & PF_AutoUPan) {
-						panU += fmod(levelTime * 35.0 * (zone ? zone->TexUPanSpeed : 1.0), 1024.0);
-					}
-					if (flags & PF_AutoVPan) {
-						panV += fmod(levelTime * 35.0 * (zone ? zone->TexVPanSpeed : 1.0), 1024.0);
-					}
-				}
-#if !RUNE
-				if (flags & PF_SmallWavy) {
-					panU += 8.0 * sin(levelTime) + 4.0 * cos(2.3 * levelTime);
-					panV += 8.0 * cos(levelTime) + 4.0 * sin(2.3 * levelTime);
-				}
-#endif
-				if (panU != 0 || panV != 0) {
-					FVector* pan = New<FVector>(GDynMem);
-					*pan = FVector(panU, panV, 0);
-					// Hide this away in the span coz we're not using it
-					facet->Span = (FSpanBuffer*)pan;
-				}
-
-				for (const INT& iNode : surfData.nodes) {
-					const FBspNode& node = model->Nodes(iNode);
-					FSavedPoly* poly = (FSavedPoly*)New<BYTE>(GDynMem, sizeof(FSavedPoly) + node.NumVertices * sizeof(FTransform*));
-					poly->Next = facet->Polys;
-					facet->Polys = poly;
-#if !UTGLR_OLD_POLY_CLASSES
-					poly->iNode = iNode;
-#endif
-					poly->NumPts = node.NumVertices;
-
-					// Allocate and store each point
-					for (int i = 0; i < poly->NumPts; i++) {
-						FVert& vert = model->Verts(node.iVertPool + i);
-						FTransform* trans = New<FTransform>(VectorMem);
-						trans->Point = model->Points(vert.pVertex);
-						poly->Pts[i] = trans;
-					}
-				}
-			}
+		// Allocate and store each point
+		for (int i = 0; i < poly->NumPts; i++) {
+			FVert& vert = model->Verts(node.iVertPool + i);
+			FTransform* trans = New<FTransform>(VectorMem);
+			trans->Point = model->Points(vert.pVertex);
+			poly->Pts[i] = trans;
 		}
 	}
 }

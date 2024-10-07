@@ -35,6 +35,7 @@ private:
 		std::vector<INT> nodes;
 		const FBspSurf* surf;
 		FSurfaceFacet* facet = nullptr;
+		void calculateSurfaceFacet(ULevel* level, const DWORD flags);
 	};
 	struct ModelFacets {
 		SurfKeyBucketVector<UTexture*, SurfaceData> facetPairs[RPASS_MAX];
