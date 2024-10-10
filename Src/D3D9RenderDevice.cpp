@@ -901,68 +901,27 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		}
 	}
 
-	bool doSoftwareVertexInit = false;
-	//Try HW vertex init if not forcing SW vertex init
-	if (!doSoftwareVertexInit) {
-		bool tryDefaultRefreshRate = true;
-		DWORD behaviorFlags = D3DCREATE_HARDWARE_VERTEXPROCESSING;
+	bool tryDefaultRefreshRate = true;
+	DWORD behaviorFlags = D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_PUREDEVICE;
 
-		behaviorFlags |= D3DCREATE_PUREDEVICE;
-
-		//Possibly attempt to set refresh rate if fullscreen
-		if (!m_d3dpp.Windowed && (RefreshRate > 0)) {
-			//Attempt to create with specific refresh rate
-			m_d3dpp.FullScreen_RefreshRateInHz = RefreshRate;
-			hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
-			if (FAILED(hResult)) {
-			}
-			else {
-				tryDefaultRefreshRate = false;
-			}
+	//Possibly attempt to set refresh rate if fullscreen
+	if (!m_d3dpp.Windowed && (RefreshRate > 0)) {
+		//Attempt to create with specific refresh rate
+		m_d3dpp.FullScreen_RefreshRateInHz = RefreshRate;
+		hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
+		if (FAILED(hResult)) {
 		}
-
-		if (tryDefaultRefreshRate) {
-			//Attempt to create with default refresh rate
-			m_d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
-			hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
-			if (FAILED(hResult)) {
-				debugf(NAME_Init, TEXT("Failed to create D3D device with hardware vertex processing (0x%08X)"), hResult);
-				doSoftwareVertexInit = true;
-			}
+		else {
+			tryDefaultRefreshRate = false;
 		}
 	}
-	//Try SW vertex init if forced earlier or if HW vertex init failed
-	if (doSoftwareVertexInit) {
-		bool tryDefaultRefreshRate = true;
-		DWORD behaviorFlags = D3DCREATE_SOFTWARE_VERTEXPROCESSING;
 
-		//Possibly attempt to set refresh rate if fullscreen
-		if (!m_d3dpp.Windowed && (RefreshRate > 0)) {
-			//Attempt to create with specific refresh rate
-			m_d3dpp.FullScreen_RefreshRateInHz = RefreshRate;
-			hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
-			if (FAILED(hResult)) {
-				debugf(NAME_Init, TEXT("Failed to create D3D device with software vertex processing (0x%08X)"), hResult);
-			}
-			else {
-				tryDefaultRefreshRate = false;
-			}
-		}
-
-		if (tryDefaultRefreshRate) {
-			//Attempt to create with default refresh rate
-			m_d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
-			hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
-			if (FAILED(hResult)) {
-				// stijn: on win10, we also see devices getting lost here...
-				if (hResult == D3DERR_DEVICELOST) {
-					debugf(NAME_Init, TEXT("Failed to create D3D device with default refresh rate (0x%08X)"), hResult);
-					return 0;
-				}
-				else {
-					appErrorf(TEXT("Failed to create D3D device (0x%08X)"), hResult);
-				}
-			}
+	if (tryDefaultRefreshRate) {
+		//Attempt to create with default refresh rate
+		m_d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
+		hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
+		if (FAILED(hResult)) {
+			appErrorf(TEXT("Failed to create D3D device (0x%08X)"), hResult);
 		}
 	}
 
