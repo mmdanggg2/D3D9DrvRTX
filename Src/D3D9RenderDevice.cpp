@@ -1295,10 +1295,16 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	m_d3dTempVertexColorBuffer = nullptr;
 	m_vertexTempBufferSize = 0;
 	m_csVertexArray.clear();
+
+	constexpr const TCHAR* vertexBufferFailMessage = TEXT(
+		"CreateVertexBuffer failed (0x%08X)\n"
+		"This was likely caused by an error in RTX Remix."
+	);
+
 	//Vertex and primary color
 	hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColor) * VERTEX_BUFFER_SIZE, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dVertexColorBuffer, NULL);
 	if (FAILED(hResult)) {
-		appErrorf(TEXT("CreateVertexBuffer failed"));
+		appErrorf(vertexBufferFailMessage, hResult);
 	}
 
 	//Secondary color
@@ -1311,7 +1317,7 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	for (u = 0; u < TMUnits; u++) {
 		hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLTexCoord) * VERTEX_BUFFER_SIZE, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dTexCoordBuffer[u], NULL);
 		if (FAILED(hResult)) {
-			appErrorf(TEXT("CreateVertexBuffer failed"));
+			appErrorf(vertexBufferFailMessage, hResult);
 		}
 		m_d3dTempTexCoordBuffer[u] = nullptr;
 		m_texTempBufferSize[u] = 0;
@@ -1320,7 +1326,7 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	//For sprite quad
 	hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColorTex) * 4, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dQuadBuffer, NULL);
 	if (FAILED(hResult)) {
-		appErrorf(TEXT("CreateVertexBuffer failed"));
+		appErrorf(vertexBufferFailMessage, hResult);
 	}
 
 	updateQuadBuffer(0xDEADBEEF);
