@@ -2733,124 +2733,123 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 		return;
 	}
 
-	if (1) {
-		//Check if need to start new tile buffering
-		if (needsNewBuffer(PolyFlags, 6, &Info)) {
-			//Flush any previously buffered tiles
-			EndBuffering();
 
-			//Check if vertex buffer flush is required
-			if ((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 6)) {
-				FlushVertexBuffers();
-			}
+	//Check if need to start new tile buffering
+	if (needsNewBuffer(PolyFlags, 6, &Info)) {
+		//Flush any previously buffered tiles
+		EndBuffering();
 
-			//Start tile buffering
-			StartBuffering(BV_TYPE_TILES);
-
-			//Update current poly flags (before possible local modification)
-			m_curPolyFlags = PolyFlags;
-
-			//Set default texture state
-			SetDefaultTextureState();
-
-			SetBlend(PolyFlags, true);
-			SetTextureNoPanBias(0, Info, PolyFlags);
-
-			if (PolyFlags & PF_Modulated) {
-				m_requestedColorFlags = 0;
-			}
-			else {
-				m_requestedColorFlags = CF_COLOR_ARRAY;
-			}
-
-			//Lock vertexColor and texCoord0 buffers
-			LockVertexColorBuffer(6);
-			LockTexCoordBuffer(0, 6);
-
-			//Set stream state
-			SetDefaultStreamState();
+		//Check if vertex buffer flush is required
+		if ((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 6)) {
+			FlushVertexBuffers();
 		}
 
-		//Get tile color
-		DWORD tileColor;
-		tileColor = 0xFFFFFFFF;
-		if (!(PolyFlags & PF_Modulated)) {
-#if UTGLR_USES_ALPHABLEND
-			if (PolyFlags & PF_AlphaBlend) {
-				if (Info.Texture->Alpha > 0.f)
-					Color.W = Info.Texture->Alpha;
-				tileColor = FPlaneTo_BGRAClamped(&Color);
-			}
-			else {
-				tileColor = FPlaneTo_BGRClamped_A255(&Color);
-			}
-#else
-			tileColor = FPlaneTo_BGRClamped_A255(&Color);
-#endif
+		//Start tile buffering
+		StartBuffering(BV_TYPE_TILES);
+
+		//Update current poly flags (before possible local modification)
+		m_curPolyFlags = PolyFlags;
+
+		//Set default texture state
+		SetDefaultTextureState();
+
+		SetBlend(PolyFlags, true);
+		SetTextureNoPanBias(0, Info, PolyFlags);
+
+		if (PolyFlags & PF_Modulated) {
+			m_requestedColorFlags = 0;
+		}
+		else {
+			m_requestedColorFlags = CF_COLOR_ARRAY;
 		}
 
-		//Buffer the tile
-		FGLVertexColor *pVertexColorArray = &m_pVertexColorArray[m_bufferedVerts];
-		FGLTexCoord *pTexCoordArray = &m_pTexCoordArray[0][m_bufferedVerts];
+		//Lock vertexColor and texCoord0 buffers
+		LockVertexColorBuffer(6);
+		LockTexCoordBuffer(0, 6);
 
-		pVertexColorArray[0].x = RPX1;
-		pVertexColorArray[0].y = RPY1;
-		pVertexColorArray[0].z = Z;
-		pVertexColorArray[0].color = tileColor;
-
-		pVertexColorArray[1].x = RPX2;
-		pVertexColorArray[1].y = RPY1;
-		pVertexColorArray[1].z = Z;
-		pVertexColorArray[1].color = tileColor;
-
-		pVertexColorArray[2].x = RPX2;
-		pVertexColorArray[2].y = RPY2;
-		pVertexColorArray[2].z = Z;
-		pVertexColorArray[2].color = tileColor;
-
-		pVertexColorArray[3].x = RPX1;
-		pVertexColorArray[3].y = RPY1;
-		pVertexColorArray[3].z = Z;
-		pVertexColorArray[3].color = tileColor;
-
-		pVertexColorArray[4].x = RPX2;
-		pVertexColorArray[4].y = RPY2;
-		pVertexColorArray[4].z = Z;
-		pVertexColorArray[4].color = tileColor;
-
-		pVertexColorArray[5].x = RPX1;
-		pVertexColorArray[5].y = RPY2;
-		pVertexColorArray[5].z = Z;
-		pVertexColorArray[5].color = tileColor;
-
-		FLOAT TexInfoUMult = TexInfo[0].UMult;
-		FLOAT TexInfoVMult = TexInfo[0].VMult;
-
-		FLOAT SU1 = (U) * TexInfoUMult;
-		FLOAT SU2 = (U + UL) * TexInfoUMult;
-		FLOAT SV1 = (V) * TexInfoVMult;
-		FLOAT SV2 = (V + VL) * TexInfoVMult;
-
-		pTexCoordArray[0].u = SU1;
-		pTexCoordArray[0].v = SV1;
-
-		pTexCoordArray[1].u = SU2;
-		pTexCoordArray[1].v = SV1;
-
-		pTexCoordArray[2].u = SU2;
-		pTexCoordArray[2].v = SV2;
-
-		pTexCoordArray[3].u = SU1;
-		pTexCoordArray[3].v = SV1;
-
-		pTexCoordArray[4].u = SU2;
-		pTexCoordArray[4].v = SV2;
-
-		pTexCoordArray[5].u = SU1;
-		pTexCoordArray[5].v = SV2;
-
-		m_bufferedVerts += 6;
+		//Set stream state
+		SetDefaultStreamState();
 	}
+
+	//Get tile color
+	DWORD tileColor;
+	tileColor = 0xFFFFFFFF;
+	if (!(PolyFlags & PF_Modulated)) {
+#if UTGLR_USES_ALPHABLEND
+		if (PolyFlags & PF_AlphaBlend) {
+			if (Info.Texture->Alpha > 0.f)
+				Color.W = Info.Texture->Alpha;
+			tileColor = FPlaneTo_BGRAClamped(&Color);
+		}
+		else {
+			tileColor = FPlaneTo_BGRClamped_A255(&Color);
+		}
+#else
+		tileColor = FPlaneTo_BGRClamped_A255(&Color);
+#endif
+	}
+
+	//Buffer the tile
+	FGLVertexColor *pVertexColorArray = &m_pVertexColorArray[m_bufferedVerts];
+	FGLTexCoord *pTexCoordArray = &m_pTexCoordArray[0][m_bufferedVerts];
+
+	pVertexColorArray[0].x = RPX1;
+	pVertexColorArray[0].y = RPY1;
+	pVertexColorArray[0].z = Z;
+	pVertexColorArray[0].color = tileColor;
+
+	pVertexColorArray[1].x = RPX2;
+	pVertexColorArray[1].y = RPY1;
+	pVertexColorArray[1].z = Z;
+	pVertexColorArray[1].color = tileColor;
+
+	pVertexColorArray[2].x = RPX2;
+	pVertexColorArray[2].y = RPY2;
+	pVertexColorArray[2].z = Z;
+	pVertexColorArray[2].color = tileColor;
+
+	pVertexColorArray[3].x = RPX1;
+	pVertexColorArray[3].y = RPY1;
+	pVertexColorArray[3].z = Z;
+	pVertexColorArray[3].color = tileColor;
+
+	pVertexColorArray[4].x = RPX2;
+	pVertexColorArray[4].y = RPY2;
+	pVertexColorArray[4].z = Z;
+	pVertexColorArray[4].color = tileColor;
+
+	pVertexColorArray[5].x = RPX1;
+	pVertexColorArray[5].y = RPY2;
+	pVertexColorArray[5].z = Z;
+	pVertexColorArray[5].color = tileColor;
+
+	FLOAT TexInfoUMult = TexInfo[0].UMult;
+	FLOAT TexInfoVMult = TexInfo[0].VMult;
+
+	FLOAT SU1 = (U) * TexInfoUMult;
+	FLOAT SU2 = (U + UL) * TexInfoUMult;
+	FLOAT SV1 = (V) * TexInfoVMult;
+	FLOAT SV2 = (V + VL) * TexInfoVMult;
+
+	pTexCoordArray[0].u = SU1;
+	pTexCoordArray[0].v = SV1;
+
+	pTexCoordArray[1].u = SU2;
+	pTexCoordArray[1].v = SV1;
+
+	pTexCoordArray[2].u = SU2;
+	pTexCoordArray[2].v = SV2;
+
+	pTexCoordArray[3].u = SU1;
+	pTexCoordArray[3].v = SV1;
+
+	pTexCoordArray[4].u = SU2;
+	pTexCoordArray[4].v = SV2;
+
+	pTexCoordArray[5].u = SU1;
+	pTexCoordArray[5].v = SV2;
+
+	m_bufferedVerts += 6;
 
 	unguard;
 }
