@@ -36,4 +36,7 @@
       </LinkedListItems>
     </Expand>
   </Type>
+  <Type Name="FTime">
+    <DisplayString>{v/4294967296.0}</DisplayString>
+  </Type>
 </AutoVisualizer>
