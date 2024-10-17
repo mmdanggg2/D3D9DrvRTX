@@ -4,6 +4,7 @@
   <PropertyGroup Label="UserMacros">
     <UNREAL_SDK_DIR>.\sdk</UNREAL_SDK_DIR>
     <UNREAL_SYSTEM_DIR>.\install\System</UNREAL_SYSTEM_DIR>
+    <UNREAL_EXE_NAME>UnrealTournament.exe</UNREAL_EXE_NAME>
   </PropertyGroup>
   <PropertyGroup>
     <IncludePath>$(DXSDK_DIR)Include;$(IncludePath)</IncludePath>
@@ -48,6 +49,9 @@
     </BuildMacro>
     <BuildMacro Include="UNREAL_SYSTEM_DIR">
       <Value>$(UNREAL_SYSTEM_DIR)</Value>
+    </BuildMacro>
+    <BuildMacro Include="UNREAL_EXE_NAME">
+      <Value>$(UNREAL_EXE_NAME)</Value>
     </BuildMacro>
   </ItemGroup>
 </Project>
