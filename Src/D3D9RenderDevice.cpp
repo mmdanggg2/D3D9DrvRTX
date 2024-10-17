@@ -1255,11 +1255,6 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	m_vertexTempBufferSize = 0;
 	m_csVertexArray.clear();
 
-	constexpr const TCHAR* vertexBufferFailMessage = TEXT(
-		"CreateVertexBuffer failed (0x%08X)\n"
-		"This was likely caused by an error in RTX Remix."
-	);
-
 	//Vertex and primary color
 	hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColor) * VERTEX_BUFFER_SIZE, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dVertexColorBuffer, NULL);
 	if (FAILED(hResult)) {

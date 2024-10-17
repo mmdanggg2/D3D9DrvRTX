@@ -477,6 +477,11 @@ struct SpecialCoord {
 	bool enabled = false;
 };
 
+constexpr const TCHAR* vertexBufferFailMessage = TEXT(
+	"CreateVertexBuffer failed (0x%08X)\n"
+	"This was likely caused by an error in RTX Remix."
+);
+
 #if UNREAL_TOURNAMENT_OLDUNREAL
 typedef URenderDeviceOldUnreal469 RENDERDEVICE_SUPER;
 #else
@@ -655,7 +660,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 				//dout << L"Creating vert buffer of size " << numPoints << std::endl;
 				hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColor) * numPoints, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, D3DPOOL_DEFAULT, &m_d3dTempVertexColorBuffer, NULL);
 				if (FAILED(hResult)) {
-					appErrorf(TEXT("CreateVertexBuffer failed"));
+					appErrorf(vertexBufferFailMessage, hResult);
 				}
 				m_vertexTempBufferSize = numPoints;
 			} else {
@@ -730,7 +735,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 				//dout << L"Creating tex buffer of size " << numPoints << std::endl;
 				hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLTexCoord) * numPoints, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, D3DPOOL_DEFAULT, &texCoordBuffer, NULL);
 				if (FAILED(hResult)) {
-					appErrorf(TEXT("CreateVertexBuffer failed"));
+					appErrorf(vertexBufferFailMessage, hResult);
 				}
 				m_texTempBufferSize[texUnit] = numPoints;
 			} else {
