@@ -2590,11 +2590,7 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 	//Check if need to start new poly buffering
 	//Make sure enough entries are left in the vertex buffers
 	//based on the current position when it was locked
-	if ((m_curPolyFlags != PolyFlags) ||
-		(TexInfo[0].CurrentCacheID != calcCacheID(Info, PolyFlags)) ||
-		((m_curVertexBufferPos + m_bufferedVerts + NumPts) >= (VERTEX_BUFFER_SIZE - 14)) ||
-		(m_bufferedVerts == 0))
-	{
+	if (needsNewBuffer(PolyFlags, 14, &Info)) {
 		//Flush any previously buffered gouraud polys
 		EndBuffering();
 
@@ -2739,11 +2735,7 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 
 	if (1) {
 		//Check if need to start new tile buffering
-		if ((m_curPolyFlags != PolyFlags) ||
-			(TexInfo[0].CurrentCacheID != calcCacheID(Info, PolyFlags)) ||
-			((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 6)) ||
-			(m_bufferedVerts == 0))
-		{
+		if (needsNewBuffer(PolyFlags, 6, &Info)) {
 			//Flush any previously buffered tiles
 			EndBuffering();
 
@@ -2915,11 +2907,7 @@ void UD3D9RenderDevice::Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 		const DWORD PolyFlags = PF_Highlighted | PF_Occlude;
 
 		//Check if need to start new line buffering
-		if ((m_curPolyFlags != PolyFlags) ||
-			(TexInfo[0].CurrentCacheID != TEX_CACHE_ID_NO_TEX) ||
-			((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 2)) ||
-			(m_bufferedVerts == 0))
-		{
+		if (needsNewBuffer(PolyFlags, 2)) {
 			//Flush any previously buffered lines
 			EndBuffering();
 
@@ -3018,11 +3006,7 @@ void UD3D9RenderDevice::Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 	const DWORD PolyFlags = PF_Highlighted | PF_Occlude;
 
 	//Check if need to start new line buffering
-	if ((m_curPolyFlags != PolyFlags) ||
-		(TexInfo[0].CurrentCacheID != TEX_CACHE_ID_NO_TEX) ||
-		((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 2)) ||
-		(m_bufferedVerts == 0))
-	{
+	if (needsNewBuffer(PolyFlags, 2)) {
 		//Flush any previously buffered lines
 		EndBuffering();
 
@@ -3144,11 +3128,7 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 	const DWORD PolyFlags = PF_Highlighted | PF_Occlude;
 
 	//Check if need to start new point buffering
-	if ((m_curPolyFlags != PolyFlags) ||
-		(TexInfo[0].CurrentCacheID != TEX_CACHE_ID_NO_TEX) ||
-		((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - 6)) ||
-		(m_bufferedVerts == 0))
-	{
+	if (needsNewBuffer(PolyFlags, 6)) {
 		//Flush any previously buffered points
 		EndBuffering();
 

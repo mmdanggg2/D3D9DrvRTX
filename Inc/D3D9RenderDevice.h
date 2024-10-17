@@ -1186,12 +1186,20 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	// Reworked masked texture hack
 	// sets the last bit to 1 when a texture is masked this stops the same texture
 	// with different flags clashing and having the wrong properties
-	inline QWORD calcCacheID(FTextureInfo info, DWORD polyFlags) {
+	inline QWORD calcCacheID(const FTextureInfo& info, DWORD polyFlags) {
 		QWORD cacheID = info.CacheID;
 		if ((cacheID & 0xFF) == CID_RenderTexture && (polyFlags & PF_Masked)) {
 			cacheID |= 1;
 		}
 		return cacheID;
+	}
+
+	inline bool needsNewBuffer(DWORD PolyFlags, int bufferSizeOffset, FTextureInfo* Info = nullptr) {
+		if (m_curPolyFlags != PolyFlags) return true;
+		QWORD cacheId = Info ? calcCacheID(*Info, PolyFlags) : TEX_CACHE_ID_NO_TEX;
+		if (TexInfo[0].CurrentCacheID != cacheId) return true;
+		if ((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - bufferSizeOffset)) return true;
+		return m_bufferedVerts == 0;
 	}
 
 	inline void FASTCALL SetTexture(INT Multi, FTextureInfo& Info, DWORD PolyFlags, FLOAT PanBias) {
