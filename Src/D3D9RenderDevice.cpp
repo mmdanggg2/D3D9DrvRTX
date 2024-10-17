@@ -805,14 +805,14 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	//No longer changing resolution here
 	if (Fullscreen) {
 		INT FindX = NewX, FindY = NewY, BestError = MAXINT;
-		for (INT i = 0; i < Modes.Num(); i++) {
-			if (Modes(i).Z==NewColorBytes*8) {
-				INT Error
-				=	(Modes(i).X-FindX)*(Modes(i).X-FindX)
-				+	(Modes(i).Y-FindY)*(Modes(i).Y-FindY);
+		for (const FPlane& mode : Modes) {
+			if (mode.Z==NewColorBytes*8) {
+				INT Error =
+					(mode.X - FindX) * (mode.X - FindX) +
+					(mode.Y - FindY) * (mode.Y - FindY);
 				if (Error < BestError) {
-					NewX      = Modes(i).X;
-					NewY      = Modes(i).Y;
+					NewX      = mode.X;
+					NewY      = mode.Y;
 					BestError = Error;
 				}
 			}
@@ -1481,7 +1481,7 @@ UBOOL UD3D9RenderDevice::Init(UViewport* InViewport, INT NewX, INT NewY, INT New
 		if (!EnumDisplaySettingsW(NULL, i, &Tmp)) {
 			break;
 		}
-		Modes.AddUniqueItem(FPlane(Tmp.dmPelsWidth, Tmp.dmPelsHeight, Tmp.dmBitsPerPel, Tmp.dmDisplayFrequency));
+		Modes.insert(FPlane(Tmp.dmPelsWidth, Tmp.dmPelsHeight, Tmp.dmBitsPerPel, Tmp.dmDisplayFrequency));
 	}
 
 	//Load D3D9 library
@@ -1548,19 +1548,16 @@ UBOOL UD3D9RenderDevice::Exec(const TCHAR* Cmd, FOutputDevice& Ar) {
 	}
 #endif
 	if (ParseCommand(&Cmd, TEXT("GetRes"))) {
-		TArray<FPlane> Relevant;
-		INT i;
-		for (i = 0; i < Modes.Num(); i++) {
-			if (Modes(i).Z == (Viewport->ColorBytes * 8))
-				if
-				(	(Modes(i).X!=320 || Modes(i).Y!=200)
-				&&	(Modes(i).X!=640 || Modes(i).Y!=400) )
-				Relevant.AddUniqueItem(FPlane(Modes(i).X, Modes(i).Y, 0, 0));
+		std::set<FPlane> Relevant;
+		for (const FPlane& mode : Modes) {
+			if (mode.Z == (Viewport->ColorBytes * 8))
+				if ((mode.X!=320 || mode.Y!=200) &&
+					(mode.X!=640 || mode.Y!=400))
+					Relevant.insert(FPlane(mode.X, mode.Y, 0, 0));
 		}
-		appQsort(&Relevant(0), Relevant.Num(), sizeof(FPlane), (QSORT_COMPARE)CompareRes);
 		FString Str;
-		for (i = 0; i < Relevant.Num(); i++) {
-			Str += FString::Printf(TEXT("%ix%i "), (INT)Relevant(i).X, (INT)Relevant(i).Y);
+		for (const FPlane& mode : Relevant) {
+			Str += FString::Printf(TEXT("%ix%i "), (INT)mode.X, (INT)mode.Y);
 		}
 		Ar.Log(*Str.LeftChop(1));
 		return 1;

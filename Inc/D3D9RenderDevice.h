@@ -78,6 +78,7 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include <set>
 #include <map>
 #include <deque>
 #pragma warning(disable : 4018)
@@ -423,6 +424,13 @@ struct std::hash<FTextureInfo> {
 
 bool inline operator==(const FTextureInfo& lhs, const FTextureInfo& rhs) {
 	return std::hash<FTextureInfo>()(lhs) == std::hash<FTextureInfo>()(rhs);
+}
+
+bool inline operator<(const FPlane& lhs, const FPlane& rhs) {
+	if (lhs.X != rhs.X) return lhs.X < rhs.X;
+	if (lhs.Y != rhs.Y) return lhs.Y < rhs.Y;
+	if (lhs.Z != rhs.Z) return lhs.Z < rhs.Z;
+	return lhs.W < rhs.W;
 }
 
 typedef const std::pair<FTextureInfo* const, const DWORD> SurfKey;
@@ -825,7 +833,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	QWORD_CTTree_NodePool_t m_nonZeroPrefixNodePool;
 
-	TArray<FPlane> Modes;
+	std::set<FPlane> Modes;
 
 	//Use UViewport* in URenderDevice
 	//UViewport* Viewport;
@@ -1097,10 +1105,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 
 	UBOOL Init(UViewport* InViewport, INT NewX, INT NewY, INT NewColorBytes, UBOOL Fullscreen);
-
-	static QSORT_RETURN CDECL CompareRes(const FPlane* A, const FPlane* B) {
-		return (QSORT_RETURN) (((A->X - B->X) != 0.0f) ? (A->X - B->X) : (A->Y - B->Y));
-	}
 
 	UBOOL Exec(const TCHAR* Cmd, FOutputDevice& Ar);
 	void Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane ScreenClear, DWORD RenderLockFlags, BYTE* InHitData, INT* InHitSize);
