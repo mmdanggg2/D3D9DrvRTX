@@ -1514,6 +1514,9 @@ UBOOL UD3D9RenderDevice::Init(UViewport* InViewport, INT NewX, INT NewY, INT New
 		return FailedInitf(LocalizeError("ResFailed"));
 	}
 
+	// Default to a state for drawing ui
+	endWorldDraw(nullptr);
+
 	std::wstring fileName = L"D3D9DrvRTX_hash_tex_blacklist.txt";
 	std::wifstream file(fileName);
 
@@ -2367,10 +2370,7 @@ void UD3D9RenderDevice::DrawFogSurface(FSceneNode* Frame, FFogSurf &FogSurf) {
 		UnlockTexCoordBuffer(0);
 
 		//Draw the triangles
-		m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos, NumPts - 2);
-
-		//Advance vertex buffer position
-		m_curVertexBufferPos += NumPts;
+		m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, getVertBufferPos(NumPts), NumPts - 2);
 	}
 
 	if (FogSurf.PolyFlags & PF_Masked) {
@@ -4224,6 +4224,8 @@ std::unordered_set<int> UD3D9RenderDevice::LightSlots::updateActors(const std::v
 void UD3D9RenderDevice::renderLights(std::vector<AActor*> lightActors) {
 	guard(UD3D9RenderDevice::renderLights);
 
+	EndBuffering();
+
 	//m_d3dDevice->SetRenderState(D3DRS_LIGHTING, TRUE);
 
 	std::unordered_set<int> nowEmptySlots = lightSlots->updateActors(lightActors);
@@ -4276,12 +4278,20 @@ static FVector hashToNormalVector(size_t hash) {
 }
 
 void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* location) {
+#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: renderSkyZoneAnchor = " << si++ << std::endl;
+	}
+#endif
 	guard(UD3D9RenderDevice::renderSkyZoneAnchor);
 	using namespace DirectX;
 
 	if (!EnableSkyBoxAnchors) {
 		return;
 	}
+
+	EndBuffering();
 
 	XMMATRIX actorMatrix = XMMatrixIdentity();
 
@@ -4687,10 +4697,7 @@ void UD3D9RenderDevice::EndFlash() {
 		UnlockTexCoordBuffer(0);
 
 		//Draw the square
-		m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos, 2);
-
-		//Advance vertex buffer position
-		m_curVertexBufferPos += 4;
+		m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, getVertBufferPos(4), 2);
 	}
 	unguard;
 }
@@ -6624,6 +6631,25 @@ void UD3D9RenderDevice::setProjection(float aspect, float fovAngle) {
 	m_d3dDevice->SetTransform(D3DTS_PROJECTION, &proj);
 }
 
+void UD3D9RenderDevice::setCompatMatrix(FSceneNode* frame) {
+	D3DMATRIX prevCoords;
+	m_d3dDevice->GetTransform(D3DTS_WORLD, &prevCoords);
+	D3DMATRIX coords = ToD3DMATRIX(FCoordToDXMat(frame->Coords));
+	if (memcmp(&prevCoords, &coords, sizeof(D3DMATRIX))) {
+		EndBuffering();
+	}
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &coords);
+};
+
+void UD3D9RenderDevice::setIdentityMatrix() {
+	D3DMATRIX prevCoords;
+	m_d3dDevice->GetTransform(D3DTS_WORLD, &prevCoords);
+	if (memcmp(&prevCoords, &identityMatrix, sizeof(D3DMATRIX))) {
+		EndBuffering();
+	}
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
+};
+
 void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 	{
@@ -6633,6 +6659,8 @@ void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 #endif
 	guard(UD3D9RenderDevice::startWorldDraw);
 	using namespace DirectX;
+
+	EndBuffering();
 
 	// Setup projection and view matrices for current frame
 #if DEUS_EX
@@ -6665,8 +6693,8 @@ void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 	);
 
 	m_d3dDevice->SetTransform(D3DTS_VIEW, &view);
-	D3DMATRIX coords = ToD3DMATRIX(FCoordToDXMat(frame->Coords));
-	m_d3dDevice->SetTransform(D3DTS_WORLD, &coords); // Enables old draw methods to draw in world space
+	// Enables old draw methods to draw in world space
+	setCompatMatrix(frame);
 	//m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
 	m_d3dDevice->SetRenderState(D3DRS_ZENABLE, D3DZB_TRUE);
 	unguard;

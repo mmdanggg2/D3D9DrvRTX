@@ -1194,11 +1194,11 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		return cacheID;
 	}
 
-	inline bool needsNewBuffer(DWORD PolyFlags, int bufferSizeOffset, FTextureInfo* Info = nullptr) {
-		if (m_curPolyFlags != PolyFlags) return true;
-		QWORD cacheId = Info ? calcCacheID(*Info, PolyFlags) : TEX_CACHE_ID_NO_TEX;
+	inline bool needsNewBuffer(DWORD polyFlags, int numVerts, FTextureInfo* info = nullptr) {
+		if (m_curPolyFlags != polyFlags) return true;
+		QWORD cacheId = info ? calcCacheID(*info, polyFlags) : TEX_CACHE_ID_NO_TEX;
 		if (TexInfo[0].CurrentCacheID != cacheId) return true;
-		if ((m_curVertexBufferPos + m_bufferedVerts) >= (VERTEX_BUFFER_SIZE - bufferSizeOffset)) return true;
+		if ((m_curVertexBufferPos + m_bufferedVerts + numVerts) >= (VERTEX_BUFFER_SIZE)) return true;
 		return m_bufferedVerts == 0;
 	}
 
@@ -1440,6 +1440,8 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void endWorldDraw(FSceneNode* frame);
 
 	void setProjection(float aspect, float fovAngle);
+	void setCompatMatrix(FSceneNode* frame);
+	void setIdentityMatrix();
 };
 
 #if __STATIC_LINK

@@ -293,6 +293,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				for (int i = 0; i < numPts; i++) {
 					pointsPtrs[i] = &decal[i];
 				}
+				d3d9Dev->setIdentityMatrix();
 				d3d9Dev->DrawGouraudPolygon(frame, *texInfo, pointsPtrs, numPts, decalsPair.flags, NULL);
 				delete[] pointsPtrs;
 			}
@@ -312,9 +313,6 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			}
 		}
 	}
-	for (std::pair<UTexture* const, FTextureInfo>& entry : lockedTextures) {
-		entry.first->Unlock(entry.second);
-	}
 
 	for (ASkyZoneInfo* zone : skyZones) {
 		d3d9Dev->renderSkyZoneAnchor(zone, &frame->Coords.Origin);
@@ -323,6 +321,10 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	d3d9Dev->renderLights(lightActors);
 
 	d3d9Dev->endWorldDraw(frame);
+
+	for (std::pair<UTexture* const, FTextureInfo>& entry : lockedTextures) {
+		entry.first->Unlock(entry.second);
+	}
 
 	// Render view model actor and extra HUD stuff
 	if (!GIsEditor && playerActor && (viewport->Actor->ShowFlags & SHOW_Actors)) {
@@ -340,7 +342,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, ParentCoord* parentCoord)
 {
-	SpecialCoord specialCoord;
+	SpecialCoord specialCoord{};
 #if RUNE
 	if (actor->IsA(ATrigger::StaticClass())) {
 		// "Draw" triggers because for some unholy reason trigger logic is in the render module
@@ -361,7 +363,7 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 			d3d9Dev->renderParticleSystemActor(frame, (AParticleSystem*)actor, parentCoord ? parentCoord->localCoord : GMath.UnitCoords);
 		}
 		else {
-			d3d9Dev->startWorldDraw(frame);
+			d3d9Dev->setCompatMatrix(frame);
 			DrawParticleSystem(frame, actor, nullptr, parentCoord ? parentCoord->localCoord : GMath.UnitCoords);
 		}
 	}
@@ -552,7 +554,7 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 		weapon->Mesh = origMesh;
 		weapon->DrawScale = origDrawScale;
 	}
-#endif
+#endif // !RUNE
 #if !UTGLR_NO_PLAYER_FLAG
 	if (pawn->PlayerReplicationInfo && pawn->PlayerReplicationInfo->HasFlag) {
 		AActor* flag = pawn->PlayerReplicationInfo->HasFlag;
