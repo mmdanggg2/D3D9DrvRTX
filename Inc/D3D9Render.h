@@ -63,5 +63,8 @@ static_assert(sizeof(URender) == UGold_size);
 #elif RUNE
 constexpr int Rune_size = 256;
 static_assert(sizeof(URender) == Rune_size);
+#elif HARRY_POTTER_1
+constexpr int HP1_size = 280;
+static_assert(sizeof(URender) == HP1_size);
 #endif
 static_assert(sizeof(UD3D9Render) == sizeof(URender));

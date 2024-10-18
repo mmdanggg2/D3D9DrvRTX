@@ -62,6 +62,9 @@
 	#define UTGLR_NO_DETAIL_TEX 1
 	#define UTGLR_NO_ALLOW_PRECACHE 1
 	#define UTGLR_NO_SUPER_EXEC 1
+#elif defined(HARRY_POTTER_1)
+	#define UTGLR_VALID_BUILD_CONFIG 1
+	#define UTGLR_FORCE_RENDER_DEVICE 1
 #else
 	#define UTGLR_VALID_BUILD_CONFIG 0
 #endif
@@ -1137,6 +1140,10 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2);
 	void Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2);
 	void Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FLOAT X1, FLOAT Y1, FLOAT X2, FLOAT Y2, FLOAT Z);
+#if HARRY_POTTER_1
+	INT MaxVertices() override { return 0xFFFF; }
+	void DrawTriangles(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, USHORT* Indices, INT NumIdx, DWORD PolyFlags, FSpanBuffer* Span) override;
+#endif
 
 	// Render a sprite actor
 	void renderSprite(FSceneNode* frame, AActor* actor);

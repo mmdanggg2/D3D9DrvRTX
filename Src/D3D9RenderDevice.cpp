@@ -288,6 +288,11 @@ void UD3D9RenderDevice::StaticConstructor() {
 
 	guard(UD3D9RenderDevice::StaticConstructor);
 
+#if UTGLR_FORCE_RENDER_DEVICE
+	// Harry potter is mean and forces the render device to the inbuilt ones
+	GConfig->SetString(TEXT("Engine.Engine"), TEXT("GameRenderDevice"), TEXT("D3D9DrvRTX.D3D9RenderDevice"));
+#endif
+
 	if (
 		FString(GConfig->GetStr(TEXT("Engine.Engine"), TEXT("Render"))) != TEXT("D3D9DrvRTX.D3D9Render") &&
 		FString(GConfig->GetStr(TEXT("Engine.Engine"), TEXT("GameRenderDevice"))) == TEXT("D3D9DrvRTX.D3D9RenderDevice")
@@ -2429,6 +2434,82 @@ void UD3D9RenderDevice::PostDrawGouraud(FLOAT FogDistance) {
 }
 #endif
 
+#if HARRY_POTTER_1
+void UD3D9RenderDevice::DrawTriangles(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, USHORT* Indices, INT NumIdx, DWORD PolyFlags, FSpanBuffer* Span) {
+#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: DrawTriangles = " << si++ << std::endl;
+	}
+#endif
+	guard(UD3D9RenderDevice::DrawTriangles);
+	assert(NumIdx % 3 == 0);
+	if (!NumIdx) {
+		return;
+	}
+	
+	EndBufferingExcept(BV_TYPE_GOURAUD_POLYS);
+
+	if (needsNewBuffer(PolyFlags, NumIdx + 14, &Info)) {
+		EndBuffering();
+
+		//Check if vertex buffer flush is required
+		if ((m_curVertexBufferPos + m_bufferedVerts + NumIdx) >= (VERTEX_BUFFER_SIZE - 14)) {
+			FlushVertexBuffers();
+		}
+		//Start gouraud polygon buffering
+		StartBuffering(BV_TYPE_GOURAUD_POLYS);
+
+		//Update current poly flags
+		m_curPolyFlags = PolyFlags;
+
+		//Set default texture state
+		SetDefaultTextureState();
+
+		SetBlend(PolyFlags);
+		SetTextureNoPanBias(0, Info, PolyFlags);
+
+		if (PolyFlags & PF_Modulated) {
+			m_requestedColorFlags = 0;
+		}
+		else {
+			m_requestedColorFlags = CF_COLOR_ARRAY;
+		}
+
+		//Lock vertexColor and texCoord0 buffers
+		LockVertexColorBuffer(NumIdx);
+		LockTexCoordBuffer(0, NumIdx);
+
+		//Set stream state
+		SetDefaultStreamState();
+	}
+
+	FGLTexCoord* pTexCoordArray = &m_pTexCoordArray[0][m_bufferedVerts];
+	FGLVertexColor* pVertexColorArray = &m_pVertexColorArray[m_bufferedVerts];
+	for (int i = 0; i < NumIdx; i++) {
+		assert(Indices[i] < NumPts);
+		FTransTexture*& point = Pts[Indices[i]];
+
+		pTexCoordArray->u = point->U * TexInfo[0].UMult;
+		pTexCoordArray->v = point->V * TexInfo[0].VMult;
+		pTexCoordArray++;
+
+		pVertexColorArray->x = point->Point.X;
+		pVertexColorArray->y = point->Point.Y;
+		pVertexColorArray->z = point->Point.Z;
+		// stijn: needed clamping in 64-bit because Actors with AmbientGlow==0 often had RGBA values above 1
+		if (m_requestedColorFlags & CF_COLOR_ARRAY) {
+			pVertexColorArray->color = FPlaneTo_BGRClamped_A255(&point->Light);
+		}
+		//pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGR_A255(&P->Light);
+		pVertexColorArray++;
+	}
+	m_bufferedVerts += NumIdx;
+
+	unguard;
+}
+#endif
+
 void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, DWORD PolyFlags, FSpanBuffer* Span) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 {
@@ -3422,7 +3503,12 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	//dout << "rendering actor " << actor->GetName() << std::endl;
 	XMMATRIX actorMatrix = XMMatrixIdentity();
 
-	if (!actor->bParticles) {
+	bool renderAsParticles = false;
+#if !HARRY_POTTER_1
+	renderAsParticles = actor->bParticles;
+#endif
+
+	if (!renderAsParticles) {
 		XMMATRIX matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
 		actorMatrix *= matScale;
 	}
@@ -3461,6 +3547,17 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		numVerts = meshLod->ModelVerts;
 		meshLod->GetFrame(allSamples, sizeof(samples[0]), GMath.UnitCoords, actor, numVerts);
 		numTris = meshLod->Faces.Num();
+#if HARRY_POTTER_1
+		if (specialCoord && !specialCoord->enabled && mesh->IsA(USkeletalMesh::StaticClass())) {
+			USkeletalMesh* skelMesh = static_cast<USkeletalMesh*>(mesh);
+			if (skelMesh->WeaponBoneIndex > -1) {
+				specialCoord->coord = skelMesh->ClassicWeaponCoords.Inverse();
+				specialCoord->baseMatrix = ToD3DMATRIX(actorMatrix);
+				specialCoord->exists = true;
+			}
+		}
+		else
+#endif
 		if (specialCoord && !specialCoord->enabled && meshLod->SpecialFaces.Num() > 0) {
 			// Setup special coordinate (attachment point)
 			FVector& v0 = allSamples[0];
@@ -3491,7 +3588,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	FTime currentTime = frame->Viewport->CurrentTime;
 	DWORD baseFlags = getBasePolyFlags(actor);
 
-	if (actor->bParticles) {
+	if (renderAsParticles) {
 		FLOAT lux = Clamp(actor->ScaleGlow * 0.5f + actor->AmbientGlow / 256.f, 0.f, 1.f);
 		FPlane color = FVector(lux, lux, lux);
 		if (GIsEditor && (baseFlags & PF_Selected)) {

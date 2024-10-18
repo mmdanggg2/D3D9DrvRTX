@@ -189,6 +189,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		AActor* actor = frame->Level->Actors(iActor);
 		if (!actor) continue;
 		if (actor->LightType != LT_None) {
+#if HARRY_POTTER_1
+			if (!actor->bDarkLight)
+#endif
 			lightActors.push_back(actor);
 		}
 		if (actor->IsA(ASkyZoneInfo::StaticClass())) {
@@ -366,6 +369,14 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 			d3d9Dev->setCompatMatrix(frame);
 			DrawParticleSystem(frame, actor, nullptr, parentCoord ? parentCoord->localCoord : GMath.UnitCoords);
 		}
+	}
+	else
+#endif
+#if HARRY_POTTER_1
+	if (actor->DrawType == DT_Particles) {
+		d3d9Dev->setCompatMatrix(frame);
+		FDynamicSprite sprite(actor);
+		DrawParticleSystem(frame, &sprite);
 	}
 	else
 #endif
