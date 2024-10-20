@@ -3948,8 +3948,6 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 
 	UniqueValueArray<UTexture*> textures(NUM_POLYGROUPS);
 	UniqueValueArray<FTextureInfo> texInfos(NUM_POLYGROUPS);
-	UTexture* envTex = nullptr;
-	FTextureInfo envTexInfo;
 
 	// Lock all mesh textures
 	for (int i = 0; i < NUM_POLYGROUPS; i++) {
@@ -3981,21 +3979,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 		} else {
 			tex->Alpha = 1;
 		}
-		envTex = tex;
 	}
-	if (actor->Texture) {
-		envTex = actor->Texture;
-	}
-	else if (actor->Region.Zone && actor->Region.Zone->EnvironmentMap) {
-		envTex = actor->Region.Zone->EnvironmentMap;
-	}
-	else if (actor->Level->EnvironmentMap) {
-		envTex = actor->Level->EnvironmentMap;
-	}
-	if (!envTex) {
-		return;
-	}
-	envTex->Lock(envTexInfo, currentTime, -1, this);
 
 	bool fatten = actor->Fatness != 128;
 	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
@@ -4045,11 +4029,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 
 		if (polyFlags & PF_Invisible) continue;
 
-		bool environMapped = polyFlags & PF_Environment;
-		FTextureInfo* texInfo = &envTexInfo;
-		if (!environMapped && actor->SkelGroupSkins[texIdx]) {
-			texInfo = &texInfos.at(texIdx);
-		}
+		FTextureInfo* texInfo = &texInfos.at(texIdx);
 		if (!texInfo->Texture) {
 			continue;
 		}
@@ -4127,7 +4107,6 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 			continue;
 		tex->Unlock(texInfos.at(textures.getIndex(tex)));
 	}
-	envTex->Unlock(envTexInfo);
 
 	STAT(unclockFast(GStat.SkelRenderTime));
 

@@ -621,7 +621,7 @@ void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor) {
 	// TODO: fix this muzzle flash schtuff
 	d3d9Dev->executeBufferedTileDraws();
 	d3d9Dev->startWorldDraw(frame);
-	d3d9Dev->renderMeshActor(frame, actor);
+	drawActorSwitch(frame, d3d9Dev, actor);
 	//dout << "Drawing actor! " << actor->GetName() << std::endl;
 	d3d9Dev->endWorldDraw(frame);
 	unguard;
