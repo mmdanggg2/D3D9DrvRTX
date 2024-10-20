@@ -3508,6 +3508,20 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 	unguard;
 }
 
+static void calcEnvMapping(FRenderVert& vert, const DirectX::XMMATRIX& screenSpaceMat, FSceneNode* frame, float scaleU, float scaleV) {
+	using namespace DirectX;
+	XMVECTOR ssPoint = XMVector3Transform(FVecToDXVec(vert.Point), screenSpaceMat);
+	XMVECTOR ssNormal = XMVector3TransformNormal(FVecToDXVec(vert.Normal), screenSpaceMat);
+	ssNormal = XMVector3Normalize(ssNormal);
+
+	XMVECTOR normPoint = XMVector3Normalize(ssPoint);
+	XMVECTOR reflected = XMVector3Reflect(normPoint, ssNormal);
+	XMVECTOR envNorm = XMVector3TransformNormal(reflected, FCoordToDXMat(frame->Coords));
+
+	vert.U = (XMVectorGetX(envNorm) + 1.0) * 0.5 * 256.0 * scaleU;
+	vert.V = (XMVectorGetY(envNorm) + 1.0) * 0.5 * 256.0 * scaleV;
+}
+
 void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 	{
@@ -3711,6 +3725,8 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		normals[i] = DXVecToFVec(normal);
 	}
 
+	XMMATRIX screenSpaceMat = actorMatrix * FCoordToDXMat(frame->Uncoords);
+
 	SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets;
 	surfaceBuckets.reserve(numTris);
 
@@ -3769,12 +3785,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 			// Calculate the environment UV mapping
 			if (environMapped) {
-				XMVECTOR ptNorm = XMVector3TransformNormal(FVecToDXVec(vert.Normal), actorMatrix);
-				XMVECTOR envNorm = XMVector3TransformNormal(FVecToDXVec(vert.Point), actorMatrix);
-				envNorm = XMVector3Normalize(envNorm);
-				envNorm = XMVector3Reflect(envNorm, ptNorm);
-				vert.U = (XMVectorGetX(envNorm) + 1.0) * 0.5 * 256.0 * scaleU;
-				vert.V = (XMVectorGetY(envNorm) + 1.0) * 0.5 * 256.0 * scaleV;
+				calcEnvMapping(vert, screenSpaceMat, frame, scaleU, scaleV);
 			}
 		}
 	}
@@ -4019,6 +4030,8 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	STAT(unclockFast(GStat.SkelDecimateTime));
 	STAT(clockFast(GStat.SkelClipTime));
 
+	XMMATRIX screenSpaceMat = actorMatrix * FCoordToDXMat(frame->Uncoords);
+
 	SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets;
 	surfaceBuckets.reserve(numTris);
 	
@@ -4059,13 +4072,8 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 			}
 
 			// Calculate the environment UV mapping
-			if (environMapped) {
-				XMVECTOR ptNorm = XMVector3TransformNormal(FVecToDXVec(vert.Normal), actorMatrix);
-				XMVECTOR envNorm = XMVector3TransformNormal(FVecToDXVec(vert.Point), actorMatrix);
-				envNorm = XMVector3Normalize(envNorm);
-				envNorm = XMVector3Reflect(envNorm, ptNorm);
-				vert.U = (XMVectorGetX(envNorm) + 1.0) * 0.5 * 256.0 * scaleU;
-				vert.V = (XMVectorGetY(envNorm) + 1.0) * 0.5 * 256.0 * scaleV;
+			if (polyFlags & PF_Environment) {
+				calcEnvMapping(vert, screenSpaceMat, frame, scaleU, scaleV);
 			}
 		}
 		STAT(unclockFast(GStat.SkelLightTime));
