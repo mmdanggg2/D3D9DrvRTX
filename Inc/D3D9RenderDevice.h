@@ -84,6 +84,7 @@
 #include <set>
 #include <map>
 #include <deque>
+#include <functional>
 #pragma warning(disable : 4018)
 #include <vector>
 
@@ -1136,7 +1137,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 #endif
 	void DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, DWORD PolyFlags, FSpanBuffer* Span);
 	void DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, DWORD PolyFlags, FSpanBuffer* Span);
-	void DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X, FLOAT Y, FLOAT XL, FLOAT YL, FLOAT U, FLOAT V, FLOAT UL, FLOAT VL, class FSpanBuffer* Span, FLOAT Z, FPlane Color, FPlane Fog, DWORD PolyFlags);
+	void DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X, FLOAT Y, FLOAT XL, FLOAT YL, FLOAT U, FLOAT V, FLOAT UL, FLOAT VL, FSpanBuffer* Span, FLOAT Z, FPlane Color, FPlane Fog, DWORD PolyFlags);
 	void Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2);
 	void Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2);
 	void Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FLOAT X1, FLOAT Y1, FLOAT X2, FLOAT Y2, FLOAT Z);
@@ -1440,6 +1441,34 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	INT FASTCALL BufferTriangleSurfaceGeometry(const std::vector<FRenderVert>& vertices);
 
 	void FASTCALL BufferAdditionalClippedVerts(FTransTexture** Pts, INT NumPts);
+
+	bool bufferTileDraws;
+	struct TileFuncCall {
+		FSceneNode frame;
+		FTextureInfo texInfo;
+		FLOAT X, Y, XL, YL, U, V, UL, VL, Z;
+		FPlane Color;
+		FPlane Fog;
+		DWORD PolyFlags;
+		
+		TileFuncCall() {}
+		TileFuncCall(const TileFuncCall& other) = default;
+
+		void operator()(UD3D9RenderDevice* device) {
+			device->DrawTile(&frame, texInfo, X, Y, XL, YL, U, V, UL, VL, nullptr, Z, Color, Fog, PolyFlags);
+		}
+	};
+	std::vector<TileFuncCall> bufferedTileDraws;
+
+	void executeBufferedTileDraws() {
+		bool wasBuffered = bufferTileDraws;
+		bufferTileDraws = false;
+		for (TileFuncCall& call : bufferedTileDraws) {
+			call(this);
+		}
+		bufferedTileDraws.clear();
+		bufferTileDraws = wasBuffered;
+	}
 
 	// Sets up the projections ready for drawing in the world
 	void startWorldDraw(FSceneNode* frame);

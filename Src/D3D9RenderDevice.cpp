@@ -1750,6 +1750,9 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 #endif
 	}
 
+	// Buffer at the start of the frame
+	bufferTileDraws = true;
+
 	unguard;
 }
 
@@ -1863,6 +1866,9 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 	guard(UD3D9RenderDevice::Unlock);
 
 	EndBuffering();
+
+	executeBufferedTileDraws();
+	bufferTileDraws = false;
 
 	SetDefaultStreamState();
 	SetDefaultTextureState();
@@ -2763,21 +2769,37 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 	unguard;
 }
 
-void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X, FLOAT Y, FLOAT XL, FLOAT YL, FLOAT U, FLOAT V, FLOAT UL, FLOAT VL, class FSpanBuffer* Span, FLOAT Z, FPlane Color, FPlane Fog, DWORD PolyFlags) {
+void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X, FLOAT Y, FLOAT XL, FLOAT YL, FLOAT U, FLOAT V, FLOAT UL, FLOAT VL, FSpanBuffer* Span, FLOAT Z, FPlane Color, FPlane Fog, DWORD PolyFlags) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 {
 	static int si;
-	dout << L"utd3d9r: DrawTile = " << si++ << std::endl;
+	if (bufferTileDraws) {
+		dout << L"utd3d9r: DrawTile = " << si++ << L"; buffererd " << bufferedTileDraws.size() << std::endl;
+	} else {
+		dout << L"utd3d9r: DrawTile = " << si++ << std::endl;
+	}
 }
 #endif
 	guard(UD3D9RenderDevice::DrawTile);
 
-	// stijn: fix for invisible actor icons in ortho viewports
-	if (GIsEditor &&
-		Frame->Viewport->Actor &&
-		(Frame->Viewport->IsOrtho() || Abs(Z) <= SMALL_NUMBER))
-	{
-		Z = 1.f;
+	if (bufferTileDraws) {
+		TileFuncCall& call = bufferedTileDraws.emplace_back();
+		// And we pray that the pointers in here don't go stale!
+		call.frame = *Frame;
+		call.texInfo = Info;
+		call.X = X;
+		call.Y = Y;
+		call.XL = XL;
+		call.YL = YL;
+		call.U = U;
+		call.V = V;
+		call.UL = UL;
+		call.VL = VL;
+		call.Z = Z;
+		call.Color = Color;
+		call.Fog = Fog;
+		call.PolyFlags = PolyFlags;
+		return;
 	}
 
 	EndBufferingExcept(BV_TYPE_TILES);
@@ -4726,6 +4748,11 @@ void UD3D9RenderDevice::EndFlash() {
 }
 #endif
 	guard(UD3D9RenderDevice::EndFlash);
+
+	// Usually called after world drawing, so stop buffering
+	bufferTileDraws = false;
+	executeBufferedTileDraws();
+
 	if ((FlashScale != FPlane(0.5f, 0.5f, 0.5f, 0.0f)) || (FlashFog != FPlane(0.0f, 0.0f, 0.0f, 0.0f))) {
 		EndBuffering();
 
@@ -6828,6 +6855,10 @@ void UD3D9RenderDevice::endWorldDraw(FSceneNode* frame) {
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
 	m_d3dDevice->SetTransform(D3DTS_VIEW, &identityMatrix);
 	m_d3dDevice->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
+	
+	executeBufferedTileDraws();
+	bufferTileDraws = false;
+
 	unguard;
 }
 
