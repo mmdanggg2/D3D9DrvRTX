@@ -51,6 +51,11 @@ private:
 	void getSurfaceDecals(FSceneNode* frame, const SurfaceData& surfaceData, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures);
 #if RUNE
 	void drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, const ParentCoord* parentCoord);
+	// These seem to be non exported global variables that are swapped about in the original URender::DrawWorld
+	// currFrameMaxZ seems to set in OccludeFrame to the furthest bsp vert
+	static float* const currFrameMaxZ;
+	// prevFrameMaxZ * 1.25 is checked against in SetupDynamics I presume to do distance culling of actors
+	static float* const prevFrameMaxZ;
 #endif
 };
 

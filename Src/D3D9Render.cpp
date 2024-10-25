@@ -166,8 +166,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	FMemMark dynMark(GDynMem);
 	FMemMark vectorMark(VectorMem);
 
-	if (Engine->Audio && !GIsEditor)
+	if (Engine->Audio && !GIsEditor) {
 		Engine->Audio->RenderAudioGeometry(frame);
+	}
 
 	const UViewport* viewport = frame->Viewport;
 	AActor* playerActor = NULL;
@@ -216,6 +217,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 					visibleMovers.push_back(polyObj);
 				}
 				continue;
+			} else if (actor->IsA(ATrigger::StaticClass())) {
+				// Wacky trigger logic, only try and render triggers if directly viewable by OccludeFrame
+				continue;
 			}
 			if (actor->bCarriedItem) {
 				continue;
@@ -224,7 +228,11 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			viableActors.push_back(actor);
 		}
 	}
-
+#if RUNE
+	// Allows frame->Sprite to be populated
+	*prevFrameMaxZ = *currFrameMaxZ;
+	*currFrameMaxZ = -1.0f;
+#endif
 	// Seems to also update mover bsp nodes for colision decal calculations
 	OccludeFrame(frame);
 
@@ -609,6 +617,10 @@ void UD3D9Render::drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9De
 		drawActorSwitch(frame, d3d9Dev, child, &childCoords);
 	}
 }
+
+// Just the offsets from the closest exported symbols
+float* const UD3D9Render::prevFrameMaxZ = ((float*)&UD3D9Render::Stamp) - 196;
+float* const UD3D9Render::currFrameMaxZ = ((float*)&UD3D9Render::MaxLeafLights) - 1;
 #endif
 
 void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor) {
