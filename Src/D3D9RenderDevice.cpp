@@ -4158,14 +4158,20 @@ void UD3D9RenderDevice::renderParticleSystemActor(FSceneNode* frame, AParticleSy
 			break;
 		case STY_AlphaBlend:
 			polyFlags = PF_AlphaBlend;
-			tex->Alpha = particle.Alpha.X;
 			break;
 		default:
 			polyFlags = 0;
 		}
+		FPlane colour = FPlane(actor->ScaleGlow, actor->ScaleGlow, actor->ScaleGlow, 1);
+		if (polyFlags & PF_Environment) {
+			tex->Alpha = particle.Alpha.X;
+		} else {
+			colour *= particle.Alpha;
+			tex->Alpha = 1.0f;
+		}
 		polyFlags |= PF_TwoSided;
 		tex->Lock(texInfo, curTime, -1, this);
-		renderSpriteGeo(frame, location, particle.XScale, particle.YScale, texInfo, polyFlags, FPlane(1, 1, 1, 1));
+		renderSpriteGeo(frame, location, particle.XScale, particle.YScale, texInfo, polyFlags, colour);
 		tex->Unlock(texInfo);
 	}
 	unguard;
