@@ -58,6 +58,9 @@ TODO:
 #include <fstream>
 #include <set>
 
+#pragma warning(disable : 4018)
+#pragma warning(disable : 4245)
+
 /*-----------------------------------------------------------------------------
 	Globals.
 -----------------------------------------------------------------------------*/
@@ -68,9 +71,7 @@ static const char *g_d3d9DllName = "d3d9d.dll";
 static const char *g_d3d9DllName = "d3d9.dll";
 #endif
 
-#if UTGLR_DEFINE_HACK_FLAGS
-DWORD GUglyHackFlags;
-#endif
+//#define UTGLR_DEBUG_SHOW_CALL_COUNTS
 
 static const TCHAR *g_pSection = TEXT("D3D9DrvRTX.D3D9RenderDevice");
 
@@ -139,6 +140,69 @@ static const D3DVERTEXELEMENT9 g_twoColorSingleTextureStreamDef[] = {
 	{ 2, 0,  D3DDECLTYPE_FLOAT2,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD,	0 },
 	D3DDECL_END()
 };
+
+#ifdef BGRA_MAKE
+#undef BGRA_MAKE
+#endif
+static inline DWORD BGRA_MAKE(BYTE b, BYTE g, BYTE r, BYTE a) {
+	return (a << 24) | (r << 16) | (g << 8) | b;
+}
+
+static inline DWORD FASTCALL FPlaneTo_BGR_A255(const FPlane* pPlane) {
+	return BGRA_MAKE(
+		appRound(pPlane->Z * 255.0f),
+		appRound(pPlane->Y * 255.0f),
+		appRound(pPlane->X * 255.0f),
+		255);
+}
+
+static inline DWORD FASTCALL FPlaneTo_BGRClamped_A255(const FPlane* pPlane) {
+	return BGRA_MAKE(
+		Clamp(appRound(pPlane->Z * 255.0f), 0, 255),
+		Clamp(appRound(pPlane->Y * 255.0f), 0, 255),
+		Clamp(appRound(pPlane->X * 255.0f), 0, 255),
+		255);
+}
+
+static inline DWORD FASTCALL FPlaneTo_BGR_A0(const FPlane* pPlane) {
+	return BGRA_MAKE(
+		appRound(pPlane->Z * 255.0f),
+		appRound(pPlane->Y * 255.0f),
+		appRound(pPlane->X * 255.0f),
+		0);
+}
+
+static inline DWORD FASTCALL FPlaneTo_BGR_Aub(const FPlane* pPlane, BYTE alpha) {
+	return BGRA_MAKE(
+		appRound(pPlane->Z * 255.0f),
+		appRound(pPlane->Y * 255.0f),
+		appRound(pPlane->X * 255.0f),
+		alpha);
+}
+
+static inline DWORD FASTCALL FPlaneTo_BGRA(const FPlane* pPlane) {
+	return BGRA_MAKE(
+		appRound(pPlane->Z * 255.0f),
+		appRound(pPlane->Y * 255.0f),
+		appRound(pPlane->X * 255.0f),
+		appRound(pPlane->W * 255.0f));
+}
+
+static inline DWORD FASTCALL FPlaneTo_BGRAClamped(const FPlane* pPlane) {
+	return BGRA_MAKE(
+		Clamp(appRound(pPlane->Z * 255.0f), 0, 255),
+		Clamp(appRound(pPlane->Y * 255.0f), 0, 255),
+		Clamp(appRound(pPlane->X * 255.0f), 0, 255),
+		Clamp(appRound(pPlane->W * 255.0f), 0, 255));
+}
+
+static inline DWORD FASTCALL FPlaneTo_BGRScaled_A255(const FPlane* pPlane, FLOAT rgbScale) {
+	return BGRA_MAKE(
+		appRound(pPlane->Z * rgbScale),
+		appRound(pPlane->Y * rgbScale),
+		appRound(pPlane->X * rgbScale),
+		255);
+}
 
 // Class to hold multiple unique T objects, accessable by multiple indices
 template <typename T>
@@ -274,14 +338,32 @@ static DirectX::XMMATRIX FRotToDXRotMat(const FRotator& rot) {
 	return FCoordToDXMat(coords);
 }
 
-//#define UTGLR_DEBUG_SHOW_CALL_COUNTS
-
 /*-----------------------------------------------------------------------------
 	D3D9Drv.
 -----------------------------------------------------------------------------*/
 
 IMPLEMENT_CLASS(UD3D9RenderDevice);
 
+
+static void SC_AddBoolConfigParam(DWORD BitMaskOffset, const TCHAR* pName, UBOOL& param, ECppProperty EC_CppProperty, INT InOffset, UBOOL defaultValue) {
+#if !UNREAL_TOURNAMENT_OLDUNREAL
+	param = (((defaultValue) != 0) ? 1 : 0) << BitMaskOffset; //Doesn't exactly work like a UBOOL "// Boolean 0 (false) or 1 (true)."
+#else
+	// stijn: we no longer need the manual bitmask shifting in patch 469
+	param = defaultValue;
+#endif
+	new(UD3D9RenderDevice::StaticClass(), pName, RF_Public)UBoolProperty(EC_CppProperty, InOffset, TEXT("Options"), CPF_Config);
+}
+
+static void SC_AddIntConfigParam(const TCHAR* pName, INT& param, ECppProperty EC_CppProperty, INT InOffset, INT defaultValue) {
+	param = defaultValue;
+	new(UD3D9RenderDevice::StaticClass(), pName, RF_Public)UIntProperty(EC_CppProperty, InOffset, TEXT("Options"), CPF_Config);
+}
+
+static void SC_AddFloatConfigParam(const TCHAR* pName, FLOAT& param, ECppProperty EC_CppProperty, INT InOffset, FLOAT defaultValue) {
+	param = defaultValue;
+	new(UD3D9RenderDevice::StaticClass(), pName, RF_Public)UFloatProperty(EC_CppProperty, InOffset, TEXT("Options"), CPF_Config);
+}
 
 void UD3D9RenderDevice::StaticConstructor() {
 	unsigned int u;
@@ -412,38 +494,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 }
 
 
-void UD3D9RenderDevice::SC_AddBoolConfigParam(DWORD BitMaskOffset, const TCHAR *pName, UBOOL &param, ECppProperty EC_CppProperty, INT InOffset, UBOOL defaultValue) {
-#if !UNREAL_TOURNAMENT_OLDUNREAL
-	param = (((defaultValue) != 0) ? 1 : 0) << BitMaskOffset; //Doesn't exactly work like a UBOOL "// Boolean 0 (false) or 1 (true)."
-#else
-	// stijn: we no longer need the manual bitmask shifting in patch 469
-	param = defaultValue;
-#endif
-	new(GetClass(), pName, RF_Public)UBoolProperty(EC_CppProperty, InOffset, TEXT("Options"), CPF_Config);
-}
-
-void UD3D9RenderDevice::SC_AddIntConfigParam(const TCHAR *pName, INT &param, ECppProperty EC_CppProperty, INT InOffset, INT defaultValue) {
-	param = defaultValue;
-	new(GetClass(), pName, RF_Public)UIntProperty(EC_CppProperty, InOffset, TEXT("Options"), CPF_Config);
-}
-
-void UD3D9RenderDevice::SC_AddFloatConfigParam(const TCHAR *pName, FLOAT &param, ECppProperty EC_CppProperty, INT InOffset, FLOAT defaultValue) {
-	param = defaultValue;
-	new(GetClass(), pName, RF_Public)UFloatProperty(EC_CppProperty, InOffset, TEXT("Options"), CPF_Config);
-}
-
-
-void UD3D9RenderDevice::DbgPrintInitParam(const TCHAR *pName, INT value) {
-	dout << TEXT("utd3d9r: ") << pName << TEXT(" = ") << value << std::endl;
-	return;
-}
-
-void UD3D9RenderDevice::DbgPrintInitParam(const TCHAR *pName, FLOAT value) {
-	dout << TEXT("utd3d9r: ") << pName << TEXT(" = ") << value << std::endl;
-	return;
-}
-
-
 void UD3D9RenderDevice::InitFrameRateLimitTimerSafe(void) {
 	//Only initialize once
 	if (m_frameRateLimitTimerInitialized) {
@@ -493,16 +543,16 @@ static void FASTCALL Buffer3Verts(UD3D9RenderDevice *pRD, FTransTexture** Pts) {
 		if (pRD->m_requestedColorFlags & UD3D9RenderDevice::CF_FOG_MODE) {
 			FLOAT f255_Times_One_Minus_FogW = 255.0f * (1.0f - P->Fog.W);
 
-			pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGRScaled_A255(&P->Light, f255_Times_One_Minus_FogW);
+			pVertexColorArray->color = FPlaneTo_BGRScaled_A255(&P->Light, f255_Times_One_Minus_FogW);
 
-			pSecondaryColorArray->specular = UD3D9RenderDevice::FPlaneTo_BGR_A0(&P->Fog);
+			pSecondaryColorArray->specular = FPlaneTo_BGR_A0(&P->Fog);
 			pSecondaryColorArray++;
 		}
 		else if (pRD->m_requestedColorFlags & UD3D9RenderDevice::CF_COLOR_ARRAY) {
 			if (pRD->m_gpAlpha > 0)
-				pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGR_Aub(&P->Light, pRD->m_gpAlpha);
+				pVertexColorArray->color = FPlaneTo_BGR_Aub(&P->Light, pRD->m_gpAlpha);
 			else
-				pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGR_A255(&P->Light);
+				pVertexColorArray->color = FPlaneTo_BGR_A255(&P->Light);
 		}
 		else {
 			pVertexColorArray->color = 0xFFFFFFFF;
@@ -548,7 +598,7 @@ static void FASTCALL Buffer3ColoredVerts(UD3D9RenderDevice *pRD, FTransTexture**
 		pVertexColorArray->y = P->Point.Y;
 		pVertexColorArray->z = P->Point.Z;
 		// stijn: needed clamping in 64-bit because Actors with AmbientGlow==0 often had RGBA values above 1
-		pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGRClamped_A255(&P->Light);
+		pVertexColorArray->color = FPlaneTo_BGRClamped_A255(&P->Light);
 		//pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGR_A255(&P->Light);
 		pVertexColorArray++;
 	}
@@ -570,10 +620,10 @@ static void FASTCALL Buffer3FoggedVerts(UD3D9RenderDevice *pRD, FTransTexture** 
 		pVertexColorArray->y = P->Point.Y;
 		pVertexColorArray->z = P->Point.Z;
 		FLOAT f255_Times_One_Minus_FogW = 255.0f * (1.0f - P->Fog.W);
-		pVertexColorArray->color = UD3D9RenderDevice::FPlaneTo_BGRScaled_A255(&P->Light, f255_Times_One_Minus_FogW);
+		pVertexColorArray->color = FPlaneTo_BGRScaled_A255(&P->Light, f255_Times_One_Minus_FogW);
 		pVertexColorArray++;
 
-		pSecondaryColorArray->specular = UD3D9RenderDevice::FPlaneTo_BGR_A0(&P->Fog);
+		pSecondaryColorArray->specular = FPlaneTo_BGR_A0(&P->Fog);
 		pSecondaryColorArray++;
 	}
 }
@@ -710,10 +760,6 @@ void UD3D9RenderDevice::ShutdownAfterError() {
 
 	debugf(NAME_Exit, TEXT("UD3D9RenderDevice::ShutdownAfterError"));
 
-	if (DebugBit(DEBUG_BIT_BASIC)) {
-		dout << TEXT("utd3d9r: ShutdownAfterError") << std::endl;
-	}
-
 	//ChangeDisplaySettings(NULL, 0);
 
 	unguard;
@@ -758,21 +804,29 @@ UBOOL UD3D9RenderDevice::ResetDevice()
 	return TRUE;
 }
 
+static bool CheckDepthFormat(IDirect3D9* d3d9, D3DFORMAT adapterFormat, D3DFORMAT backBufferFormat, D3DFORMAT depthBufferFormat) {
+	HRESULT hResult;
+
+	//Check depth format
+	hResult = d3d9->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, adapterFormat, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_SURFACE, depthBufferFormat);
+	if (FAILED(hResult)) {
+		return false;
+	}
+
+	//Check depth format compatibility
+	hResult = d3d9->CheckDepthStencilMatch(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, adapterFormat, backBufferFormat, depthBufferFormat);
+	if (FAILED(hResult)) {
+		return false;
+	}
+
+	return true;
+}
+
 UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Fullscreen) {
 	guard(UD3D9RenderDevice::SetRes);
 
 	HRESULT hResult;
 	bool saved_SetRes_isDeviceReset;
-
-	//Get debug bits
-	{
-		INT i = 0;
-		if (!GConfig->GetInt(g_pSection, TEXT("DebugBits"), i)) i = 0;
-		m_debugBits = i;
-	}
-	//Display debug bits
-	if (DebugBit(DEBUG_BIT_ANY)) dout << TEXT("utd3d9r: DebugBits = ") << m_debugBits << std::endl;
-
 
 	debugf(TEXT("Enter SetRes()"));
 
@@ -890,19 +944,16 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 
 	//Choose initial depth buffer format
 	m_d3dpp.AutoDepthStencilFormat = D3DFMT_D32;
-	m_numDepthBits = 32;
 
 	//Reduce depth buffer format if necessary based on what's supported
 	if (m_d3dpp.AutoDepthStencilFormat == D3DFMT_D32) {
-		if (!CheckDepthFormat(d3ddm.Format, m_d3dpp.BackBufferFormat, D3DFMT_D32)) {
+		if (!CheckDepthFormat(m_d3d9, d3ddm.Format, m_d3dpp.BackBufferFormat, D3DFMT_D32)) {
 			m_d3dpp.AutoDepthStencilFormat = D3DFMT_D24X8;
-			m_numDepthBits = 24;
 		}
 	}
 	if (m_d3dpp.AutoDepthStencilFormat == D3DFMT_D24X8) {
-		if (!CheckDepthFormat(d3ddm.Format, m_d3dpp.BackBufferFormat, D3DFMT_D24X8)) {
+		if (!CheckDepthFormat(m_d3d9, d3ddm.Format, m_d3dpp.BackBufferFormat, D3DFMT_D24X8)) {
 			m_d3dpp.AutoDepthStencilFormat = D3DFMT_D16;
-			m_numDepthBits = 16;
 		}
 	}
 
@@ -934,40 +985,8 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	//Reset previous SwapBuffers status to okay
 	m_prevSwapBuffersStatus = true;
 
-	//Display depth buffer bit depth
-	debugf(NAME_Init, TEXT("Depth bits: %u"), m_numDepthBits);
-
-	//Debug parameter listing
-	if (DebugBit(DEBUG_BIT_BASIC)) {
-		#define UTGLR_DEBUG_SHOW_PARAM_REG(_name) DbgPrintInitParam(TEXT(#_name), _name)
-
-		UTGLR_DEBUG_SHOW_PARAM_REG(LODBias);
-		UTGLR_DEBUG_SHOW_PARAM_REG(OneXBlending);
-		UTGLR_DEBUG_SHOW_PARAM_REG(MinLogTextureSize);
-		UTGLR_DEBUG_SHOW_PARAM_REG(MaxLogTextureSize);
-		UTGLR_DEBUG_SHOW_PARAM_REG(MaxAnisotropy);
-		UTGLR_DEBUG_SHOW_PARAM_REG(TMUnits);
-		UTGLR_DEBUG_SHOW_PARAM_REG(RefreshRate);
-		UTGLR_DEBUG_SHOW_PARAM_REG(UsePrecache);
-		UTGLR_DEBUG_SHOW_PARAM_REG(UseTrilinear);
-		UTGLR_DEBUG_SHOW_PARAM_REG(UseS3TC);
-		UTGLR_DEBUG_SHOW_PARAM_REG(NoFiltering);
-		UTGLR_DEBUG_SHOW_PARAM_REG(SinglePassFog);
-		UTGLR_DEBUG_SHOW_PARAM_REG(UseTexIdPool);
-		UTGLR_DEBUG_SHOW_PARAM_REG(UseTexPool);
-		UTGLR_DEBUG_SHOW_PARAM_REG(DynamicTexIdRecycleLevel);
-		UTGLR_DEBUG_SHOW_PARAM_REG(TexDXT1ToDXT3);
-		UTGLR_DEBUG_SHOW_PARAM_REG(FrameRateLimit);
-		UTGLR_DEBUG_SHOW_PARAM_REG(SmoothMaskedTextures);
-
-		#undef UTGLR_DEBUG_SHOW_PARAM_REG
-	}
-
 	//Restrict dynamic tex id recycle level range
 	if (DynamicTexIdRecycleLevel < 10) DynamicTexIdRecycleLevel = 10;
-
-	//Always use vertex specular unless caps check fails later
-	UseVertexSpecular = 1;
 
 	SupportsTC = UseS3TC;
 
@@ -1142,25 +1161,6 @@ void UD3D9RenderDevice::UnsetRes() {
 	unguard;
 }
 
-
-bool UD3D9RenderDevice::CheckDepthFormat(D3DFORMAT adapterFormat, D3DFORMAT backBufferFormat, D3DFORMAT depthBufferFormat) {
-	HRESULT hResult;
-
-	//Check depth format
-	hResult = m_d3d9->CheckDeviceFormat(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, adapterFormat, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_SURFACE, depthBufferFormat);
-	if (FAILED(hResult)) {
-		return false;
-	}
-
-	//Check depth format compatibility
-	hResult = m_d3d9->CheckDepthStencilMatch(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, adapterFormat, backBufferFormat, depthBufferFormat);
-	if (FAILED(hResult)) {
-		return false;
-	}
-
-	return true;
-}
-
 void UD3D9RenderDevice::ConfigValidate_RequiredExtensions(void) {
 #if !UTGLR_NO_DETAIL_TEX
 	if (!(m_d3dCaps.TextureOpCaps & D3DTEXOPCAPS_BLENDCURRENTALPHA)) DetailTextures = 0;
@@ -1184,24 +1184,8 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	unsigned int u;
 	HRESULT hResult;
 
-	//Set view matrix
-	//D3DMATRIX d3dView = { +1.0f,  0.0f,  0.0f,  0.0f,
-	//					   0.0f, -1.0f,  0.0f,  0.0f,
-	//					   0.0f,  0.0f, -1.0f,  0.0f,
-	//					   0.0f,  0.0f,  0.0f, +1.0f };
-	//m_d3dDevice->SetTransform(D3DTS_VIEW, &d3dView);
-
 	//Little white texture for no texture operations
 	InitNoTextureSafe();
-
-	//Clear fsBlendInfo to set any unused values to known state
-	m_fsBlendInfo[0] = 0.0f;
-	m_fsBlendInfo[1] = 0.0f;
-	m_fsBlendInfo[2] = 0.0f;
-	m_fsBlendInfo[3] = 0.0f;
-
-	//Set alpha test disabled
-	m_fsBlendInfo[0] = 0.0f;
 
 	m_d3dDevice->SetRenderState(D3DRS_ZENABLE, D3DZB_TRUE);
 	m_d3dDevice->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
@@ -1220,7 +1204,6 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	m_d3dDevice->SetRenderState(D3DRS_FOGTABLEMODE, D3DFOG_LINEAR);
 	FLOAT fFogStart = 0.0f;
 	m_d3dDevice->SetRenderState(D3DRS_FOGSTART, *(DWORD *)&fFogStart);
-	m_gpFogEnabled = false;
 #endif
 
 	m_d3dDevice->SetRenderState(D3DRS_LIGHTING, FALSE);
@@ -1328,28 +1311,6 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	}
 
 
-	//Set stream sources Now set in the lock functions
-	//Vertex and primary color
-	//hResult = m_d3dDevice->SetStreamSource(0, m_d3dVertexColorBuffer, 0, sizeof(FGLVertexColor));
-	//if (FAILED(hResult)) {
-	//	appErrorf(TEXT("SetStreamSource failed"));
-	//}
-
-	//Secondary Color
-	//hResult = m_d3dDevice->SetStreamSource(1, m_d3dSecondaryColorBuffer, 0, sizeof(FGLSecondaryColor));
-	//if (FAILED(hResult)) {
-	//	appErrorf(TEXT("SetStreamSource failed"));
-	//}
-
-	//TexCoord
-	//for (u = 0; u < TMUnits; u++) {
-	//	hResult = m_d3dDevice->SetStreamSource(2 + u, m_d3dTexCoordBuffer[u], 0, sizeof(FGLTexCoord));
-	//	if (FAILED(hResult)) {
-	//		appErrorf(TEXT("SetStreamSource failed"));
-	//	}
-	//}
-
-
 	//Set default stream definition
 	hResult = m_d3dDevice->SetVertexDeclaration(m_standardNTextureVertexDecl[0]);
 	if (FAILED(hResult)) {
@@ -1366,7 +1327,6 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 
 	m_curBlendFlags = PF_Occlude;
 	m_smoothMaskedTexturesBit = 0;
-	m_alphaTestEnabled = false;
 	m_curPolyFlags = 0;
 
 	//Initialize color flags
@@ -1591,15 +1551,7 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 	BindCycles = ImageCycles = ComplexCycles = GouraudCycles = TileCycles = 0;
 
 #ifdef D3D9_DEBUG
-	m_vpEnableCount = 0;
-	m_vpSwitchCount = 0;
-	m_fpEnableCount = 0;
-	m_fpSwitchCount = 0;
-	m_AASwitchCount = 0;
-	m_sceneNodeCount = 0;
 	m_vbFlushCount = 0;
-	m_stat0Count = 0;
-	m_stat1Count = 0;
 #endif
 
 	HRESULT hResult;
@@ -1778,10 +1730,9 @@ void UD3D9RenderDevice::SetSceneNode(FSceneNode* Frame) {
 
 	// Precompute stuff.
 	FLOAT rcpFrameFX = 1.0f / Frame->FX;
-	m_Aspect = Frame->FY * rcpFrameFX;
-	m_RProjZ = appTan(Viewport->Actor->FovAngle * PI / 360.0);
-	m_RFX2 = 2.0f * m_RProjZ * rcpFrameFX;
-	m_RFY2 = 2.0f * m_RProjZ * rcpFrameFX;
+	FLOAT rProjZ = appTan(Viewport->Actor->FovAngle * PI / 360.0);
+	m_RFX2 = 2.0f * rProjZ * rcpFrameFX;
+	m_RFY2 = 2.0f * rProjZ * rcpFrameFX;
 
 	//Remember Frame->X and Frame->Y
 	m_sceneNodeX = Frame->X;
@@ -1949,15 +1900,7 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 #endif
 
 #ifdef D3D9_DEBUG
-	dout << TEXT("VP enable count = ") << m_vpEnableCount << std::endl;
-	dout << TEXT("VP switch count = ") << m_vpSwitchCount << std::endl;
-	dout << TEXT("FP enable count = ") << m_fpEnableCount << std::endl;
-	dout << TEXT("FP switch count = ") << m_fpSwitchCount << std::endl;
-	dout << TEXT("AA switch count = ") << m_AASwitchCount << std::endl;
-	dout << TEXT("Scene node count = ") << m_sceneNodeCount << std::endl;
 	dout << TEXT("VB flush count = ") << m_vbFlushCount << std::endl;
-	dout << TEXT("Stat 0 count = ") << m_stat0Count << std::endl;
-	dout << TEXT("Stat 1 count = ") << m_stat1Count << std::endl;
 #endif
 
 
@@ -2009,8 +1952,6 @@ void UD3D9RenderDevice::Flush(UBOOL AllowPrecache) {
 	while (QWORD_CTTree_NodePool_t::node_t *nzpnpPtr = m_nonZeroPrefixNodePool.try_remove()) {
 		m_QWORD_CTTree_Allocator.free_node(nzpnpPtr);
 	}
-
-	AllocatedTextures = 0;
 
 	//Reset current texture ids to hopefully unused values
 	for (u = 0; u < MAX_TMUNITS; u++) {
@@ -2080,11 +2021,12 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	clockFast(ComplexCycles);
 
 	//Calculate UDot and VDot intermediates for complex surface
-	m_csUDot = Facet.MapCoords.XAxis | Facet.MapCoords.Origin;
-	m_csVDot = Facet.MapCoords.YAxis | Facet.MapCoords.Origin;
+	FGLMapDot csDot;
+	csDot.u = Facet.MapCoords.XAxis | Facet.MapCoords.Origin;
+	csDot.v = Facet.MapCoords.YAxis | Facet.MapCoords.Origin;
 
 	//Buffer static geometry
-	INT numVerts = BufferStaticComplexSurfaceGeometry(Facet);
+	INT numVerts = BufferStaticComplexSurfaceGeometry(Facet, csDot);
 
 	//Reject invalid surfaces early
 	if (numVerts == 0) {
@@ -2099,7 +2041,6 @@ void UD3D9RenderDevice::DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surf
 	m_rpForceSingle = false;
 	m_rpMasked = ((PolyFlags & PF_Masked) == 0) ? false : true;
 	m_rpSetDepthEqual = false;
-	m_rpColor = 0xFFFFFFFF;
 
 	AddRenderPass(Surface.Texture, PolyFlags & ~PF_FlatShaded, 0.0f);
 
@@ -2220,18 +2161,19 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 	INT numVerts = 0;
 	for (FSurfaceFacet*& facet : facets) {
 		//Calculate UDot and VDot intermediates for complex surface
-		m_csUDot = facet->MapCoords.XAxis | facet->MapCoords.Origin;
-		m_csVDot = facet->MapCoords.YAxis | facet->MapCoords.Origin;
+		FGLMapDot csDot;
+		csDot.u = facet->MapCoords.XAxis | facet->MapCoords.Origin;
+		csDot.v = facet->MapCoords.YAxis | facet->MapCoords.Origin;
 
 		if (facet->Span) {
 			// Unpack our hidden treasure, shit it onto the cs UDot stuff
 			FVector* realPan= (FVector*)facet->Span;
-			m_csUDot -= realPan->X;
-			m_csVDot -= realPan->Y;
+			csDot.u -= realPan->X;
+			csDot.v -= realPan->Y;
 		}
 
 		//Buffer static geometry
-		numVerts = BufferStaticComplexSurfaceGeometry(*facet, numVerts > 0);
+		numVerts = BufferStaticComplexSurfaceGeometry(*facet, csDot, numVerts > 0);
 	}
 
 	//Reject invalid surfaces early
@@ -2252,7 +2194,6 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 	m_rpForceSingle = false;
 	m_rpMasked = ((PolyFlags & PF_Masked) == 0) ? false : true;
 	m_rpSetDepthEqual = false;
-	m_rpColor = 0xFFFFFFFF;
 
 	AddRenderPass(surface.Texture, PolyFlags & ~PF_FlatShaded, 0.0f);
 
@@ -2404,8 +2345,6 @@ void UD3D9RenderDevice::PreDrawGouraud(FSceneNode* Frame, FLOAT FogDistance, FPl
 		EndBuffering();
 
 		//Enable fog
-		m_gpFogEnabled = true;
-		//Enable fog
 		m_d3dDevice->SetRenderState(D3DRS_FOGENABLE, TRUE);
 
 		//Default fog mode is LINEAR
@@ -2430,8 +2369,6 @@ void UD3D9RenderDevice::PostDrawGouraud(FLOAT FogDistance) {
 	if (FogDistance > 0.0f) {
 		EndBuffering();
 
-		//Disable fog
-		m_gpFogEnabled = false;
 		//Disable fog
 		m_d3dDevice->SetRenderState(D3DRS_FOGENABLE, FALSE);
 	}
@@ -2527,7 +2464,7 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 	clockFast(GouraudCycles);
 
 	//Check if should render fog and if vertex specular is supported
-	bool drawFog = (((PolyFlags & (PF_RenderFog | PF_Translucent | PF_Modulated | PF_AlphaBlend)) == PF_RenderFog) && UseVertexSpecular) ? true : false;
+	bool drawFog = (((PolyFlags & (PF_RenderFog | PF_Translucent | PF_Modulated | PF_AlphaBlend)) == PF_RenderFog)) ? true : false;
 
 	//If not drawing fog, disable the PF_RenderFog flag
 	if (!drawFog) {
@@ -2697,7 +2634,7 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 		else {
 			m_requestedColorFlags = CF_COLOR_ARRAY;
 
-			if (((PolyFlags & (PF_RenderFog | PF_Translucent | PF_Modulated | PF_AlphaBlend)) == PF_RenderFog) && UseVertexSpecular) {
+			if (((PolyFlags & (PF_RenderFog | PF_Translucent | PF_Modulated | PF_AlphaBlend)) == PF_RenderFog)) {
 				m_requestedColorFlags = CF_COLOR_ARRAY | CF_FOG_MODE;
 			}
 		}
@@ -3487,7 +3424,6 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 	m_rpTMUnits = TMUnits;
 	m_rpForceSingle = false;
 	m_rpMasked = ((flags & PF_Masked) == 0) ? false : true;
-	m_rpColor = 0xFFFFFFFF;
 
 	flags &= ~PF_FlatShaded;
 	SetBlend(flags);
@@ -3815,7 +3751,6 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		m_rpTMUnits = TMUnits;
 		m_rpForceSingle = false;
 		m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
-		m_rpColor = 0xFFFFFFFF;
 
 		AddRenderPass(texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
 
@@ -4088,7 +4023,6 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 		m_rpTMUnits = TMUnits;
 		m_rpForceSingle = false;
 		m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
-		m_rpColor = 0xFFFFFFFF;
 
 		AddRenderPass(texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
 
@@ -4265,13 +4199,14 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 			facet.MapCoords = FCoords(poly->Base, poly->TextureU, poly->TextureV, poly->Normal);
 
 			//Calculate UDot and VDot intermediates for complex surface
-			m_csUDot = facet.MapCoords.XAxis | facet.MapCoords.Origin;
-			m_csVDot = facet.MapCoords.YAxis | facet.MapCoords.Origin;
+			FGLMapDot csDot;
+			csDot.u = facet.MapCoords.XAxis | facet.MapCoords.Origin;
+			csDot.v = facet.MapCoords.YAxis | facet.MapCoords.Origin;
 
-			m_csUDot -= poly->PanU;
-			m_csVDot -= poly->PanV;
+			csDot.u -= poly->PanU;
+			csDot.v -= poly->PanV;
 			
-			BufferStaticComplexSurfaceGeometry(facet, append);
+			BufferStaticComplexSurfaceGeometry(facet, csDot, append);
 			append = true;
 		}
 
@@ -4281,7 +4216,6 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 		m_rpForceSingle = false;
 		m_rpMasked = ((flags & PF_Masked) == 0) ? false : true;
 		m_rpSetDepthEqual = false;
-		m_rpColor = 0xFFFFFFFF;
 
 		AddRenderPass(texInfo, flags & ~PF_FlatShaded, 0.0f);
 
@@ -4461,7 +4395,6 @@ void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* l
 	m_rpTMUnits = TMUnits;
 	m_rpForceSingle = false;
 	m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
-	m_rpColor = 0xFFFFFFFF;
 
 	AddRenderPass(&texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
 
@@ -5087,9 +5020,6 @@ bool UD3D9RenderDevice::BindTexture(DWORD texNum, FTexInfo& Tex, FTextureInfo& I
 			if (FAILED(hResult)) {
 				appErrorf(TEXT("CreateTexture failed"));
 			}
-
-			//Allocate a new texture id
-			AllocatedTextures++;
 		}
 	}
 	else {
@@ -5209,9 +5139,6 @@ bool UD3D9RenderDevice::BindTexture(DWORD texNum, FTexInfo& Tex, FTextureInfo& I
 				if (FAILED(hResult)) {
 					appErrorf(TEXT("CreateTexture failed"));
 				}
-
-				//Allocate a new texture id
-				AllocatedTextures++;
 			}
 		}
 	}
@@ -6258,26 +6185,17 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags, bool isUI) {
 	}
 	if (Xor & (PF_Masked|PF_AlphaBlend)) {
 		if (blendFlags & PF_AlphaBlend) {
-			m_fsBlendInfo[0] = 0.01f;
-
-			m_alphaTestEnabled = true;
 			m_d3dDevice->SetRenderState(D3DRS_ALPHAREF, 1);
 			m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
 
 		}
 		else if (blendFlags & PF_Masked) {
 			//Enable alpha test with alpha ref of D3D9 version of 0.5
-			m_fsBlendInfo[0] = (127.0f / 255.0f) + 1e-6f;
-
-			m_alphaTestEnabled = true;
 			m_d3dDevice->SetRenderState(D3DRS_ALPHAREF, 127);
 			m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
 		}
 		else {
 			//Disable alpha test
-			m_fsBlendInfo[0] = 0.0f;
-
-			m_alphaTestEnabled = false;
 			m_d3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
 		}
 	}
@@ -6540,7 +6458,7 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 
 	//Write vertex and color
 	FGLVertexColor *pVertexColorArray = m_pVertexColorArray;
-	DWORD rpColor = m_rpColor;
+	DWORD rpColor = 0xFFFFFFFF;
 	for (FGLVertexNormTex& vert : m_csVertexArray) {
 		pVertexColorArray->x = vert.vert.x;
 		pVertexColorArray->y = vert.vert.y;
@@ -6579,7 +6497,7 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 	return;
 }
 
-INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet, bool append) {
+INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet, const FGLMapDot& csDot, bool append) {
 	if (!append) {
 		m_csVertexArray.clear();
 	}
@@ -6607,8 +6525,8 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 			bufVert->norm.x = 0;
 			bufVert->norm.y = 0;
 			bufVert->norm.z = 0;
-			bufVert->tex.u = (Facet.MapCoords.XAxis | *hubPoint) - m_csUDot;
-			bufVert->tex.v = (Facet.MapCoords.YAxis | *hubPoint) - m_csVDot;
+			bufVert->tex.u = (Facet.MapCoords.XAxis | *hubPoint) - csDot.u;
+			bufVert->tex.v = (Facet.MapCoords.YAxis | *hubPoint) - csDot.v;
 
 			bufVert = &m_csVertexArray.emplace_back();
 			bufVert->vert.x = secondPoint->X;
@@ -6617,8 +6535,8 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 			bufVert->norm.x = 0;
 			bufVert->norm.y = 0;
 			bufVert->norm.z = 0;
-			bufVert->tex.u = (Facet.MapCoords.XAxis | *secondPoint) - m_csUDot;
-			bufVert->tex.v = (Facet.MapCoords.YAxis | *secondPoint) - m_csVDot;
+			bufVert->tex.u = (Facet.MapCoords.XAxis | *secondPoint) - csDot.u;
+			bufVert->tex.v = (Facet.MapCoords.YAxis | *secondPoint) - csDot.v;
 
 			bufVert = &m_csVertexArray.emplace_back();
 			bufVert->vert.x = point->X;
@@ -6627,8 +6545,8 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 			bufVert->norm.x = 0;
 			bufVert->norm.y = 0;
 			bufVert->norm.z = 0;
-			bufVert->tex.u = (Facet.MapCoords.XAxis | *point) - m_csUDot;
-			bufVert->tex.v = (Facet.MapCoords.YAxis | *point) - m_csVDot;
+			bufVert->tex.u = (Facet.MapCoords.XAxis | *point) - csDot.u;
+			bufVert->tex.v = (Facet.MapCoords.YAxis | *point) - csDot.v;
 
 			secondPoint = point;
 		} while (--numPolys != 0);
@@ -6862,6 +6780,10 @@ INT UD3D9RenderDevice::LockCount = 0;
 
 HMODULE UD3D9RenderDevice::hModuleD3d9 = NULL;
 LPDIRECT3DCREATE9 UD3D9RenderDevice::pDirect3DCreate9 = NULL;
+
+#if UTGLR_DEFINE_HACK_FLAGS
+DWORD GUglyHackFlags;
+#endif
 
 /*-----------------------------------------------------------------------------
 	The End.

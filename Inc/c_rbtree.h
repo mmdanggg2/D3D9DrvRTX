@@ -403,4 +403,55 @@ private:
 	node_t *m_pRoot;
 };
 
+template <class ClassT> class rbtree_node_pool {
+public:
+	typedef typename ClassT::node_t node_t;
+
+public:
+	rbtree_node_pool() {
+		m_pTail = 0;
+	}
+	~rbtree_node_pool() {
+	}
+
+	inline void FASTCALL add(node_t* pNode) {
+		pNode->pParent = m_pTail;
+
+		m_pTail = pNode;
+
+		return;
+	}
+
+	inline node_t* try_remove(void) {
+		node_t* pNode;
+
+		if (m_pTail == 0) {
+			return 0;
+		}
+
+		pNode = m_pTail;
+
+		m_pTail = pNode->pParent;
+
+		return pNode;
+	}
+
+	unsigned int calc_size(void) {
+		node_t* pNode;
+		unsigned int size;
+
+		pNode = m_pTail;
+		size = 0;
+		while (pNode != 0) {
+			pNode = pNode->pParent;
+			size++;
+		}
+
+		return size;
+	}
+
+private:
+	node_t* m_pTail;
+};
+
 #endif //_C_RBTREE_

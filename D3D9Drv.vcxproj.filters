@@ -34,6 +34,9 @@
     <ClInclude Include="Inc\D3D9RenderDevice.h">
       <Filter>Inc</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\D3D9Config.h">
+      <Filter>Inc</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="D3D9DrvRTX.rc" />

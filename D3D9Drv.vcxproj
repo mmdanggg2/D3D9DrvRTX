@@ -223,6 +223,7 @@
   <ItemGroup>
     <ClInclude Include="Inc\c_gclip.h" />
     <ClInclude Include="Inc\c_rbtree.h" />
+    <ClInclude Include="Inc\D3D9Config.h" />
     <ClInclude Include="Inc\D3D9DebugUtils.h" />
     <ClInclude Include="Inc\D3D9Render.h" />
     <ClInclude Include="Inc\D3D9RenderDevice.h" />

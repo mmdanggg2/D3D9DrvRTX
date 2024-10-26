@@ -15,64 +15,9 @@
 #include "Render.h"
 #include "UnRender.h"
 
-
-//Make sure valid build config selected
-#undef UTGLR_VALID_BUILD_CONFIG
+#include "D3D9Config.h"
 
 //#define D3D9_DEBUG
-
-#if defined(UNREAL_TOURNAMENT)
-	#define UTGLR_VALID_BUILD_CONFIG 1
-		#if UNREAL_TOURNAMENT_OLDUNREAL
-			#define UTGLR_USES_ALPHABLEND 1
-		#endif
-#elif defined(DEUS_EX)
-	#define UTGLR_VALID_BUILD_CONFIG 1
-	#define UTGLR_ALT_DECLARE_CLASS 1
-	#define UTGLR_DEFINE_FTIME 1
-#elif defined(NERF_ARENA)
-	#define UTGLR_VALID_BUILD_CONFIG 1
-	#define UTGLR_USES_ALPHABLEND 0
-	#define UTGLR_NO_DECALS 1
-	#define UTGLR_ALT_DECLARE_CLASS 1
-	#define UTGLR_DEFINE_FTIME 1
-	#define UTGLR_ALT_FLUSH 1
-	#define UTGLR_DEFINE_HACK_FLAGS 1
-	#define UTGLR_OLD_POLY_CLASSES 1
-	#define UTGLR_NO_DETAIL_TEX 1
-	#define UTGLR_NO_ALLOW_PRECACHE 1
-	#define UTGLR_NO_PLAYER_FLAG 1
-	#define UTGLR_NO_SUPER_EXEC 1
-#elif defined(RUNE)
-	#define UTGLR_VALID_BUILD_CONFIG 1
-	#define UTGLR_USES_ALPHABLEND 1
-	#define UTGLR_DEFINE_FTIME 1
-#elif defined(UTGLR_UNREAL_227_BUILD)
-	#define UTGLR_VALID_BUILD_CONFIG 1
-	#define UTGLR_USES_ALPHABLEND 1
-#elif defined(UNREAL_GOLD)
-	#define UTGLR_VALID_BUILD_CONFIG 1
-	#define UTGLR_USES_ALPHABLEND 0
-	#define UTGLR_NO_DECALS 1
-	#define UTGLR_ALT_DECLARE_CLASS 1
-	#define UTGLR_DEFINE_FTIME 1
-	#define UTGLR_ALT_FLUSH 1
-	#define UTGLR_DEFINE_HACK_FLAGS 1
-	#define UTGLR_OLD_POLY_CLASSES 1
-	#define UTGLR_NO_DETAIL_TEX 1
-	#define UTGLR_NO_ALLOW_PRECACHE 1
-	#define UTGLR_NO_SUPER_EXEC 1
-#elif defined(HARRY_POTTER_1)
-	#define UTGLR_VALID_BUILD_CONFIG 1
-	#define UTGLR_FORCE_RENDER_DEVICE 1
-#else
-	#define UTGLR_VALID_BUILD_CONFIG 0
-#endif
-
-#if !UTGLR_VALID_BUILD_CONFIG
-#error Valid build config not selected.
-#endif
-#undef UTGLR_VALID_BUILD_CONFIG
 
 #include "D3D9DebugUtils.h"
 
@@ -84,11 +29,8 @@
 #include <set>
 #include <map>
 #include <deque>
-#include <functional>
-#pragma warning(disable : 4018)
 #include <vector>
 
-#pragma warning(disable : 4245)
 #include "c_gclip.h"
 
 #if !UTGLR_USES_ALPHABLEND
@@ -163,24 +105,24 @@ enum bind_type_t {
 	BIND_TYPE_NON_ZERO_PREFIX_LRU_LIST
 };
 
-#define CT_MIN_FILTER_POINT					0x00
-#define CT_MIN_FILTER_LINEAR				0x01
-#define CT_MIN_FILTER_ANISOTROPIC			0x02
-#define CT_MIN_FILTER_MASK					0x03
+constexpr BYTE CT_MIN_FILTER_POINT =		0x00;
+constexpr BYTE CT_MIN_FILTER_LINEAR =		0x01;
+constexpr BYTE CT_MIN_FILTER_ANISOTROPIC =	0x02;
+constexpr BYTE CT_MIN_FILTER_MASK =			0x03;
 
-#define CT_MIP_FILTER_NONE					0x00
-#define CT_MIP_FILTER_POINT					0x04
-#define CT_MIP_FILTER_LINEAR				0x08
-#define CT_MIP_FILTER_MASK					0x0C
+constexpr BYTE CT_MIP_FILTER_NONE =			0x00;
+constexpr BYTE CT_MIP_FILTER_POINT =		0x04;
+constexpr BYTE CT_MIP_FILTER_LINEAR =		0x08;
+constexpr BYTE CT_MIP_FILTER_MASK =			0x0C;
 
-#define CT_MAG_FILTER_LINEAR_NOT_POINT_BIT	0x10
+constexpr BYTE CT_MAG_FILTER_LINEAR_NOT_POINT_BIT = 0x10;
 
-#define CT_HAS_MIPMAPS_BIT					0x20
+constexpr BYTE CT_HAS_MIPMAPS_BIT = 0x20;
 
-#define CT_ADDRESS_CLAMP_NOT_WRAP_BIT		0x40
+constexpr BYTE CT_ADDRESS_CLAMP_NOT_WRAP_BIT = 0x40;
 
 //Default texture parameters for new D3D texture
-const BYTE CT_DEFAULT_TEX_FILTER_PARAMS = CT_MIN_FILTER_POINT | CT_MIP_FILTER_NONE;
+constexpr BYTE CT_DEFAULT_TEX_FILTER_PARAMS = CT_MIN_FILTER_POINT | CT_MIP_FILTER_NONE;
 
 struct tex_params_t {
 	BYTE filter;
@@ -190,9 +132,9 @@ struct tex_params_t {
 };
 
 //Default texture stage parameters for D3D
-const tex_params_t CT_DEFAULT_TEX_PARAMS = { CT_DEFAULT_TEX_FILTER_PARAMS, 0, 0, 0 };
+constexpr tex_params_t CT_DEFAULT_TEX_PARAMS = { CT_DEFAULT_TEX_FILTER_PARAMS, 0, 0, 0 };
 
-#define DT_NO_SMOOTH_BIT	0x01
+constexpr BYTE DT_NO_SMOOTH_BIT = 0x01;
 
 struct FCachedTexture {
 	IDirect3DTexture9 *pTexObj;
@@ -252,57 +194,6 @@ public:
 private:
 	FCachedTexture m_head;
 	FCachedTexture m_tail;
-};
-
-template <class ClassT> class rbtree_node_pool {
-public:
-	typedef typename ClassT::node_t node_t;
-
-public:
-	rbtree_node_pool() {
-		m_pTail = 0;
-	}
-	~rbtree_node_pool() {
-	}
-
-	inline void FASTCALL add(node_t *pNode) {
-		pNode->pParent = m_pTail;
-
-		m_pTail = pNode;
-
-		return;
-	}
-
-	inline node_t *try_remove(void) {
-		node_t *pNode;
-
-		if (m_pTail == 0) {
-			return 0;
-		}
-
-		pNode = m_pTail;
-
-		m_pTail = pNode->pParent;
-
-		return pNode;
-	}
-
-	unsigned int calc_size(void) {
-		node_t *pNode;
-		unsigned int size;
-
-		pNode = m_pTail;
-		size = 0;
-		while (pNode != 0) {
-			pNode = pNode->pParent;
-			size++;
-		}
-
-		return size;
-	}
-
-private:
-	node_t *m_pTail;
 };
 
 struct FTexInfo {
@@ -501,76 +392,30 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	DECLARE_CLASS(UD3D9RenderDevice, RENDERDEVICE_SUPER, CLASS_Config, D3D9DrvRTX)
 #endif
 
-	//Debug bits
-	DWORD m_debugBits;
-	inline bool FASTCALL DebugBit(DWORD debugBit) {
-		return ((m_debugBits & debugBit) != 0);
-	}
-	enum {
-		DEBUG_BIT_BASIC		= 0x00000001,
-		DEBUG_BIT_GL_ERROR	= 0x00000002,
-		DEBUG_BIT_ANY		= 0xFFFFFFFF
-	};
+	// Static variables.
+	static INT NumDevices;
+	static INT LockCount;
 
-	//Fixed texture cache ids
-	#define TEX_CACHE_ID_UNUSED		0xFFFFFFFFFFFFFFFFULL
-	#define TEX_CACHE_ID_NO_TEX		0xFFFFFFFF00000010ULL
+	static HMODULE hModuleD3d9;
+	static LPDIRECT3DCREATE9 pDirect3DCreate9;
 
-	//Mask for poly flags that impact texture object state
-	#define TEX_DYNAMIC_POLY_FLAGS_MASK		(PF_NoSmooth)
+#ifdef WIN32
+	// Permanent variables.
+	HWND m_hWnd;
+	HDC m_hDC;
+#endif
 
-	// Information about a cached texture.
-	enum tex_type_t {
-		TEX_TYPE_NONE,
-		TEX_TYPE_COMPRESSED_DXT1,
-		TEX_TYPE_COMPRESSED_DXT1_TO_DXT3,
-		TEX_TYPE_COMPRESSED_DXT3,
-		TEX_TYPE_COMPRESSED_DXT5,
-		TEX_TYPE_PALETTED,
-		TEX_TYPE_HAS_PALETTE,
-		TEX_TYPE_NORMAL,
-		TEX_TYPE_CACHE_GEN,
-	};
-	#define TEX_FLAG_NO_CLAMP	0x00000001
+	IDirect3D9* m_d3d9;
+	IDirect3DDevice9* m_d3dDevice;
 
-	struct FTexConvertCtx {
-		INT stepBits;
-		DWORD texWidthPow2;
-		DWORD texHeightPow2;
-		const FCachedTexture *pBind;
-		D3DLOCKED_RECT lockRect;
-	} m_texConvertCtx;
+	D3DCAPS9 m_d3dCaps;
+	bool m_dxt1TextureCap;
+	bool m_dxt3TextureCap;
+	bool m_dxt5TextureCap;
 
-	enum { VERTEX_ARRAY_ALIGN = 64 };	//Must be even multiple of 16B for SSE
-	enum { VERTEX_ARRAY_TAIL_PADDING = 72 };	//Must include 8B for half SSE tail
+	D3DPRESENT_PARAMETERS m_d3dpp;
 
-	class LightSlots {
-	private:
-		std::unordered_map<AActor*, int> actorSlots;
-		std::deque<int> availableSlots;
-		ods_stream dout;
-
-	public:
-		LightSlots(int numSlots) {
-			actorSlots.reserve(numSlots);
-			for (int i = 0; i < numSlots; ++i) {
-				availableSlots.push_back(i);
-			}
-		}
-
-		// Updates which actors are in the slots, returns a set of slots that are no longer used
-		std::unordered_set<int> updateActors(const std::vector<AActor*>& actors);
-
-		const std::deque<int> unusedSlots() {
-			return availableSlots;
-		}
-
-		const std::unordered_map<AActor*, int> slotMap() {
-			return actorSlots;
-		}
-	};
-
-	LightSlots* lightSlots;
+	IDirect3DTexture9* m_pNoTexObj;
 
 	//Vertex declarations
 	IDirect3DVertexDeclaration9 *m_oneColorVertexDecl;
@@ -609,25 +454,236 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	bool m_secondaryColorBufferNeedsDiscard;
 	bool m_texCoordBufferNeedsDiscard[MAX_TMUNITS];
 
+	void (FASTCALL* m_pBuffer3BasicVertsProc)(UD3D9RenderDevice*, FTransTexture**);
+	void (FASTCALL* m_pBuffer3ColoredVertsProc)(UD3D9RenderDevice*, FTransTexture**);
+	void (FASTCALL* m_pBuffer3FoggedVertsProc)(UD3D9RenderDevice*, FTransTexture**);
+
+	void (FASTCALL* m_pBuffer3VertsProc)(UD3D9RenderDevice*, FTransTexture**);
+
+	//Texture state cache information
+	BYTE m_texEnableBits;
+
+	UBOOL WasFullscreen;
+
+	bool m_frameRateLimitTimerInitialized;
+
+	bool m_prevSwapBuffersStatus;
+
+	std::set<FPlane> Modes;
+
+	// Timing.
+	DWORD BindCycles, ImageCycles, ComplexCycles, GouraudCycles, TileCycles;
+
+	DWORD m_vbFlushCount;
+
+	// Hardware constraints.
+	FLOAT LODBias;
+	UBOOL OneXBlending;
+	INT MaxLogUOverV;
+	INT MaxLogVOverU;
+	INT MinLogTextureSize;
+	INT MaxLogTextureSize;
+	INT MaxAnisotropy;
+	INT TMUnits;
+	INT RefreshRate;
+	UBOOL UsePrecache;
+	UBOOL UseTrilinear;
+	UBOOL UseS3TC;
+	UBOOL NoFiltering;
+	UBOOL SinglePassFog;
+	UBOOL UseTexIdPool;
+	UBOOL UseTexPool;
+	INT DynamicTexIdRecycleLevel;
+	UBOOL TexDXT1ToDXT3;
+	INT FrameRateLimit;
+	FTime m_prevFrameTimestamp;
+	UBOOL SmoothMaskedTextures;
+
+	UBOOL EnableSkyBoxAnchors;
+	UBOOL EnableHashTextures;
+
+	FColor SurfaceSelectionColor;
+
+	std::unordered_set<std::wstring> hashTexBlacklist;
+
+	//Previous lock variables
+	//Used to detect changes in settings
+	UBOOL PL_OneXBlending;
+	INT PL_MaxLogUOverV;
+	INT PL_MaxLogVOverU;
+	INT PL_MinLogTextureSize;
+	INT PL_MaxLogTextureSize;
+	UBOOL PL_NoFiltering;
+	UBOOL PL_UseTrilinear;
+	UBOOL PL_TexDXT1ToDXT3;
+	INT PL_MaxAnisotropy;
+	UBOOL PL_SmoothMaskedTextures;
+	FLOAT PL_LODBias;
+
+	INT m_rpPassCount;
+	INT m_rpTMUnits;
+	bool m_rpForceSingle;
+	bool m_rpMasked;
+	bool m_rpSetDepthEqual;
+
+	// Hit info.
+	BYTE* m_HitData;
+	INT* m_HitSize;
+	INT m_HitBufSize;
+	INT m_HitCount;
+	CGClip m_gclip;
+
+	DWORD m_currentFrameCount;
+
+	// Lock variables.
+	FPlane FlashScale, FlashFog;
+	FLOAT m_RFX2, m_RFY2;
+	INT m_sceneNodeX, m_sceneNodeY;
+
+	DWORD m_curBlendFlags;
+	DWORD m_smoothMaskedTexturesBit;
+	DWORD m_curPolyFlags;
+
+	enum {
+		CF_COLOR_ARRAY		= 0x01,
+		CF_FOG_MODE			= 0x02,
+	};
+	BYTE m_requestedColorFlags;
+#if UTGLR_USES_ALPHABLEND
+	BYTE m_gpAlpha;
+#endif
+
+	DWORD m_curTexEnvFlags[MAX_TMUNITS];
+	tex_params_t m_curTexStageParams[MAX_TMUNITS];
+	FTexInfo TexInfo[MAX_TMUNITS];
+
+	INT m_SetRes_NewX;
+	INT m_SetRes_NewY;
+	INT m_SetRes_NewColorBytes;
+	UBOOL m_SetRes_Fullscreen;
+	bool m_SetRes_isDeviceReset;
+
+	// MultiPass rendering information
+	struct FGLRenderPass {
+		struct FGLSinglePass {
+			FTextureInfo* Info;
+			DWORD PolyFlags;
+			FLOAT PanBias;
+		} TMU[MAX_TMUNITS];
+	} MultiPass;				// vogel: MULTIPASS!!! ;)
+
+	typedef rbtree<DWORD, FCachedTexture> DWORD_CTTree_t;
+	typedef rbtree_allocator<DWORD_CTTree_t> DWORD_CTTree_Allocator_t;
+	typedef rbtree<QWORD, FCachedTexture> QWORD_CTTree_t;
+	typedef rbtree_allocator<QWORD_CTTree_t> QWORD_CTTree_Allocator_t;
+	typedef rbtree_node_pool<QWORD_CTTree_t> QWORD_CTTree_NodePool_t;
+	typedef DWORD TexPoolMapKey_t;
+	typedef rbtree<TexPoolMapKey_t, QWORD_CTTree_NodePool_t> TexPoolMap_t;
+	typedef rbtree_allocator<TexPoolMap_t> TexPoolMap_Allocator_t;
+
+	enum { NUM_CTTree_TREES = 16 }; //Must be a power of 2
+	inline DWORD FASTCALL CTZeroPrefixCacheIDSuffixToTreeIndex(DWORD CacheIDSuffix) {
+		return ((CacheIDSuffix >> 12) & (NUM_CTTree_TREES - 1));
+	}
+	inline DWORD FASTCALL CTNonZeroPrefixCacheIDSuffixToTreeIndex(DWORD CacheIDSuffix) {
+		return ((CacheIDSuffix >> 20) & (NUM_CTTree_TREES - 1));
+	}
+	inline DWORD FASTCALL MakeTexPoolMapKey(DWORD UBits, DWORD VBits) {
+		return ((UBits << 16) | VBits);
+	}
+
+	DWORD_CTTree_t m_localZeroPrefixBindTrees[NUM_CTTree_TREES], * m_zeroPrefixBindTrees;
+	QWORD_CTTree_t m_localNonZeroPrefixBindTrees[NUM_CTTree_TREES], * m_nonZeroPrefixBindTrees;
+	CCachedTextureChain m_localNonZeroPrefixBindChain, * m_nonZeroPrefixBindChain;
+	TexPoolMap_t m_localRGBA8TexPool, * m_RGBA8TexPool;
+
+	DWORD_CTTree_Allocator_t m_DWORD_CTTree_Allocator;
+	QWORD_CTTree_Allocator_t m_QWORD_CTTree_Allocator;
+	TexPoolMap_Allocator_t m_TexPoolMap_Allocator;
+
+	QWORD_CTTree_NodePool_t m_nonZeroPrefixNodePool;
+
+	//Fixed texture cache ids
+#define TEX_CACHE_ID_UNUSED		0xFFFFFFFFFFFFFFFFULL
+#define TEX_CACHE_ID_NO_TEX		0xFFFFFFFF00000010ULL
+
+//Mask for poly flags that impact texture object state
+#define TEX_DYNAMIC_POLY_FLAGS_MASK		(PF_NoSmooth)
+
+// Information about a cached texture.
+	enum tex_type_t {
+		TEX_TYPE_NONE,
+		TEX_TYPE_COMPRESSED_DXT1,
+		TEX_TYPE_COMPRESSED_DXT1_TO_DXT3,
+		TEX_TYPE_COMPRESSED_DXT3,
+		TEX_TYPE_COMPRESSED_DXT5,
+		TEX_TYPE_PALETTED,
+		TEX_TYPE_HAS_PALETTE,
+		TEX_TYPE_NORMAL,
+		TEX_TYPE_CACHE_GEN,
+	};
+#define TEX_FLAG_NO_CLAMP	0x00000001
+
+	struct FTexConvertCtx {
+		INT stepBits;
+		DWORD texWidthPow2;
+		DWORD texHeightPow2;
+		const FCachedTexture* pBind;
+		D3DLOCKED_RECT lockRect;
+	} m_texConvertCtx;
+
+	class LightSlots {
+	private:
+		std::unordered_map<AActor*, int> actorSlots;
+		std::deque<int> availableSlots;
+		ods_stream dout;
+
+	public:
+		LightSlots(int numSlots) {
+			actorSlots.reserve(numSlots);
+			for (int i = 0; i < numSlots; ++i) {
+				availableSlots.push_back(i);
+			}
+		}
+
+		// Updates which actors are in the slots, returns a set of slots that are no longer used
+		std::unordered_set<int> updateActors(const std::vector<AActor*>& actors);
+
+		const std::deque<int> unusedSlots() {
+			return availableSlots;
+		}
+
+		const std::unordered_map<AActor*, int> slotMap() {
+			return actorSlots;
+		}
+	};
+	LightSlots* lightSlots;
+
+	struct TileFuncCall {
+		FSceneNode frame;
+		FTextureInfo texInfo;
+		FLOAT X, Y, XL, YL, U, V, UL, VL, Z;
+		FPlane Color;
+		FPlane Fog;
+		DWORD PolyFlags;
+
+		TileFuncCall() {}
+		TileFuncCall(const TileFuncCall& other) = default;
+
+		void operator()(UD3D9RenderDevice* device) {
+			device->DrawTile(&frame, texInfo, X, Y, XL, YL, U, V, UL, VL, nullptr, Z, Color, Fog, PolyFlags);
+		}
+	};
+	bool bufferTileDraws;
+	std::vector<TileFuncCall> bufferedTileDraws;
+
 	inline void FlushVertexBuffers(void) {
 		//dout << L"Vertex buffers flushed" << std::endl;
 		m_curVertexBufferPos = 0;
 		m_vertexColorBufferNeedsDiscard = true;
-		//if (m_d3dTempVertexColorBuffer) {
-		//	dout << L"Flush releasing vert buffer of size " << m_vertexTempBufferSize << std::endl;
-		//	m_d3dTempVertexColorBuffer->Release();
-		//	m_d3dTempVertexColorBuffer = nullptr;
-		//	m_vertexTempBufferSize = 0;
-		//}
 		m_secondaryColorBufferNeedsDiscard = true;
 		for (int u = 0; u < MAX_TMUNITS; u++) {
 			m_texCoordBufferNeedsDiscard[u] = true;
-			//if (m_d3dTempTexCoordBuffer[u]) {
-			//	dout << L"Flush releasing tex buffer of size " << m_vertexTempBufferSize << std::endl;
-			//	m_d3dTempTexCoordBuffer[u]->Release();
-			//	m_d3dTempTexCoordBuffer[u] = nullptr;
-			//	m_texTempBufferSize[u] = 0;
-			//}
 		}
 
 #ifdef D3D9_DEBUG
@@ -645,6 +701,14 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 			m_curVertexBufferPos += numPoints;
 		}
 		return bufferPos;
+	}
+
+	inline bool needsNewBuffer(DWORD polyFlags, int numVerts, FTextureInfo* info = nullptr) {
+		if (m_curPolyFlags != polyFlags) return true;
+		QWORD cacheId = info ? calcCacheID(*info, polyFlags) : TEX_CACHE_ID_NO_TEX;
+		if (TexInfo[0].CurrentCacheID != cacheId) return true;
+		if ((m_curVertexBufferPos + m_bufferedVerts + numVerts) >= (VERTEX_BUFFER_SIZE)) return true;
+		return m_bufferedVerts == 0;
 	}
 
 	// Locks/Creates a vertex buffer appropriate for the given number of points
@@ -694,10 +758,10 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		BYTE* pData = nullptr;
 
 		//dout << L"Locking vert buffer of size " << numPoints << std::endl;
-		if (FAILED(vertBuffer->Lock(0, 0, (VOID **)&pData, lockFlags))) {
+		if (FAILED(vertBuffer->Lock(0, 0, (VOID**)&pData, lockFlags))) {
 			appErrorf(TEXT("Vertex buffer lock failed"));
 		}
-		
+
 		m_pVertexColorArray = (FGLVertexColor*)(pData + (bufferPos * sizeof(FGLVertexColor)));
 	}
 	inline void UnlockVertexColorBuffer(void) {
@@ -708,8 +772,8 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	inline void LockSecondaryColorBuffer(INT numPoints) {
 		appErrorf(TEXT("Can't be bothered, don't use LockSecondaryColorBuffer thx bye!"));
-		FGLSecondaryColor*pData = nullptr;
-		if (FAILED(m_d3dSecondaryColorBuffer->Lock(0, 0, (VOID **)&pData, D3DLOCK_NOSYSLOCK))) {
+		FGLSecondaryColor* pData = nullptr;
+		if (FAILED(m_d3dSecondaryColorBuffer->Lock(0, 0, (VOID**)&pData, D3DLOCK_NOSYSLOCK))) {
 			appErrorf(TEXT("Vertex buffer lock failed"));
 		}
 
@@ -768,10 +832,10 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		BYTE* pData = nullptr;
 
 		//dout << L"Locking tex buffer of size " << numPoints << std::endl;
-		if (FAILED(texBuffer->Lock(0, 0, (VOID **)&pData, lockFlags))) {
+		if (FAILED(texBuffer->Lock(0, 0, (VOID**)&pData, lockFlags))) {
 			appErrorf(TEXT("Vertex buffer lock failed"));
 		}
-		
+
 		m_pTexCoordArray[texUnit] = (FGLTexCoord*)(pData + (bufferPos * sizeof(FGLTexCoord)));
 	}
 	inline void FASTCALL UnlockTexCoordBuffer(DWORD texUnit) {
@@ -782,114 +846,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	// Updates the vertex colour of the quad buffer
 	inline void updateQuadBuffer(DWORD color);
-
-	FLOAT m_csUDot;
-	FLOAT m_csVDot;
-
-
-	// MultiPass rendering information
-	struct FGLRenderPass {
-		struct FGLSinglePass {
-			FTextureInfo* Info;
-			DWORD PolyFlags;
-			FLOAT PanBias;
-		} TMU[MAX_TMUNITS];
-	} MultiPass;				// vogel: MULTIPASS!!! ;)
-
-	//Texture state cache information
-	BYTE m_texEnableBits;
-
-#ifdef WIN32
-	// Permanent variables.
-	HWND m_hWnd;
-	HDC m_hDC;
-#endif
-
-	UBOOL WasFullscreen;
-
-	bool m_frameRateLimitTimerInitialized;
-
-	bool m_prevSwapBuffersStatus;
-
-	typedef rbtree<DWORD, FCachedTexture> DWORD_CTTree_t;
-	typedef rbtree_allocator<DWORD_CTTree_t> DWORD_CTTree_Allocator_t;
-	typedef rbtree<QWORD, FCachedTexture> QWORD_CTTree_t;
-	typedef rbtree_allocator<QWORD_CTTree_t> QWORD_CTTree_Allocator_t;
-	typedef rbtree_node_pool<QWORD_CTTree_t> QWORD_CTTree_NodePool_t;
-	typedef DWORD TexPoolMapKey_t;
-	typedef rbtree<TexPoolMapKey_t, QWORD_CTTree_NodePool_t> TexPoolMap_t;
-	typedef rbtree_allocator<TexPoolMap_t> TexPoolMap_Allocator_t;
-
-	enum { NUM_CTTree_TREES = 16 }; //Must be a power of 2
-	inline DWORD FASTCALL CTZeroPrefixCacheIDSuffixToTreeIndex(DWORD CacheIDSuffix) {
-		return ((CacheIDSuffix >> 12) & (NUM_CTTree_TREES - 1));
-	}
-	inline DWORD FASTCALL CTNonZeroPrefixCacheIDSuffixToTreeIndex(DWORD CacheIDSuffix) {
-		return ((CacheIDSuffix >> 20) & (NUM_CTTree_TREES - 1));
-	}
-	inline DWORD FASTCALL MakeTexPoolMapKey(DWORD UBits, DWORD VBits) {
-		return ((UBits << 16) | VBits);
-	}
-
-	DWORD_CTTree_t m_localZeroPrefixBindTrees[NUM_CTTree_TREES], *m_zeroPrefixBindTrees;
-	QWORD_CTTree_t m_localNonZeroPrefixBindTrees[NUM_CTTree_TREES], *m_nonZeroPrefixBindTrees;
-	CCachedTextureChain m_localNonZeroPrefixBindChain, *m_nonZeroPrefixBindChain;
-	TexPoolMap_t m_localRGBA8TexPool, *m_RGBA8TexPool;
-
-	DWORD_CTTree_Allocator_t m_DWORD_CTTree_Allocator;
-	QWORD_CTTree_Allocator_t m_QWORD_CTTree_Allocator;
-	TexPoolMap_Allocator_t m_TexPoolMap_Allocator;
-
-	QWORD_CTTree_NodePool_t m_nonZeroPrefixNodePool;
-
-	std::set<FPlane> Modes;
-
-	//Use UViewport* in URenderDevice
-	//UViewport* Viewport;
-
-
-	// Timing.
-	DWORD BindCycles, ImageCycles, ComplexCycles, GouraudCycles, TileCycles;
-
-	DWORD m_vpEnableCount;
-	DWORD m_vpSwitchCount;
-	DWORD m_fpEnableCount;
-	DWORD m_fpSwitchCount;
-	DWORD m_AASwitchCount;
-	DWORD m_vbFlushCount;
-	DWORD m_stat0Count;
-	DWORD m_stat1Count;
-
-
-	// Hardware constraints.
-
-	FLOAT LODBias;
-	UBOOL OneXBlending;
-	INT MaxLogUOverV;
-	INT MaxLogVOverU;
-	INT MinLogTextureSize;
-	INT MaxLogTextureSize;
-	INT MaxAnisotropy;
-	INT TMUnits;
-	INT RefreshRate;
-	UBOOL UsePrecache;
-	UBOOL UseTrilinear;
-	UBOOL UseVertexSpecular;
-	UBOOL UseS3TC;
-	UBOOL NoFiltering;
-	UBOOL SinglePassFog;
-	UBOOL UseTexIdPool;
-	UBOOL UseTexPool;
-	INT DynamicTexIdRecycleLevel;
-	UBOOL TexDXT1ToDXT3;
-	INT FrameRateLimit;
-	FTime m_prevFrameTimestamp;
-	UBOOL SmoothMaskedTextures;
-
-	UBOOL EnableSkyBoxAnchors;
-	UBOOL EnableHashTextures;
-
-	FColor SurfaceSelectionColor;
 
 	enum {
 		BV_TYPE_NONE			= 0x00,
@@ -921,263 +877,72 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void EndPointBufferingNoCheck(void);
 
 
-	//Previous lock variables
-	//Used to detect changes in settings
-	UBOOL PL_OneXBlending;
-	INT PL_MaxLogUOverV;
-	INT PL_MaxLogVOverU;
-	INT PL_MinLogTextureSize;
-	INT PL_MaxLogTextureSize;
-	UBOOL PL_NoFiltering;
-	UBOOL PL_UseTrilinear;
-	UBOOL PL_TexDXT1ToDXT3;
-	INT PL_MaxAnisotropy;
-	UBOOL PL_SmoothMaskedTextures;
-	FLOAT PL_LODBias;
-
-	DWORD m_numDepthBits;
-
-	INT AllocatedTextures;
-
-	INT m_rpPassCount;
-	INT m_rpTMUnits;
-	bool m_rpForceSingle;
-	bool m_rpMasked;
-	bool m_rpSetDepthEqual;
-	DWORD m_rpColor;
-
-	// Hit info.
-	BYTE* m_HitData;
-	INT* m_HitSize;
-	INT m_HitBufSize;
-	INT m_HitCount;
-	CGClip m_gclip;
-
-
-	DWORD m_currentFrameCount;
-
-	// Lock variables.
-	FPlane FlashScale, FlashFog;
-	FLOAT m_RProjZ, m_Aspect;
-	FLOAT m_RFX2, m_RFY2;
-	INT m_sceneNodeX, m_sceneNodeY;
-
-	DWORD m_curBlendFlags;
-	DWORD m_smoothMaskedTexturesBit;
-	bool m_alphaTestEnabled;
-	DWORD m_curPolyFlags;
-
-	enum {
-		CF_COLOR_ARRAY		= 0x01,
-		CF_FOG_MODE			= 0x02,
-		CF_NORMAL_ARRAY		= 0x04
-	};
-	BYTE m_requestedColorFlags;
-#if UTGLR_USES_ALPHABLEND
-	BYTE m_gpAlpha;
-	bool m_gpFogEnabled;
-#endif
-
-	FLOAT m_fsBlendInfo[4];
-
-	DWORD m_curTexEnvFlags[MAX_TMUNITS];
-	tex_params_t m_curTexStageParams[MAX_TMUNITS];
-	FTexInfo TexInfo[MAX_TMUNITS];
-
-	void (FASTCALL *m_pBuffer3BasicVertsProc)(UD3D9RenderDevice *, FTransTexture **);
-	void (FASTCALL *m_pBuffer3ColoredVertsProc)(UD3D9RenderDevice *, FTransTexture **);
-	void (FASTCALL *m_pBuffer3FoggedVertsProc)(UD3D9RenderDevice *, FTransTexture **);
-
-	void (FASTCALL *m_pBuffer3VertsProc)(UD3D9RenderDevice *, FTransTexture **);
-
-	IDirect3DTexture9 *m_pNoTexObj;
-
-	// Static variables.
-	static INT NumDevices;
-	static INT LockCount;
-
-	static HMODULE hModuleD3d9;
-	static LPDIRECT3DCREATE9 pDirect3DCreate9;
-
-
-	IDirect3D9 *m_d3d9;
-	IDirect3DDevice9 *m_d3dDevice;
-
-	INT m_SetRes_NewX;
-	INT m_SetRes_NewY;
-	INT m_SetRes_NewColorBytes;
-	UBOOL m_SetRes_Fullscreen;
-	bool m_SetRes_isDeviceReset;
-
-	D3DCAPS9 m_d3dCaps;
-	bool m_dxt1TextureCap;
-	bool m_dxt3TextureCap;
-	bool m_dxt5TextureCap;
-
-	D3DPRESENT_PARAMETERS m_d3dpp;
-
-
-#ifdef BGRA_MAKE
-#undef BGRA_MAKE
-#endif
-	static inline DWORD BGRA_MAKE(BYTE b, BYTE g, BYTE r, BYTE a) {
-		return (a << 24) | (r << 16) | (g << 8) | b;
-	}
-
-	static inline DWORD FASTCALL FPlaneTo_BGR_A255(const FPlane *pPlane) {
-		return BGRA_MAKE(
-					appRound(pPlane->Z * 255.0f),
-					appRound(pPlane->Y * 255.0f),
-					appRound(pPlane->X * 255.0f),
-					255);
-	}
-
-	static inline DWORD FASTCALL FPlaneTo_BGRClamped_A255(const FPlane *pPlane) {
-		return BGRA_MAKE(
-					Clamp(appRound(pPlane->Z * 255.0f), 0, 255),
-					Clamp(appRound(pPlane->Y * 255.0f), 0, 255),
-					Clamp(appRound(pPlane->X * 255.0f), 0, 255),
-					255);
-	}
-
-	static inline DWORD FASTCALL FPlaneTo_BGR_A0(const FPlane *pPlane) {
-		return BGRA_MAKE(
-					appRound(pPlane->Z * 255.0f),
-					appRound(pPlane->Y * 255.0f),
-					appRound(pPlane->X * 255.0f),
-					0);
-	}
-
-	static inline DWORD FASTCALL FPlaneTo_BGR_Aub(const FPlane *pPlane, BYTE alpha) {
-		return BGRA_MAKE(
-					appRound(pPlane->Z * 255.0f),
-					appRound(pPlane->Y * 255.0f),
-					appRound(pPlane->X * 255.0f),
-					alpha);
-	}
-
-	static inline DWORD FASTCALL FPlaneTo_BGRA(const FPlane *pPlane) {
-		return BGRA_MAKE(
-					appRound(pPlane->Z * 255.0f),
-					appRound(pPlane->Y * 255.0f),
-					appRound(pPlane->X * 255.0f),
-					appRound(pPlane->W * 255.0f));
-	}
-
-	static inline DWORD FASTCALL FPlaneTo_BGRAClamped(const FPlane *pPlane) {
-		return BGRA_MAKE(
-					Clamp(appRound(pPlane->Z * 255.0f), 0, 255),
-					Clamp(appRound(pPlane->Y * 255.0f), 0, 255),
-					Clamp(appRound(pPlane->X * 255.0f), 0, 255),
-					Clamp(appRound(pPlane->W * 255.0f), 0, 255));
-	}
-
-	static inline DWORD FASTCALL FPlaneTo_BGRScaled_A255(const FPlane *pPlane, FLOAT rgbScale) {
-		return BGRA_MAKE(
-					appRound(pPlane->Z * rgbScale),
-					appRound(pPlane->Y * rgbScale),
-					appRound(pPlane->X * rgbScale),
-					255);
-	}
-
 	static const TCHAR* StaticConfigName() { return TEXT("D3D9DrvRTX"); }
 
 	// UObject interface.
 	void StaticConstructor();
 
+	// FExec interface
+	UBOOL Exec(const TCHAR* Cmd, FOutputDevice& Ar) override;
+
+	// URenderDevice interface.
+	UBOOL Init(UViewport* InViewport, INT NewX, INT NewY, INT NewColorBytes, UBOOL Fullscreen) override;
+	UBOOL SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Fullscreen) override;
+	void Exit() override;
+#if UTGLR_ALT_FLUSH
+	void Flush() override;
+#else
+	void Flush(UBOOL AllowPrecache) override;
+#endif
+	void Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane ScreenClear, DWORD RenderLockFlags, BYTE* InHitData, INT* InHitSize) override;
+	void Unlock(UBOOL Blit) override;
+	void DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet) override;
+	void DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, DWORD PolyFlags, FSpanBuffer* Span) override;
+	void DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X, FLOAT Y, FLOAT XL, FLOAT YL, FLOAT U, FLOAT V, FLOAT UL, FLOAT VL, FSpanBuffer* Span, FLOAT Z, FPlane Color, FPlane Fog, DWORD PolyFlags) override;
+	void Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2) override;
+	void Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2) override;
+	void Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FLOAT X1, FLOAT Y1, FLOAT X2, FLOAT Y2, FLOAT Z) override;
+	void ClearZ(FSceneNode* Frame) override;
+	void PushHit(const BYTE* Data, INT Count) override;
+	void PopHit(INT Count, UBOOL bForce) override;
+	void GetStats(TCHAR* Result) override;
+	void ReadPixels(FColor* Pixels) override;
+	void EndFlash() override;
+
+	void SetSceneNode(FSceneNode* Frame) override;
+	void PrecacheTexture(FTextureInfo& Info, DWORD PolyFlags) override;
+
+#if UNREAL_TOURNAMENT_OLDUNREAL
+	UBOOL SupportsTextureFormat(ETextureFormat Format) override;
+#endif
+#ifdef RUNE
+	void PreDrawFogSurface() override;
+	void PostDrawFogSurface() override;
+	void DrawFogSurface(FSceneNode* Frame, FFogSurf &FogSurf) override;
+	void PreDrawGouraud(FSceneNode* Frame, FLOAT FogDistance, FPlane FogColor) override;
+	void PostDrawGouraud(FLOAT FogDistance) override;
+#endif
+#if HARRY_POTTER_1
+	INT MaxVertices() override { return 0xFFFF; }
+	void DrawTriangles(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, USHORT* Indices, INT NumIdx, DWORD PolyFlags, FSpanBuffer* Span) override;
+#endif
 
 	// Implementation.
-	void FASTCALL SC_AddBoolConfigParam(DWORD BitMaskOffset, const TCHAR *pName, UBOOL &param, ECppProperty EC_CppProperty, INT InOffset, UBOOL defaultValue);
-	void FASTCALL SC_AddIntConfigParam(const TCHAR *pName, INT &param, ECppProperty EC_CppProperty, INT InOffset, INT defaultValue);
-	void FASTCALL SC_AddFloatConfigParam(const TCHAR *pName, FLOAT &param, ECppProperty EC_CppProperty, INT InOffset, FLOAT defaultValue);
-
-	void FASTCALL DbgPrintInitParam(const TCHAR *pName, INT value);
-	void FASTCALL DbgPrintInitParam(const TCHAR *pName, FLOAT value);
-
 	void InitFrameRateLimitTimerSafe(void);
 	void ShutdownFrameRateLimitTimer(void);
 
 	UBOOL FailedInitf(const TCHAR* Fmt, ...);
-	void Exit();
-	void ShutdownAfterError();
+	void ShutdownAfterError() override;
 
-	UBOOL SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Fullscreen);
 	void UnsetRes();
 	UBOOL ResetDevice();
-
-	bool FASTCALL CheckDepthFormat(D3DFORMAT adapterFormat, D3DFORMAT backBufferFormat, D3DFORMAT depthBufferFormat);
 
 	void ConfigValidate_RequiredExtensions(void);
 
 	void InitPermanentResourcesAndRenderingState(void);
 	void FreePermanentResources(void);
 
-
-	UBOOL Init(UViewport* InViewport, INT NewX, INT NewY, INT NewColorBytes, UBOOL Fullscreen);
-
-	UBOOL Exec(const TCHAR* Cmd, FOutputDevice& Ar);
-	void Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane ScreenClear, DWORD RenderLockFlags, BYTE* InHitData, INT* InHitSize);
-	void SetSceneNode(FSceneNode* Frame);
-	void Unlock(UBOOL Blit);
-#if UTGLR_ALT_FLUSH
-	void Flush() override;
-#else
-	void Flush(UBOOL AllowPrecache) override;
-#endif
-
-	void DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet);
-	// Takes a list of faces and draws them in batches
-	void drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surface, std::vector<FSurfaceFacet*>& facets);
-#ifdef RUNE
-	void PreDrawFogSurface();
-	void PostDrawFogSurface();
-	void DrawFogSurface(FSceneNode* Frame, FFogSurf &FogSurf);
-	void PreDrawGouraud(FSceneNode* Frame, FLOAT FogDistance, FPlane FogColor);
-	void PostDrawGouraud(FLOAT FogDistance);
-#endif
 	void DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, DWORD PolyFlags, FSpanBuffer* Span);
-	void DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, DWORD PolyFlags, FSpanBuffer* Span);
-	void DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X, FLOAT Y, FLOAT XL, FLOAT YL, FLOAT U, FLOAT V, FLOAT UL, FLOAT VL, FSpanBuffer* Span, FLOAT Z, FPlane Color, FPlane Fog, DWORD PolyFlags);
-	void Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2);
-	void Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2);
-	void Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FLOAT X1, FLOAT Y1, FLOAT X2, FLOAT Y2, FLOAT Z);
-#if HARRY_POTTER_1
-	INT MaxVertices() override { return 0xFFFF; }
-	void DrawTriangles(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, USHORT* Indices, INT NumIdx, DWORD PolyFlags, FSpanBuffer* Span) override;
-#endif
-
-	// Render a sprite actor
-	void renderSprite(FSceneNode* frame, AActor* actor);
-	// Renders a sprite at the given location
-	void renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScaleU, FLOAT drawScaleV, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color);
-	inline void renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScale, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color) {
-		renderSpriteGeo(frame, location, drawScale, drawScale, texInfo, basePolyFlags, color);
-	}
-	// Renders a mesh actor
-	void renderMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord = nullptr);
-#if RUNE
-	// Renders a skeletal mesh actor
-	void renderSkeletalMeshActor(FSceneNode* frame, AActor* actor, const FCoords* parentCoord = nullptr);
-	// Renders a particleSystem actor
-	void renderParticleSystemActor(FSceneNode* frame, AParticleSystem* actor, const FCoords& parentCoord);
-#endif
-	// Renders a mover brush
-	void renderMover(FSceneNode* frame, ABrush* mover);
-	// Updates and sends the given lights to dx
-	void renderLights(std::vector<AActor*> lightActors);
-	// Renders a magic shape for anchoring stuff to the sky box
-	void renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* location);
-
-	void ClearZ(FSceneNode* Frame);
-	void PushHit(const BYTE* Data, INT Count);
-	void PopHit(INT Count, UBOOL bForce);
-	void GetStats(TCHAR* Result);
-	void ReadPixels(FColor* Pixels);
-	void EndFlash();
-	void PrecacheTexture(FTextureInfo& Info, DWORD PolyFlags);
-#if UNREAL_TOURNAMENT_OLDUNREAL
-	UBOOL SupportsTextureFormat(ETextureFormat Format);
-#endif
 
 	void InitNoTextureSafe(void);
 
@@ -1200,14 +965,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 			cacheID |= 1;
 		}
 		return cacheID;
-	}
-
-	inline bool needsNewBuffer(DWORD polyFlags, int numVerts, FTextureInfo* info = nullptr) {
-		if (m_curPolyFlags != polyFlags) return true;
-		QWORD cacheId = info ? calcCacheID(*info, polyFlags) : TEX_CACHE_ID_NO_TEX;
-		if (TexInfo[0].CurrentCacheID != cacheId) return true;
-		if ((m_curVertexBufferPos + m_bufferedVerts + numVerts) >= (VERTEX_BUFFER_SIZE)) return true;
-		return m_bufferedVerts == 0;
 	}
 
 	inline void FASTCALL SetTexture(INT Multi, FTextureInfo& Info, DWORD PolyFlags, FLOAT PanBias) {
@@ -1283,10 +1040,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void FASTCALL ConvertBGRA8_BGRA8888_NoClamp(const FMipmapBase *Mip, INT Level);
 	void FASTCALL ConvertRGBA8_BGRA8888(const FMipmapBase *Mip, INT Level);
 	void FASTCALL ConvertRGBA8_BGRA8888_NoClamp(const FMipmapBase *Mip, INT Level);
-	
-	std::unordered_set<std::wstring> hashTexBlacklist;
-	void fillHashTexture(FTexConvertCtx convertContext, FTextureInfo& tex);
-	bool shouldGenHashTexture(const FTextureInfo& tex);
 
 	inline void FASTCALL SetBlend(DWORD PolyFlags, bool isUI = false) {
 #if UTGLR_USES_ALPHABLEND
@@ -1437,28 +1190,38 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	void RenderPassesNoCheckSetup(void);
 
-	INT FASTCALL BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet, bool append = false);
+	INT FASTCALL BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet, const FGLMapDot& csDot, bool append = false);
 	INT FASTCALL BufferTriangleSurfaceGeometry(const std::vector<FRenderVert>& vertices);
 
 	void FASTCALL BufferAdditionalClippedVerts(FTransTexture** Pts, INT NumPts);
 
-	bool bufferTileDraws;
-	struct TileFuncCall {
-		FSceneNode frame;
-		FTextureInfo texInfo;
-		FLOAT X, Y, XL, YL, U, V, UL, VL, Z;
-		FPlane Color;
-		FPlane Fog;
-		DWORD PolyFlags;
-		
-		TileFuncCall() {}
-		TileFuncCall(const TileFuncCall& other) = default;
+	// Takes a list of faces and draws them in batches
+	void drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surface, std::vector<FSurfaceFacet*>& facets);
 
-		void operator()(UD3D9RenderDevice* device) {
-			device->DrawTile(&frame, texInfo, X, Y, XL, YL, U, V, UL, VL, nullptr, Z, Color, Fog, PolyFlags);
-		}
-	};
-	std::vector<TileFuncCall> bufferedTileDraws;
+	// Render a sprite actor
+	void renderSprite(FSceneNode* frame, AActor* actor);
+	// Renders a sprite at the given location
+	void renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScaleU, FLOAT drawScaleV, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color);
+	inline void renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScale, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color) {
+		renderSpriteGeo(frame, location, drawScale, drawScale, texInfo, basePolyFlags, color);
+	}
+	// Renders a mesh actor
+	void renderMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord = nullptr);
+#if RUNE
+	// Renders a skeletal mesh actor
+	void renderSkeletalMeshActor(FSceneNode* frame, AActor* actor, const FCoords* parentCoord = nullptr);
+	// Renders a particleSystem actor
+	void renderParticleSystemActor(FSceneNode* frame, AParticleSystem* actor, const FCoords& parentCoord);
+#endif
+	// Renders a mover brush
+	void renderMover(FSceneNode* frame, ABrush* mover);
+	// Updates and sends the given lights to dx
+	void renderLights(std::vector<AActor*> lightActors);
+	// Renders a magic shape for anchoring stuff to the sky box
+	void renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* location);
+
+	void fillHashTexture(FTexConvertCtx convertContext, FTextureInfo& tex);
+	bool shouldGenHashTexture(const FTextureInfo& tex);
 
 	void executeBufferedTileDraws() {
 		bool wasBuffered = bufferTileDraws;
