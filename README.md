@@ -13,6 +13,7 @@ This is a custom render device for the Unreal Engine, optimized for use with NVI
 - Deus Ex (v1112fm)
 - Nerf Arena Blast (v300)
 - Rune (v107)
+- Harry Potter Philosopher's Stone
 
 ## Installation
 1. Download the appropriate zip file [from releases](https://github.com/mmdanggg2/D3D9DrvRTX/releases).
@@ -28,6 +29,8 @@ This is a custom render device for the Unreal Engine, optimized for use with NVI
 	...
 	Render=D3D9DrvRTX.D3D9Render
 	```
+### Harry Potter Philosopher's Stone installation
+For Harry Potter, the .ini file is located in `%USERPROFILE%\Documents\Harry Potter\HP.ini` and must be manually edited as described above as there is no render device selection menu.
 
 ## Usage
 After installation, start the game, and it should now be using the RTX Remix optimized render device.
