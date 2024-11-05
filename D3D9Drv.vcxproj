@@ -238,6 +238,18 @@
     <None Include="Config\dxvk.conf" />
     <None Include="Config\rtx.conf" />
     <None Include="README.md" />
+    <None Include="scripts\BuildAll.py" />
+    <None Include="scripts\ChangeLinks.bat" />
+    <None Include="scripts\DeusEx.bat" />
+    <None Include="scripts\HP1.bat" />
+    <None Include="scripts\HP2.bat" />
+    <None Include="scripts\LibGen.py" />
+    <None Include="scripts\Nerf.bat" />
+    <None Include="scripts\Rune.bat" />
+    <None Include="scripts\SetDebug.py" />
+    <None Include="scripts\Unreal_226.bat" />
+    <None Include="scripts\UT_436.bat" />
+    <None Include="scripts\UT_469d.bat" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Config\D3D9DrvRTX_hash_tex_blacklist.txt" />

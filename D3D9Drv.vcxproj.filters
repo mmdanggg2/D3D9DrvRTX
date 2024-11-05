@@ -55,6 +55,42 @@
     <None Include="Config\D3D9DrvRTX.ini">
       <Filter>Conf</Filter>
     </None>
+    <None Include="scripts\BuildAll.py">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="scripts\ChangeLinks.bat">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="scripts\DeusEx.bat">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="scripts\HP1.bat">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="scripts\HP2.bat">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="scripts\LibGen.py">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="scripts\Nerf.bat">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="scripts\Rune.bat">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="scripts\SetDebug.py">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="scripts\Unreal_226.bat">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="scripts\UT_436.bat">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="scripts\UT_469d.bat">
+      <Filter>Scripts</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Src">
@@ -65,6 +101,9 @@
     </Filter>
     <Filter Include="Conf">
       <UniqueIdentifier>{ce0f73d3-66ca-402d-99ce-eca7486cc528}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scripts">
+      <UniqueIdentifier>{6c4cdd26-e4fb-4cd5-9166-999c4d6eea02}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
