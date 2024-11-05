@@ -315,7 +315,7 @@ static inline DirectX::XMVECTOR FVecToDXVec(const FVector& vec) {
 	return DirectX::XMVectorSet(vec.X, vec.Y, vec.Z, 0.0f);
 }
 
-static inline FVector DXVecToFVec(DirectX::XMVECTOR& vec) {
+static inline FVector DXVecToFVec(const DirectX::XMVECTOR& vec) {
 	using namespace DirectX;
 	return FVector(XMVectorGetX(vec), XMVectorGetY(vec), XMVectorGetZ(vec));
 }
@@ -329,6 +329,17 @@ static DirectX::XMMATRIX FCoordToDXMat(const FCoords& coord) {
 		coord.Origin.X, coord.Origin.Y, coord.Origin.Z, 1.0f
 	};
 	return mat;
+}
+
+static FCoords DXMatToFCoord(const DirectX::XMMATRIX& mat) {
+	using namespace DirectX;
+	FCoords coords(
+		DXVecToFVec(mat.r[3]),
+		DXVecToFVec(mat.r[0]),
+		DXVecToFVec(mat.r[1]),
+		DXVecToFVec(mat.r[2])
+	);
+	return coords;
 }
 
 static DirectX::XMMATRIX FRotToDXRotMat(const FRotator& rot) {
@@ -3512,10 +3523,10 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	if (mesh->IsA(ULodMesh::StaticClass())) {
 		isLod = true;
 		ULodMesh* meshLod = (ULodMesh*)mesh;
-		FVector* allSamples = New<FVector>(GMem, meshLod->ModelVerts + meshLod->SpecialVerts);
+		numVerts = meshLod->ModelVerts;
+		FVector* allSamples = New<FVector>(GMem, numVerts + meshLod->SpecialVerts);
 		// First samples are special coordinates
 		samples = &allSamples[meshLod->SpecialVerts];
-		numVerts = meshLod->ModelVerts;
 		meshLod->GetFrame(allSamples, sizeof(samples[0]), GMath.UnitCoords, actor, numVerts);
 		numTris = meshLod->Faces.Num();
 #if HARRY_POTTER_1

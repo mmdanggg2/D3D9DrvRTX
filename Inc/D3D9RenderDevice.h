@@ -1241,6 +1241,13 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void setProjection(float aspect, float fovAngle);
 	void setCompatMatrix(FSceneNode* frame);
 	void setIdentityMatrix();
+
+	__forceinline void renderCoord(FSceneNode* frame, const FCoords& coord, float scale = 10.0f) {
+		setCompatMatrix(frame);
+		Draw3DLine(frame, FPlane(1, 0, 0, 1), 0, coord.Origin, coord.Origin + coord.XAxis * scale);
+		Draw3DLine(frame, FPlane(0, 1, 0, 1), 0, coord.Origin, coord.Origin + coord.YAxis * scale);
+		Draw3DLine(frame, FPlane(0, 0, 1, 1), 0, coord.Origin, coord.Origin + coord.ZAxis * scale);
+	}
 };
 
 #if __STATIC_LINK

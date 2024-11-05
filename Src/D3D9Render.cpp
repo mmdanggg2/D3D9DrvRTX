@@ -353,6 +353,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, ParentCoord* parentCoord)
 {
+	guard(UD3D9Render::drawActorSwitch);
 	SpecialCoord specialCoord{};
 #if RUNE
 	if (actor->IsA(ATrigger::StaticClass())) {
@@ -397,6 +398,7 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 	if (actor->IsA(APawn::StaticClass())) {
 		drawPawnExtras(frame, d3d9Dev, (APawn*)actor, specialCoord);
 	}
+	unguardf((actor->GetFullName()));
 }
 
 #if !UTGLR_NO_DECALS

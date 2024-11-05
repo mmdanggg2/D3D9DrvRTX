@@ -40,5 +40,9 @@ std::basic_string<TCHAR> HexString(DWORD data, DWORD numBits) {
 }
 
 const TCHAR* dereferenceFName(const FName& name) {
-	return name.operator*();
+	__try {
+		return name.operator*();
+	} __except (true) {  // Eat EVERY exception, what could go wrong?
+		return nullptr;
+	}
 }
