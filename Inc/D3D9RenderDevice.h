@@ -367,7 +367,7 @@ public:
 
 struct SpecialCoord {
 	FCoords coord;
-	D3DMATRIX baseMatrix;
+	FCoords baseCoord;
 	bool exists = false;
 	bool enabled = false;
 };

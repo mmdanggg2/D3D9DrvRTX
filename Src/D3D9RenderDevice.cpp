@@ -3485,9 +3485,8 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		actorMatrix *= matScale;
 	}
 	if (specialCoord && specialCoord->enabled) {
-		FCoords special = specialCoord->coord;
 		actorMatrix *= FCoordToDXMat(specialCoord->coord);
-		actorMatrix *= ToXMMATRIX(specialCoord->baseMatrix);
+		actorMatrix *= FCoordToDXMat(specialCoord->baseCoord);
 	} else {
 		XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
 		XMMATRIX matRot = FRotToDXRotMat(actor->Rotation);
@@ -3524,7 +3523,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 			USkeletalMesh* skelMesh = static_cast<USkeletalMesh*>(mesh);
 			if (skelMesh->WeaponBoneIndex > -1) {
 				specialCoord->coord = skelMesh->ClassicWeaponCoords.Inverse();
-				specialCoord->baseMatrix = ToD3DMATRIX(actorMatrix);
+				specialCoord->baseCoord = DXMatToFCoord(actorMatrix);
 				specialCoord->exists = true;
 			}
 		}
@@ -3541,7 +3540,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 			coord.YAxis = ((v0 - v2) ^ coord.XAxis).SafeNormal();
 			coord.ZAxis = coord.XAxis ^ coord.YAxis;
 			specialCoord->coord = coord;
-			specialCoord->baseMatrix = ToD3DMATRIX(actorMatrix);
+			specialCoord->baseCoord = DXMatToFCoord(actorMatrix);
 			specialCoord->exists = true;
 		}
 	} else {
