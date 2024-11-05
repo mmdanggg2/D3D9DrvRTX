@@ -190,7 +190,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		AActor* actor = frame->Level->Actors(iActor);
 		if (!actor) continue;
 		if (actor->LightType != LT_None) {
-#if HARRY_POTTER_1
+#if UTGLR_HP_ENGINE
 			if (!actor->bDarkLight)
 #endif
 			lightActors.push_back(actor);
@@ -381,7 +381,7 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 	}
 	else
 #endif
-#if HARRY_POTTER_1
+#if UTGLR_HP_ENGINE
 	if (actor->DrawType == DT_Particles) {
 		d3d9Dev->setCompatMatrix(frame);
 		FDynamicSprite sprite(actor);
@@ -532,6 +532,14 @@ void UD3D9Render::ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSu
 
 void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord) {
 #if !RUNE
+#if HARRY_POTTER_2
+	if (specialCoord.exists) {
+		FCoords wsCoords = specialCoord.coord * specialCoord.baseCoord.Inverse();
+		wsCoords.YAxis = -wsCoords.YAxis;
+		pawn->WeaponLoc = wsCoords.Origin;
+		pawn->WeaponRot = wsCoords.OrthoRotation();
+	}
+#endif
 	AInventory* weapon = pawn->Weapon;
 	if (specialCoord.exists && weapon && weapon->ThirdPersonMesh) {
 		specialCoord.enabled = true;

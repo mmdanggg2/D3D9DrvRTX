@@ -922,7 +922,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void PreDrawGouraud(FSceneNode* Frame, FLOAT FogDistance, FPlane FogColor) override;
 	void PostDrawGouraud(FLOAT FogDistance) override;
 #endif
-#if HARRY_POTTER_1
+#if UTGLR_HP_ENGINE
 	INT MaxVertices() override { return 0xFFFF; }
 	void DrawTriangles(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, USHORT* Indices, INT NumIdx, DWORD PolyFlags, FSpanBuffer* Span) override;
 #endif

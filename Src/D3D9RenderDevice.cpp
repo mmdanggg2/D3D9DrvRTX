@@ -2388,7 +2388,7 @@ void UD3D9RenderDevice::PostDrawGouraud(FLOAT FogDistance) {
 }
 #endif
 
-#if HARRY_POTTER_1
+#if UTGLR_HP_ENGINE
 void UD3D9RenderDevice::DrawTriangles(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, USHORT* Indices, INT NumIdx, DWORD PolyFlags, FSpanBuffer* Span) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 	{
@@ -3487,8 +3487,19 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	XMMATRIX actorMatrix = XMMatrixIdentity();
 
 	bool renderAsParticles = false;
-#if !HARRY_POTTER_1
+	FVector adjustLoc(0, 0, 0);
+#if !UTGLR_HP_ENGINE
 	renderAsParticles = actor->bParticles;
+#elif HARRY_POTTER_2
+	if (mesh->IsA(USkeletalMesh::StaticClass())) {
+		USkeletalMesh* skMesh = static_cast<USkeletalMesh*>(mesh);
+		// Fuck your private method
+		FARPROC fnPtr = GetProcAddress(GetModuleHandle(L"Engine.dll"), "?MeshAdjust@USkeletalMesh@@ABE?AVFVector@@PBVAActor@@@Z");
+		typedef FVector(USkeletalMesh::* fnTyp)(const AActor*)const;
+		fnTyp* fn = reinterpret_cast<fnTyp*>(&fnPtr);
+		adjustLoc = (skMesh->**fn)(actor);
+		adjustLoc.Z += actor->SavedPrePivotZ;
+	}
 #endif
 
 	if (!renderAsParticles) {
@@ -3499,7 +3510,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		actorMatrix *= FCoordToDXMat(specialCoord->coord);
 		actorMatrix *= FCoordToDXMat(specialCoord->baseCoord);
 	} else {
-		XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot));
+		XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot + adjustLoc));
 		XMMATRIX matRot = FRotToDXRotMat(actor->Rotation);
 		actorMatrix *= matRot;
 		actorMatrix *= matLoc;
@@ -3514,6 +3525,14 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	actor->PrePivot = FVector(0, 0, 0);
 	actor->Rotation = FRotator(0, 0, 0);
 	actor->DrawScale = 1.0f;
+#if UTGLR_HP_ENGINE
+	bool origAlignBot = actor->bAlignBottom;
+	actor->bAlignBottom = false;
+#if HARRY_POTTER_2
+	FLOAT origSavedPrePivotZ = actor->SavedPrePivotZ;
+	actor->SavedPrePivotZ = 0.0f;
+#endif
+#endif
 
 	int numVerts;
 	int numTris;
@@ -3529,7 +3548,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		samples = &allSamples[meshLod->SpecialVerts];
 		meshLod->GetFrame(allSamples, sizeof(samples[0]), GMath.UnitCoords, actor, numVerts);
 		numTris = meshLod->Faces.Num();
-#if HARRY_POTTER_1
+#if UTGLR_HP_ENGINE
 		if (specialCoord && !specialCoord->enabled && mesh->IsA(USkeletalMesh::StaticClass())) {
 			USkeletalMesh* skelMesh = static_cast<USkeletalMesh*>(mesh);
 			if (skelMesh->WeaponBoneIndex > -1) {
@@ -3566,6 +3585,12 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	actor->PrePivot = origPrePiv;
 	actor->Rotation = origRot;
 	actor->DrawScale = origScale;
+#if UTGLR_HP_ENGINE
+	actor->bAlignBottom = origAlignBot;
+#if HARRY_POTTER_2
+	actor->SavedPrePivotZ = origSavedPrePivotZ;
+#endif
+#endif
 
 	FTime currentTime = frame->Viewport->CurrentTime;
 	DWORD baseFlags = getBasePolyFlags(actor);
@@ -3666,6 +3691,12 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		}
 	}
 	for (int i = 0; i < numVerts; i++) {
+#if HARRY_POTTER_2
+		// Try and compensate for harry's cape having inner and outer faces sharing a vert
+		if (normals[i].Size() < 0.01) {
+			normals[i] = samples[i];
+		}
+#endif
 		XMVECTOR normal = FVecToDXVec(normals[i]);
 		normal = XMVector3Normalize(normal);
 		normals[i] = DXVecToFVec(normal);

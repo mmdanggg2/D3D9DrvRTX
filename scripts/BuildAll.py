@@ -77,7 +77,8 @@ games_codes = [
 	"DeusEx",
 	"Nerf",
 	"Rune",
-    "HP1",
+	"HP1",
+	"HP2",
 ]
 
 for game_code in games_codes:
