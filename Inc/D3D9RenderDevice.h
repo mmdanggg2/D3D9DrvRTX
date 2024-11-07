@@ -368,6 +368,7 @@ public:
 struct SpecialCoord {
 	FCoords coord;
 	FCoords baseCoord;
+	FCoords worldCoord;
 	bool exists = false;
 	bool enabled = false;
 };

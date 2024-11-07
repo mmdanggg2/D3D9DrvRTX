@@ -3488,9 +3488,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 	bool renderAsParticles = false;
 	FVector adjustLoc(0, 0, 0);
-#if !UTGLR_HP_ENGINE
-	renderAsParticles = actor->bParticles;
-#elif HARRY_POTTER_2
+#if UTGLR_HP_ENGINE
 	if (mesh->IsA(USkeletalMesh::StaticClass())) {
 		USkeletalMesh* skMesh = static_cast<USkeletalMesh*>(mesh);
 		// Fuck your private method
@@ -3498,8 +3496,12 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		typedef FVector(USkeletalMesh::* fnTyp)(const AActor*)const;
 		fnTyp* fn = reinterpret_cast<fnTyp*>(&fnPtr);
 		adjustLoc = (skMesh->**fn)(actor);
+#if HARRY_POTTER_2
 		adjustLoc.Z += actor->SavedPrePivotZ;
+#endif
 	}
+#else
+	renderAsParticles = actor->bParticles;
 #endif
 
 	if (!renderAsParticles) {
@@ -3530,7 +3532,9 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	actor->bAlignBottom = false;
 #if HARRY_POTTER_2
 	FLOAT origSavedPrePivotZ = actor->SavedPrePivotZ;
+	bool origAlignBotAlways = actor->bAlignBottomAlways;
 	actor->SavedPrePivotZ = 0.0f;
+	actor->bAlignBottomAlways = false;
 #endif
 #endif
 
@@ -3554,6 +3558,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 			if (skelMesh->WeaponBoneIndex > -1) {
 				specialCoord->coord = skelMesh->ClassicWeaponCoords.Inverse();
 				specialCoord->baseCoord = DXMatToFCoord(actorMatrix);
+				specialCoord->worldCoord = DXMatToFCoord(FCoordToDXMat(specialCoord->coord) * actorMatrix);
 				specialCoord->exists = true;
 			}
 		}
@@ -3571,6 +3576,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 			coord.ZAxis = coord.XAxis ^ coord.YAxis;
 			specialCoord->coord = coord;
 			specialCoord->baseCoord = DXMatToFCoord(actorMatrix);
+			specialCoord->worldCoord = DXMatToFCoord(FCoordToDXMat(specialCoord->coord) * actorMatrix);
 			specialCoord->exists = true;
 		}
 	} else {
@@ -3589,6 +3595,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	actor->bAlignBottom = origAlignBot;
 #if HARRY_POTTER_2
 	actor->SavedPrePivotZ = origSavedPrePivotZ;
+	actor->bAlignBottomAlways = origAlignBotAlways;
 #endif
 #endif
 

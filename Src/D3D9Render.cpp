@@ -534,7 +534,7 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 #if !RUNE
 #if HARRY_POTTER_2
 	if (specialCoord.exists) {
-		FCoords wsCoords = specialCoord.coord * specialCoord.baseCoord.Inverse();
+		FCoords wsCoords = specialCoord.worldCoord;
 		wsCoords.YAxis = -wsCoords.YAxis;
 		pawn->WeaponLoc = wsCoords.Origin;
 		pawn->WeaponRot = wsCoords.OrthoRotation();
