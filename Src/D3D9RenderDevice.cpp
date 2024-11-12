@@ -264,41 +264,6 @@ private:
 	std::unordered_set<T> unique_values;
 };
 
-static D3DCOLORVALUE hsvToRgb(unsigned char h, unsigned char s, unsigned char v) {
-	float H = h / 255.0f;
-	float S = s / 255.0f;
-	float V = v / 255.0f;
-
-	float C = V * S;
-	float X = C * (1 - std::abs(fmod(H * 6, 2) - 1));
-	float m = V - C;
-
-	D3DCOLORVALUE rgbColor;
-
-	if (0 <= H && H < 1 / 6.0) {
-		rgbColor.r = C; rgbColor.g = X; rgbColor.b = 0;
-	} else if (1 / 6.0 <= H && H < 2 / 6.0) {
-		rgbColor.r = X; rgbColor.g = C; rgbColor.b = 0;
-	} else if (2 / 6.0 <= H && H < 3 / 6.0) {
-		rgbColor.r = 0; rgbColor.g = C; rgbColor.b = X;
-	} else if (3 / 6.0 <= H && H < 4 / 6.0) {
-		rgbColor.r = 0; rgbColor.g = X; rgbColor.b = C;
-	} else if (4 / 6.0 <= H && H < 5 / 6.0) {
-		rgbColor.r = X; rgbColor.g = 0; rgbColor.b = C;
-	} else {
-		rgbColor.r = C; rgbColor.g = 0; rgbColor.b = X;
-	}
-
-	rgbColor.r += m;
-	rgbColor.g += m;
-	rgbColor.b += m;
-
-	// Set alpha value to maximum
-	rgbColor.a = 1.0f;
-
-	return rgbColor;
-}
-
 static inline DirectX::XMMATRIX ToXMMATRIX(const D3DMATRIX& d3dMatrix) {
 	D3DMATRIX temp = d3dMatrix;
 	return reinterpret_cast<DirectX::XMMATRIX&>(temp);
@@ -441,6 +406,9 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(2,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
 	SC_AddBoolConfigParam(1, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 1);
 	SC_AddBoolConfigParam(0, TEXT("EnableHashTextures"), CPP_PROPERTY_LOCAL(EnableHashTextures), 1);
+	SC_AddFloatConfigParam(TEXT("LightMultiplier"), CPP_PROPERTY_LOCAL(LightMultiplier), 4000.0f);
+	SC_AddFloatConfigParam(TEXT("LightRadiusDivisor"), CPP_PROPERTY_LOCAL(LightRadiusDivisor), 70.0f);
+	SC_AddFloatConfigParam(TEXT("LightRadiusExponent"), CPP_PROPERTY_LOCAL(LightRadiusExponent), 0.55f);
 
 	SurfaceSelectionColor = FColor(0, 0, 31, 31);
 	//new(GetClass(), TEXT("SurfaceSelectionColor"), RF_Public)UStructProperty(CPP_PROPERTY(SurfaceSelectionColor), TEXT("Options"), CPF_Config, FindObjectChecked<UStruct>(NULL, TEXT("Core.Object.Color"), 1));
@@ -4315,7 +4283,7 @@ std::unordered_set<int> UD3D9RenderDevice::LightSlots::updateActors(const std::v
 	return unsetSlots;
 }
 
-void UD3D9RenderDevice::renderLights(std::vector<AActor*> lightActors) {
+void UD3D9RenderDevice::renderLights(FSceneNode* frame, std::vector<AActor*> lightActors) {
 	guard(UD3D9RenderDevice::renderLights);
 
 	EndBuffering();
@@ -4334,15 +4302,23 @@ void UD3D9RenderDevice::renderLights(std::vector<AActor*> lightActors) {
 		assert(res == D3D_OK);
 	}
 
-	for (auto pair : lightSlots->slotMap()) {
-		AActor* actor = pair.first;
-		int slot = pair.second;
+	for (auto& pair : lightSlots->slotMap()) {
+		AActor* const& actor = pair.first;
+		const int& slot = pair.second;
+		FLOAT brightness = actor->LightBrightness / 255.0f;
+		FPlane colour;
+		GRender->GlobalLighting(true, actor, brightness, colour);
 		D3DLIGHT9 lightInfo = D3DLIGHT9();
 		lightInfo.Type = D3DLIGHT_POINT;
 		lightInfo.Position = D3DVECTOR{ actor->Location.X, actor->Location.Y, actor->Location.Z };
-		lightInfo.Diffuse = hsvToRgb(actor->LightHue, 0xFFu - actor->LightSaturation, actor->LightBrightness);
+		lightInfo.Diffuse.r = colour.X;
+		lightInfo.Diffuse.g = colour.Y;
+		lightInfo.Diffuse.b = colour.Z;
+		lightInfo.Diffuse.a = 1.0f;
 		lightInfo.Specular = lightInfo.Diffuse;
-		lightInfo.Range = 1000;
+		float brightnessSetting = frame->Viewport->GetOuterUClient()->Brightness * 2.0f;  // 0.5 is "normal"
+		// Some math bollocks that looks ok
+		lightInfo.Range = brightness * pow((actor->LightRadius / LightRadiusDivisor), LightRadiusExponent) * LightMultiplier * brightnessSetting;
 		HRESULT res = m_d3dDevice->SetLight(slot, &lightInfo);
 		assert(res == D3D_OK);
 		res = m_d3dDevice->LightEnable(slot, true);

@@ -3,3 +3,4 @@
 *.rc	eol=crlf working-tree-encoding=UTF-16LE-BOM
 *.props	eol=crlf
 *.bat	eol=crlf
+Config/D3D9DrvRTX.int	eol=crlf

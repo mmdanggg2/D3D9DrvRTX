@@ -4,6 +4,9 @@ Preferences=(Caption="Rendering",Parent="Advanced Options")
 Preferences=(Caption="Direct3D 9 RTX Optimised",Parent="Rendering",Class=D3D9DrvRTX.D3D9RenderDevice,Immediate=True)
 Property=(Config,Class=D3D9DrvRTX.D3D9RenderDevice,Name=EnableSkyBoxAnchors,Title="Enable Skybox Anchors",Description="Enables the special mesh generated for anchoring the skybox in remix.")
 Property=(Config,Class=D3D9DrvRTX.D3D9RenderDevice,Name=EnableHashTextures,Title="Enable Hash Textures",Description="Enables specially generated textures with a stable hash in place of procedurally generated ones.")
+Property=(Config,Class=D3D9DrvRTX.D3D9RenderDevice,Name=LightMultiplier,Title="Light Multiplier",Description="Global light brightness multiplier.")
+Property=(Config,Class=D3D9DrvRTX.D3D9RenderDevice,Name=LightRadiusDivisor,Title="Light Radius Divisor",Description="The LightRadius is divided by this value before being exponentiated.")
+Property=(Config,Class=D3D9DrvRTX.D3D9RenderDevice,Name=LightRadiusExponent,Title="Light Radius Exponent",Description="LightRadius is raised to the power of this value before being multiplied with the brightness.")
 
 [D3D9RenderDevice]
 ClassCaption="Direct3D 9 RTX Optimised"

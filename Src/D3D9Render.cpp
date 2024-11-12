@@ -329,7 +329,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		d3d9Dev->renderSkyZoneAnchor(zone, &frame->Coords.Origin);
 	}
 
-	d3d9Dev->renderLights(lightActors);
+	d3d9Dev->renderLights(frame, lightActors);
 
 	d3d9Dev->endWorldDraw(frame);
 
