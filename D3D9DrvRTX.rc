@@ -50,10 +50,20 @@ END
 //
 // Version
 //
+#define VERSION_MAJOR 1
+#define VERSION_MINOR 5
+#define VERSION_PATCH 0
+#define VER_STRING_CONCAT(V1, V2, V3) #V1 "." #V2 "." #V3
+#define VER_STRING_STRINGIFY(V1, V2, V3) VER_STRING_CONCAT(V1, V2, V3)
+#ifdef VERSION_EXTRA
+#define VERSION_STRING VER_STRING_STRINGIFY(VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH) "-" VERSION_EXTRA
+#else
+#define VERSION_STRING VER_STRING_STRINGIFY(VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH)
+#endif
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,5,0,1
- PRODUCTVERSION 1,5,0,1
+ FILEVERSION VERSION_MAJOR,VERSION_MINOR,VERSION_PATCH,1
+ PRODUCTVERSION VERSION_MAJOR,VERSION_MINOR,VERSION_PATCH,1
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -70,12 +80,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "James Horsley (mmdanggg2)"
             VALUE "FileDescription", "RTX Remix optimised renderer for Unreal Engine 1\n(" GAME_NAME ")"
-            VALUE "FileVersion", "1.5.0.1"
+            VALUE "FileVersion", VERSION_STRING
             VALUE "InternalName", "D3D9DrvRTX.dll"
             VALUE "LegalCopyright", "Copyright (C) 2024"
             VALUE "OriginalFilename", "D3D9DrvRTX.dll"
             VALUE "ProductName", "D3D9DrvRTX"
-            VALUE "ProductVersion", "1.5.0.1"
+            VALUE "ProductVersion", VERSION_STRING
         END
     END
     BLOCK "VarFileInfo"

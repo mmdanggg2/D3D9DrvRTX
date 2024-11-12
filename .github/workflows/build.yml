@@ -1,0 +1,90 @@
+name: Build D3D9DrvRTX
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  # Path to the solution file relative to the root of the project.
+  SOLUTION_FILE_PATH: .
+
+  # Configuration type to build.
+  # You can convert this to a build matrix if you need coverage of multiple configuration types.
+  # https://docs.github.com/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+  BUILD_CONFIGURATION: Release
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: 0
+
+    - name: Setup variables
+      uses: actions/github-script@v7
+      with:
+        script: core.exportVariable('GITHUB_SHA_SHORT', context.sha.substring(0, 7))
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install termcolor
+      shell: powershell
+
+    # Cache both the installer and the installed SDK
+    - name: Cache DirectX SDK Files
+      id: cache-dx9-full
+      uses: actions/cache@v4
+      with:
+        path: |
+          C:/DXSDK_Jun10.exe
+          C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)
+        key: directx-sdk-june-2010-full-v1
+
+    # Download only if not cached
+    - name: Download DirectX SDK
+      if: steps.cache-dx9-full.outputs.cache-hit != 'true'
+      run: |
+        curl -Uri "https://download.microsoft.com/download/A/E/7/AE743F1F-632B-4809-87A9-AA1BB3458E31/DXSDK_Jun10.exe" -OutFile C:/DXSDK_Jun10.exe
+      shell: powershell
+
+    # Install only if not cached
+    - name: Install DirectX SDK
+      if: steps.cache-dx9-full.outputs.cache-hit != 'true'
+      run: |
+        Start-Process -FilePath "C:/DXSDK_Jun10.exe" -ArgumentList "/U /Q" -Wait
+      shell: powershell
+    
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup DirectX SDK Environment Variables
+      run: |
+        echo "DXSDK_DIR=C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\" >> $env:GITHUB_ENV
+      shell: powershell
+
+    - name: Build Solution
+      run: |
+        python scripts/BuildAll.py --version-extra ${{env.GITHUB_SHA_SHORT}}
+
+    # Upload build artifacts
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: D3D9DrvRTX-${{env.GITHUB_SHA_SHORT}}
+        path: Releases/${{env.GITHUB_SHA_SHORT}}/*
+        retention-days: 30
+        compression-level: 1
