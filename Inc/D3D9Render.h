@@ -6,6 +6,7 @@
 #include <Render.h>
 
 #include <vector>
+#include <array>
 #include <unordered_map>
 
 class UD3D9Render : public URender {
@@ -38,7 +39,12 @@ private:
 		void calculateSurfaceFacet(ULevel* level, const DWORD flags);
 	};
 	struct ModelFacets {
-		SurfKeyBucketVector<UTexture*, SurfaceData> facetPairs[RPASS_MAX];
+		std::array<std::array<SurfKeyBucketVector<UTexture*, SurfaceData>, RPASS_MAX>, FBspNode::MAX_ZONES> facetPairs;
+	};
+	struct FrameActors {
+		std::vector<AActor*> actors;
+		std::vector<ABrush*> movers;
+		std::vector<AActor*> lights;
 	};
 	struct ParentCoord {
 		FCoords worldCoord;
@@ -49,6 +55,7 @@ private:
 	void drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, ParentCoord* parentCoord = nullptr);
 	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord);
 	void getSurfaceDecals(FSceneNode* frame, const SurfaceData& surfaceData, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures);
+	void drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, ModelFacets& modelFacets, FrameActors& objs, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures, bool isSky = false);
 #if RUNE
 	void drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, const ParentCoord* parentCoord);
 	// These seem to be non exported global variables that are swapped about in the original URender::DrawWorld
@@ -68,7 +75,7 @@ static_assert(sizeof(URender) == UGold_size);
 #elif RUNE
 constexpr int Rune_size = 256;
 static_assert(sizeof(URender) == Rune_size);
-#elif HARRY_POTTER_1
+#elif UTGLR_HP_ENGINE
 constexpr int HP1_size = 280;
 static_assert(sizeof(URender) == HP1_size);
 #endif

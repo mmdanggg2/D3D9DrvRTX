@@ -1,5 +1,7 @@
 #include "D3D9Render.h"
 
+#include <bit>
+#include <bitset>
 #include <unordered_set>
 
 IMPLEMENT_CLASS(UD3D9Render);
@@ -21,22 +23,39 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 	UModel* model = frame->Level->Model;
 	const UViewport* viewport = frame->Viewport;
 
+	struct ZoneNodes {
+		BYTE zone;
+		std::vector<INT> nodes;
+	};
+
 	// Create an array of all surfaces to hold their facets and any nodes of each surface
-	std::vector<std::vector<INT>> surfaceNodes(model->Surfs.Num());
+	std::vector<std::vector<ZoneNodes>> surfaceNodes(model->Surfs.Num());
 
 	for (INT iNode = 0; iNode < model->Nodes.Num(); iNode++) {
 		const FBspNode& node = model->Nodes(iNode);
 		if (node.NumVertices < 3) continue;
 		const INT& iSurf = node.iSurf;
-		std::vector<INT>& surfNodes= surfaceNodes[iSurf];
+		const BYTE& zone = node.iZone[1];
+		std::vector<ZoneNodes>& surfZoneNodes = surfaceNodes[iSurf];
+		ZoneNodes* zoneNodes = nullptr;
+		for (ZoneNodes& zn : surfZoneNodes) {
+			if (zn.zone == zone) {
+				zoneNodes = &zn;
+				break;
+			}
+		}
+		if (!zoneNodes) {
+			zoneNodes = &surfZoneNodes.emplace_back();
+			zoneNodes->zone = zone;
 #if !UTGLR_OLD_POLY_CLASSES
-		surfNodes.reserve(model->Surfs(iSurf).Nodes.Num());
+			zoneNodes->nodes.reserve(model->Surfs(iSurf).Nodes.Num());
 #endif
-		surfNodes.push_back(iNode);
+		}
+		zoneNodes->nodes.push_back(iNode);
 	}
 
 	DWORD flagMask = (viewport->Actor->ShowFlags & SHOW_PlayerCtrl) ? ~PF_FlatShaded : ~PF_Invisible;
-	flagMask &= ~PF_Highlighted;
+	flagMask &= ~(PF_Highlighted | PF_LowShadowDetail | PF_HighShadowDetail);
 	// Prepass to sort all surfs into texture/flag groups
 	for (INT iSurf = 0; iSurf < model->Surfs.Num(); iSurf++) {
 		const FBspSurf* surf = &model->Surfs(iSurf);
@@ -53,16 +72,18 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		flags |= viewport->ExtraPolyFlags;
 		flags &= flagMask;
 
-		if (flags & PF_Invisible) {
+		if (flags & (PF_Invisible | PF_FakeBackdrop)) {
 			continue;
 		}
 
 		// Sort into opaque and non passes
 		RPASS pass = (flags & PF_NoOcclude) ? RPASS::NONSOLID : RPASS::SOLID;
-		SurfaceData& surfData = modelFacets.facetPairs[pass].get(texture, flags).emplace_back();
-		surfData.surf = surf;
-		surfData.nodes = std::move(surfaceNodes[iSurf]);
-		surfData.calculateSurfaceFacet(frame->Level, flags);
+		for (ZoneNodes& zoneNodes: surfaceNodes[iSurf]) {
+			SurfaceData& surfData = modelFacets.facetPairs[zoneNodes.zone][pass].get(texture, flags).emplace_back();
+			surfData.surf = surf;
+			surfData.nodes = std::move(zoneNodes.nodes);
+			surfData.calculateSurfaceFacet(frame->Level, flags);
+		}
 	}
 }
 
@@ -178,11 +199,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 	//dout << "Starting frame" << std::endl;
 
-	std::vector<AActor*> lightActors;
-	lightActors.reserve(frame->Level->Actors.Num());
-	std::vector<AActor*> viableActors;
-	viableActors.reserve(frame->Level->Actors.Num());
-	std::vector<ABrush*> visibleMovers;
+	FrameActors objs;
+	objs.lights.reserve(frame->Level->Actors.Num());
+	objs.actors.reserve(frame->Level->Actors.Num());
 	std::vector<ASkyZoneInfo*> skyZones;
 
 	// Sort through all actors and put them in the appropriate pile
@@ -193,7 +212,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 #if UTGLR_HP_ENGINE
 			if (!actor->bDarkLight)
 #endif
-			lightActors.push_back(actor);
+			objs.lights.push_back(actor);
 		}
 		if (actor->IsA(ASkyZoneInfo::StaticClass())) {
 			skyZones.push_back((ASkyZoneInfo*)actor);
@@ -207,14 +226,14 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		isVisible &= !isOwned || !actor->bOwnerNoSee || (isOwned && frame->Viewport->Actor->bBehindView);
 		if (isVisible) {
 			if (actor->IsA(AMover::StaticClass())) {
-				visibleMovers.push_back((ABrush*)actor);
+				objs.movers.push_back((ABrush*)actor);
 				continue;
 			}
 #if RUNE
 			else if (actor->IsA(APolyobj::StaticClass()) && actor->DrawType == DT_Brush) {
 				APolyobj* polyObj = static_cast<APolyobj*>(actor);
 				if (polyObj->bCanRender) {
-					visibleMovers.push_back(polyObj);
+					objs.movers.push_back(polyObj);
 				}
 				continue;
 			} else if (actor->IsA(ATrigger::StaticClass())) {
@@ -225,7 +244,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				continue;
 			}
 #endif
-			viableActors.push_back(actor);
+			objs.actors.push_back(actor);
 		}
 	}
 #if RUNE
@@ -236,68 +255,139 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	// Seems to also update mover bsp nodes for colision decal calculations
 	OccludeFrame(frame);
 
-	// Add all actors in view and also any in zones that are visible
-	std::unordered_set<AActor*> visibleActors;
-	std::unordered_set<INT> visibleZones;
-	for (int pass : {0, 1, 2}) {
-		for (FBspDrawList* drawList = frame->Draw[pass]; drawList; drawList = drawList->Next) {
-			visibleZones.insert(drawList->iZone);
-		}
-	}
-	for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
-		visibleZones.insert(sprite->Actor->Region.ZoneNumber);
-		visibleActors.insert(sprite->Actor);
-	}
-	for (AActor* actor : viableActors) {
-		if (visibleZones.count(actor->Region.ZoneNumber)) {
-			visibleActors.insert(actor);
-		}
-	}
-
 	ModelFacets modelFacets;
 	getLevelModelFacets(frame, modelFacets);
 
+	std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
+
+	for (FSceneNode* child = frame->Child; child; child = child->Sibling) {
+		if (frame->Level->GetZoneActor(child->ZoneNumber)->IsA(ASkyZoneInfo::StaticClass())) {
+			d3d9Dev->startWorldDraw(child);
+			drawFrame(child, d3d9Dev, modelFacets, objs, lockedTextures, true);
+			d3d9Dev->endWorldDraw(child);
+			break;
+		}
+	}
+	d3d9Dev->ClearZ(frame);
+	
 	d3d9Dev->startWorldDraw(frame);
 
-	std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
+	drawFrame(frame, d3d9Dev, modelFacets, objs, lockedTextures);
+
+	for (ASkyZoneInfo* zone : skyZones) {
+		d3d9Dev->renderSkyZoneAnchor(zone, &frame->Coords.Origin);
+	}
+
+	d3d9Dev->renderLights(frame, objs.lights);
+
+	d3d9Dev->endWorldDraw(frame);
+
+	for (std::pair<UTexture* const, FTextureInfo>& entry : lockedTextures) {
+		entry.first->Unlock(entry.second);
+	}
+
+	// Render view model actor and extra HUD stuff
+	if (!GIsEditor && playerActor && (viewport->Actor->ShowFlags & SHOW_Actors)) {
+		GUglyHackFlags |= 1;
+		playerActor->eventRenderOverlays(viewport->Canvas);
+		GUglyHackFlags &= ~1;
+	}
+
+	memMark.Pop();
+	dynMark.Pop();
+	sceneMark.Pop();
+	vectorMark.Pop();
+	unguard;
+}
+
+void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, ModelFacets& modelFacets, FrameActors& objs, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures, bool isSky) {
+	// Add all actors in view and also any in zones that are visible
+	std::unordered_set<AActor*> visibleActors;
+	std::unordered_set<ABrush*> visibleMovers;
+	std::bitset<64> visibleZoneBits;
+	for (int pass : {0, 1, 2}) {
+		for (FBspDrawList* drawList = frame->Draw[pass]; drawList; drawList = drawList->Next) {
+			if (frame->Level->BrushTracker && frame->Level->BrushTracker->SurfIsDynamic(drawList->iSurf)) {
+				visibleMovers.insert(frame->Level->Model->Surfs(drawList->iSurf).Actor);
+			}
+			visibleZoneBits[drawList->iZone] = true;
+		}
+	}
+	for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
+		if (!isSky) {
+			visibleZoneBits[sprite->Actor->Region.ZoneNumber] = true;
+		}
+		visibleActors.insert(sprite->Actor);
+	}
+	for (AActor* actor : objs.actors) {
+		if (visibleZoneBits[actor->Region.ZoneNumber]) {
+			visibleActors.insert(actor);
+		}
+	}
+	// Add all connected zones to render adjacent level geo
+	QWORD visibleZoneMask = visibleZoneBits.to_ullong();
+	while (visibleZoneMask) {
+		DWORD zone = std::countr_zero(visibleZoneMask);
+		visibleZoneBits |= frame->Level->Model->Zones[zone].Connectivity;
+		visibleZoneMask &= (visibleZoneMask - 1);
+	}
+
+	for (ABrush* mover : objs.movers) {
+		if (visibleZoneBits[mover->Region.ZoneNumber]) {
+			visibleMovers.insert(mover);
+		}
+	}
+
+	// Add the zones as a set to easily iterate on it
+	std::unordered_set<INT> visibleZones;
+	visibleZoneMask = visibleZoneBits.to_ullong();
+	while (visibleZoneMask) {
+		DWORD zone = std::countr_zero(visibleZoneMask);
+		visibleZones.insert(zone);
+		visibleZoneMask &= (visibleZoneMask - 1);
+	}
+
 	for (RPASS pass : {SOLID, NONSOLID}) {
 		DecalMap decalMap;
-		for (auto& facetPair : modelFacets.facetPairs[pass]) {
-			UTexture* texture = facetPair.tex;
-			DWORD flags = facetPair.flags;
-			std::vector<SurfaceData>& surfaces = facetPair.bucket;
+		for (int zone : visibleZones) {
+			for (auto& facetPair : modelFacets.facetPairs[zone][pass]) {
+				UTexture* texture = facetPair.tex;
+				DWORD flags = facetPair.flags;
+				std::vector<SurfaceData>& surfaces = facetPair.bucket;
 
-			FTextureInfo* texInfo;
-			if (!lockedTextures.count(texture)) {
-				texInfo = &lockedTextures[texture];
-				texture->Lock(*texInfo, viewport->CurrentTime, -1, viewport->RenDev);
-			} else {
-				texInfo = &lockedTextures[texture];
-			}
-
-			FSurfaceInfo surfaceInfo{};
-			surfaceInfo.Level = frame->Level;
-			surfaceInfo.PolyFlags = flags;
-			surfaceInfo.Texture = texInfo;
-
-			std::vector<FSurfaceFacet*> facets;
-			facets.reserve(surfaces.size());
-			for (const SurfaceData& surface : surfaces) {
-				facets.push_back(surface.facet);
-			}
-
-			d3d9Dev->drawLevelSurfaces(frame, surfaceInfo, facets);
-#if !UTGLR_NO_DECALS
-			if (viewport->GetOuterUClient()->Decals) {
-				for (const SurfaceData& surface : surfaces) {
-					getSurfaceDecals(frame, surface, decalMap, lockedTextures);
+				FTextureInfo* texInfo;
+				if (!lockedTextures.count(texture)) {
+					texInfo = &lockedTextures[texture];
+					texture->Lock(*texInfo, frame->Viewport->CurrentTime, -1, d3d9Dev);
 				}
-			}
+				else {
+					texInfo = &lockedTextures[texture];
+				}
+
+				FSurfaceInfo surfaceInfo{};
+				surfaceInfo.Level = frame->Level;
+				surfaceInfo.PolyFlags = flags;
+				surfaceInfo.Texture = texInfo;
+
+				std::vector<FSurfaceFacet*> facets;
+				facets.reserve(surfaces.size());
+				for (const SurfaceData& surface : surfaces) {
+					facets.push_back(surface.facet);
+				}
+
+				d3d9Dev->drawLevelSurfaces(frame, surfaceInfo, facets);
+#if !UTGLR_NO_DECALS
+				if (frame->Viewport->GetOuterUClient()->Decals) {
+					for (const SurfaceData& surface : surfaces) {
+						getSurfaceDecals(frame, surface, decalMap, lockedTextures);
+					}
+				}
 #endif
+			}
 		}
 		// Render all the decals
 		for (const auto& decalsPair : decalMap) {
-			FTextureInfo *const& texInfo = decalsPair.tex;
+			FTextureInfo* const& texInfo = decalsPair.tex;
 			for (std::vector<FTransTexture> decal : decalsPair.bucket) {
 				int numPts = decal.size();
 				FTransTexture** pointsPtrs = new FTransTexture * [numPts];
@@ -324,31 +414,6 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			}
 		}
 	}
-
-	for (ASkyZoneInfo* zone : skyZones) {
-		d3d9Dev->renderSkyZoneAnchor(zone, &frame->Coords.Origin);
-	}
-
-	d3d9Dev->renderLights(frame, lightActors);
-
-	d3d9Dev->endWorldDraw(frame);
-
-	for (std::pair<UTexture* const, FTextureInfo>& entry : lockedTextures) {
-		entry.first->Unlock(entry.second);
-	}
-
-	// Render view model actor and extra HUD stuff
-	if (!GIsEditor && playerActor && (viewport->Actor->ShowFlags & SHOW_Actors)) {
-		GUglyHackFlags |= 1;
-		playerActor->eventRenderOverlays(viewport->Canvas);
-		GUglyHackFlags &= ~1;
-	}
-
-	memMark.Pop();
-	dynMark.Pop();
-	sceneMark.Pop();
-	vectorMark.Pop();
-	unguard;
 }
 
 void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, ParentCoord* parentCoord)
