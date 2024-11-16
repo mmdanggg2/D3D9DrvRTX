@@ -500,6 +500,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	FTime m_prevFrameTimestamp;
 	UBOOL SmoothMaskedTextures;
 
+	UBOOL EnableSkyBoxRendering;
 	UBOOL EnableSkyBoxAnchors;
 	UBOOL EnableHashTextures;
 	FLOAT LightMultiplier;

@@ -2,6 +2,7 @@
 Object=(Name=D3D9DrvRTX.D3D9RenderDevice,Class=Class,MetaClass=Engine.RenderDevice,Autodetect=d3d9.dll)
 Preferences=(Caption="Rendering",Parent="Advanced Options")
 Preferences=(Caption="Direct3D 9 RTX Optimised",Parent="Rendering",Class=D3D9DrvRTX.D3D9RenderDevice,Immediate=True)
+Property=(Config,Class=D3D9DrvRTX.D3D9RenderDevice,Name=EnableSkyBoxRendering,Title="Enable Skybox Rendering",Description="Enables the rendering of skybox zones.")
 Property=(Config,Class=D3D9DrvRTX.D3D9RenderDevice,Name=EnableSkyBoxAnchors,Title="Enable Skybox Anchors",Description="Enables the special mesh generated for anchoring the skybox in remix.")
 Property=(Config,Class=D3D9DrvRTX.D3D9RenderDevice,Name=EnableHashTextures,Title="Enable Hash Textures",Description="Enables specially generated textures with a stable hash in place of procedurally generated ones.")
 Property=(Config,Class=D3D9DrvRTX.D3D9RenderDevice,Name=LightMultiplier,Title="Light Multiplier",Description="Global light brightness multiplier.")

@@ -260,15 +260,17 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 	std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
 
-	for (FSceneNode* child = frame->Child; child; child = child->Sibling) {
-		if (frame->Level->GetZoneActor(child->ZoneNumber)->IsA(ASkyZoneInfo::StaticClass())) {
-			d3d9Dev->startWorldDraw(child);
-			drawFrame(child, d3d9Dev, modelFacets, objs, lockedTextures, true);
-			d3d9Dev->endWorldDraw(child);
-			break;
+	if (d3d9Dev->EnableSkyBoxRendering) {
+		for (FSceneNode* child = frame->Child; child; child = child->Sibling) {
+			if (frame->Level->GetZoneActor(child->ZoneNumber)->IsA(ASkyZoneInfo::StaticClass())) {
+				d3d9Dev->startWorldDraw(child);
+				drawFrame(child, d3d9Dev, modelFacets, objs, lockedTextures, true);
+				d3d9Dev->endWorldDraw(child);
+				break;
+			}
 		}
+		d3d9Dev->ClearZ(frame);
 	}
-	d3d9Dev->ClearZ(frame);
 	
 	d3d9Dev->startWorldDraw(frame);
 

@@ -403,8 +403,9 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddIntConfigParam(TEXT("DynamicTexIdRecycleLevel"), CPP_PROPERTY_LOCAL(DynamicTexIdRecycleLevel), 100);
 	SC_AddBoolConfigParam(0,  TEXT("TexDXT1ToDXT3"), CPP_PROPERTY_LOCAL(TexDXT1ToDXT3), 0);
 	SC_AddIntConfigParam(TEXT("FrameRateLimit"), CPP_PROPERTY_LOCAL(FrameRateLimit), 0);
-	SC_AddBoolConfigParam(2,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
-	SC_AddBoolConfigParam(1, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 1);
+	SC_AddBoolConfigParam(3,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
+	SC_AddBoolConfigParam(2, TEXT("EnableSkyBoxRendering"), CPP_PROPERTY_LOCAL(EnableSkyBoxRendering), 1);
+	SC_AddBoolConfigParam(1, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 0);
 	SC_AddBoolConfigParam(0, TEXT("EnableHashTextures"), CPP_PROPERTY_LOCAL(EnableHashTextures), 1);
 	SC_AddFloatConfigParam(TEXT("LightMultiplier"), CPP_PROPERTY_LOCAL(LightMultiplier), 4000.0f);
 	SC_AddFloatConfigParam(TEXT("LightRadiusDivisor"), CPP_PROPERTY_LOCAL(LightRadiusDivisor), 70.0f);
