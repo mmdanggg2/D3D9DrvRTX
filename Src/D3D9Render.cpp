@@ -216,7 +216,6 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		}
 		if (actor->IsA(ASkyZoneInfo::StaticClass())) {
 			skyZones.push_back((ASkyZoneInfo*)actor);
-			continue;
 		}
 		bool isVisible = true;
 		isVisible &= actor != playerActor;
@@ -260,18 +259,24 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 	std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
 
-	if (d3d9Dev->EnableSkyBoxRendering) {
-		for (FSceneNode* child = frame->Child; child; child = child->Sibling) {
-			if (frame->Level->GetZoneActor(child->ZoneNumber)->IsA(ASkyZoneInfo::StaticClass())) {
-				d3d9Dev->startWorldDraw(child);
-				drawFrame(child, d3d9Dev, modelFacets, objs, lockedTextures, true);
-				d3d9Dev->endWorldDraw(child);
-				break;
-			}
-		}
+	ASkyZoneInfo* skyZone = frame->Level->GetZoneActor(frame->ZoneNumber)->SkyZone;
+	if (d3d9Dev->EnableSkyBoxRendering && skyZone) {
+		FSceneNode child = *frame;
+		child.ZoneNumber = skyZone->Region.ZoneNumber;
+		// Keep parent frame rotation and apply sky rotation, then location
+		child.Coords.Origin = FVector();
+		child.Coords /= skyZone->Rotation;
+		child.Coords.Origin = skyZone->Location;
+		child.Draw[0] = NULL;
+		child.Draw[1] = NULL;
+		child.Draw[2] = NULL;
+		child.Sprite = NULL;
+		d3d9Dev->startWorldDraw(&child);
+		drawFrame(&child, d3d9Dev, modelFacets, objs, lockedTextures, true);
+		//d3d9Dev->endWorldDraw(&child);
 		d3d9Dev->ClearZ(frame);
 	}
-	
+
 	d3d9Dev->startWorldDraw(frame);
 
 	drawFrame(frame, d3d9Dev, modelFacets, objs, lockedTextures);
@@ -307,6 +312,7 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 	std::unordered_set<AActor*> visibleActors;
 	std::unordered_set<ABrush*> visibleMovers;
 	std::bitset<64> visibleZoneBits;
+	visibleZoneBits[frame->ZoneNumber] = true;
 	for (int pass : {0, 1, 2}) {
 		for (FBspDrawList* drawList = frame->Draw[pass]; drawList; drawList = drawList->Next) {
 			if (frame->Level->BrushTracker && frame->Level->BrushTracker->SurfIsDynamic(drawList->iSurf)) {
