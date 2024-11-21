@@ -156,9 +156,10 @@ void UD3D9Render::SurfaceData::calculateSurfaceFacet(ULevel* level, const DWORD 
 		poly->NumPts = node.NumVertices;
 
 		// Allocate and store each point
+		FTransform* transArr = New<FTransform>(VectorMem, poly->NumPts);
 		for (int i = 0; i < poly->NumPts; i++) {
 			FVert& vert = model->Verts(node.iVertPool + i);
-			FTransform* trans = New<FTransform>(VectorMem);
+			FTransform* trans = transArr + i;
 			trans->Point = model->Points(vert.pVertex);
 			poly->Pts[i] = trans;
 		}

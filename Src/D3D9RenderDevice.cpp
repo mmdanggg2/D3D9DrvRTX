@@ -6527,6 +6527,15 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 		m_csVertexArray.clear();
 	}
 
+	// Reserve space for all polygons upfront
+	size_t totalVertices = 0;
+	for (FSavedPoly* Poly = Facet.Polys; Poly; Poly = Poly->Next) {
+		if (Poly->NumPts > 2) {
+			totalVertices += (Poly->NumPts - 2) * 3;
+		}
+	}
+	m_csVertexArray.reserve(m_csVertexArray.size() + totalVertices);
+
 	// Buffer "static" geometry.
 	for (FSavedPoly* Poly = Facet.Polys; Poly; Poly = Poly->Next) {
 		//Skip if not enough points
@@ -6536,44 +6545,39 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 		}
 		INT numPolys = NumPts - 2;
 
-		m_csVertexArray.reserve(m_csVertexArray.size() + NumPts);
-
 		FTransform** pPts = &Poly->Pts[0];
 		const FVector* hubPoint = &(*pPts++)->Point;
 		const FVector* secondPoint = &(*pPts++)->Point;
+
+		const FGLTexCoord hubPtTex{
+			(Facet.MapCoords.XAxis | *hubPoint) - csDot.u,
+			(Facet.MapCoords.YAxis | *hubPoint) - csDot.v
+		};
+		FGLTexCoord secondPtTex{
+			(Facet.MapCoords.XAxis | *secondPoint) - csDot.u,
+			(Facet.MapCoords.YAxis | *secondPoint) - csDot.v
+		};
+
 		do {
+			FGLVertexNormTex& v1 = m_csVertexArray.emplace_back();
+			v1.vert = { hubPoint->X, hubPoint->Y, hubPoint->Z };
+			v1.norm = { 0.0f, 0.0f, 0.0f };
+			v1.tex = hubPtTex;
+
+			FGLVertexNormTex& v2 = m_csVertexArray.emplace_back();
+			v2.vert = { secondPoint->X, secondPoint->Y, secondPoint->Z };
+			v2.norm = { 0.0f, 0.0f, 0.0f };
+			v2.tex = secondPtTex;
+
 			const FVector* point = &(*pPts++)->Point;
-			FGLVertexNormTex* bufVert = &m_csVertexArray.emplace_back();
-			bufVert->vert.x = hubPoint->X;
-			bufVert->vert.y = hubPoint->Y;
-			bufVert->vert.z = hubPoint->Z;
-			bufVert->norm.x = 0;
-			bufVert->norm.y = 0;
-			bufVert->norm.z = 0;
-			bufVert->tex.u = (Facet.MapCoords.XAxis | *hubPoint) - csDot.u;
-			bufVert->tex.v = (Facet.MapCoords.YAxis | *hubPoint) - csDot.v;
-
-			bufVert = &m_csVertexArray.emplace_back();
-			bufVert->vert.x = secondPoint->X;
-			bufVert->vert.y = secondPoint->Y;
-			bufVert->vert.z = secondPoint->Z;
-			bufVert->norm.x = 0;
-			bufVert->norm.y = 0;
-			bufVert->norm.z = 0;
-			bufVert->tex.u = (Facet.MapCoords.XAxis | *secondPoint) - csDot.u;
-			bufVert->tex.v = (Facet.MapCoords.YAxis | *secondPoint) - csDot.v;
-
-			bufVert = &m_csVertexArray.emplace_back();
-			bufVert->vert.x = point->X;
-			bufVert->vert.y = point->Y;
-			bufVert->vert.z = point->Z;
-			bufVert->norm.x = 0;
-			bufVert->norm.y = 0;
-			bufVert->norm.z = 0;
-			bufVert->tex.u = (Facet.MapCoords.XAxis | *point) - csDot.u;
-			bufVert->tex.v = (Facet.MapCoords.YAxis | *point) - csDot.v;
+			FGLVertexNormTex& v3 = m_csVertexArray.emplace_back();
+			v3.vert = { point->X, point->Y, point->Z };
+			v3.norm = { 0.0f, 0.0f, 0.0f };
+			v3.tex.u = (Facet.MapCoords.XAxis | *point) - csDot.u;
+			v3.tex.v = (Facet.MapCoords.YAxis | *point) - csDot.v;
 
 			secondPoint = point;
+			secondPtTex = v3.tex;
 		} while (--numPolys != 0);
 	}
 
