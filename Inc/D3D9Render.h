@@ -34,13 +34,19 @@ private:
 	};
 	struct SurfaceData {
 		std::vector<INT> nodes;
-		const FBspSurf* surf;
+		INT iSurf;
 		FSurfaceFacet* facet = nullptr;
 		void calculateSurfaceFacet(ULevel* level, const DWORD flags);
 	};
 	struct ModelFacets {
 		std::array<std::array<SurfKeyBucketVector<UTexture*, SurfaceData>, RPASS_MAX>, FBspNode::MAX_ZONES> facetPairs;
 	};
+	static struct {
+		ULevel* currentLevel;
+		ModelFacets facets;
+		FMemStack facetsMem;
+		FMemMark facetsMemMark;
+	} cachedLevelModel;
 	struct FrameActors {
 		std::vector<AActor*> actors;
 		std::vector<ABrush*> movers;

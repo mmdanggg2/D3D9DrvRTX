@@ -16,8 +16,16 @@ void UD3D9Render::StaticConstructor() {
 	guard(UD3D9Render::StaticConstructor);
 	URender::StaticConstructor();
 	dout << "Static Constructing UD3D9Render!" << std::endl;
+#if UTGLR_HP_ENGINE
+	cachedLevelModel.facetsMem.Init(8192, TEXT("CacheLevelFacetMem"));
+#else
+	cachedLevelModel.facetsMem.Init(8192);
+#endif
+	cachedLevelModel.facetsMemMark = FMemMark(cachedLevelModel.facetsMem);
 	unguard;
 }
+
+decltype(UD3D9Render::cachedLevelModel) UD3D9Render::cachedLevelModel;
 
 void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets) {
 	UModel* model = frame->Level->Model;
@@ -80,7 +88,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 		RPASS pass = (flags & PF_NoOcclude) ? RPASS::NONSOLID : RPASS::SOLID;
 		for (ZoneNodes& zoneNodes: surfaceNodes[iSurf]) {
 			SurfaceData& surfData = modelFacets.facetPairs[zoneNodes.zone][pass].get(texture, flags).emplace_back();
-			surfData.surf = surf;
+			surfData.iSurf = iSurf;
 			surfData.nodes = std::move(zoneNodes.nodes);
 			surfData.calculateSurfaceFacet(frame->Level, flags);
 		}
@@ -90,10 +98,10 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 void UD3D9Render::SurfaceData::calculateSurfaceFacet(ULevel* level, const DWORD flags) {
 	UModel* model = level->Model;
 	const FLOAT levelTime = level->GetLevelInfo()->TimeSeconds;
-	const FBspSurf* const& surf = this->surf;
+	const FBspSurf* surf = &model->Surfs(this->iSurf);
 	FSurfaceFacet*& facet = this->facet;
 	// New surface, setup...
-	facet = New<FSurfaceFacet>(GDynMem);
+	facet = New<FSurfaceFacet>(cachedLevelModel.facetsMem);
 	facet->Polys = NULL;
 	facet->Span = NULL;
 	facet->MapCoords = FCoords(
@@ -139,7 +147,7 @@ void UD3D9Render::SurfaceData::calculateSurfaceFacet(ULevel* level, const DWORD 
 	}
 #endif
 	if (panU != 0 || panV != 0) {
-		FVector* pan = New<FVector>(GDynMem);
+		FVector* pan = New<FVector>(cachedLevelModel.facetsMem);
 		*pan = FVector(panU, panV, 0);
 		// Hide this away in the span coz we're not using it
 		facet->Span = (FSpanBuffer*)pan;
@@ -147,7 +155,7 @@ void UD3D9Render::SurfaceData::calculateSurfaceFacet(ULevel* level, const DWORD 
 
 	for (const INT& iNode : this->nodes) {
 		const FBspNode& node = model->Nodes(iNode);
-		FSavedPoly* poly = (FSavedPoly*)New<BYTE>(GDynMem, sizeof(FSavedPoly) + node.NumVertices * sizeof(FTransform*));
+		FSavedPoly* poly = (FSavedPoly*)New<BYTE>(cachedLevelModel.facetsMem, sizeof(FSavedPoly) + node.NumVertices * sizeof(FTransform*));
 		poly->Next = facet->Polys;
 		facet->Polys = poly;
 #if !UTGLR_OLD_POLY_CLASSES
@@ -156,7 +164,7 @@ void UD3D9Render::SurfaceData::calculateSurfaceFacet(ULevel* level, const DWORD 
 		poly->NumPts = node.NumVertices;
 
 		// Allocate and store each point
-		FTransform* transArr = New<FTransform>(VectorMem, poly->NumPts);
+		FTransform* transArr = New<FTransform>(cachedLevelModel.facetsMem, poly->NumPts);
 		for (int i = 0; i < poly->NumPts; i++) {
 			FVert& vert = model->Verts(node.iVertPool + i);
 			FTransform* trans = transArr + i;
@@ -255,8 +263,13 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	// Seems to also update mover bsp nodes for colision decal calculations
 	OccludeFrame(frame);
 
-	ModelFacets modelFacets;
-	getLevelModelFacets(frame, modelFacets);
+	if (cachedLevelModel.currentLevel != frame->Level) {
+		cachedLevelModel.facetsMemMark.Pop();
+		cachedLevelModel.facets = ModelFacets();
+		getLevelModelFacets(frame, cachedLevelModel.facets);
+		cachedLevelModel.currentLevel = frame->Level;
+	}
+	ModelFacets& modelFacets = cachedLevelModel.facets;
 
 	std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
 
@@ -479,7 +492,7 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 void UD3D9Render::getSurfaceDecals(FSceneNode* frame, const SurfaceData& surfaceData, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures) {
 	const UViewport* viewport = frame->Viewport;
 	const UModel* model = frame->Level->Model;
-	const FBspSurf& surf = *surfaceData.surf;
+	const FBspSurf& surf = model->Surfs(surfaceData.iSurf);
 	for (int i = 0; i < surf.Decals.Num(); i++) {
 		const FDecal* decal = &surf.Decals(i);
 		UTexture* texture;
