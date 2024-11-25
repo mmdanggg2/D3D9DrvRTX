@@ -17,6 +17,7 @@ This is a custom render device for the Unreal Engine, optimized for use with NVI
 - [RTX Remix](https://github.com/NVIDIAGameWorks/rtx-remix) Runtime v0.5+ (Installed in `System` folder)
 
 ## Installation
+- [Installation Tutorial video](https://youtu.be/XEe-pyZ3J9g)
 1. Download the appropriate zip file [from releases](https://github.com/mmdanggg2/D3D9DrvRTX/releases).
 2. Navigate to the game's installation directory.
 3. Extract the files into the `System` folder. (the RTX Remix `d3d9.dll` and `.trex` should be here too)
