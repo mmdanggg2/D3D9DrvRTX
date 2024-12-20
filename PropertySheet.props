@@ -22,17 +22,15 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/permissive /Zc:implicitNoexcept- %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>false</ConformanceMode>
       <DisableSpecificWarnings>4121;4324;4458;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <ExceptionHandling>Async</ExceptionHandling>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
       <WarningLevel>Level4</WarningLevel>
       <StructMemberAlignment>4Bytes</StructMemberAlignment>
-      <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
-      <PreprocessorDefinitions>NO_UNICODE_OS_SUPPORT;_WINDOWS;WIN32;UNICODE;WIN32_LEAN_AND_MEAN;NOMINMAX;_SECURE_SCL=0;WINDOWS_IGNORE_PACKING_MISMATCH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;WINDOWS_IGNORE_PACKING_MISMATCH;NOMINMAX;_UNICODE;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <OutputFile>$(UNREAL_SYSTEM_DIR)\D3D9DrvRTX.dll</OutputFile>
