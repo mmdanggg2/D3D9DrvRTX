@@ -3,13 +3,13 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
     <UNREAL_SDK_DIR>.\sdk</UNREAL_SDK_DIR>
-    <UNREAL_SYSTEM_DIR>.\install\System</UNREAL_SYSTEM_DIR>
-    <UNREAL_EXE_NAME>UnrealTournament.exe</UNREAL_EXE_NAME>
+    <UNREAL_INSTALL_DIR>.\install</UNREAL_INSTALL_DIR>
+    <UNREAL_EXE_NAME>Unreal.exe</UNREAL_EXE_NAME>
   </PropertyGroup>
   <PropertyGroup>
     <IncludePath>$(DXSDK_DIR)Include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(DXSDK_DIR)Lib\x86;$(LibraryPath)</LibraryPath>
-    <OutDir>$(UNREAL_SYSTEM_DIR)\</OutDir>
+    <LibraryPath>$(UNREAL_SDK_DIR)\Core\Lib\;$(UNREAL_SDK_DIR)\Engine\Lib\;$(UNREAL_SDK_DIR)\Render\Lib\;$(DXSDK_DIR)Lib\x86;$(LibraryPath)</LibraryPath>
+    <OutDir>$(UNREAL_INSTALL_DIR)\System\</OutDir>
     <TargetName>D3D9DrvRTX</TargetName>
     <TargetExt>.dll</TargetExt>
     <IntDir>Build\$(Configuration)\</IntDir>
@@ -29,12 +29,12 @@
       <WarningLevel>Level4</WarningLevel>
       <StructMemberAlignment>4Bytes</StructMemberAlignment>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
       <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;WINDOWS_IGNORE_PACKING_MISMATCH;NOMINMAX;_UNICODE;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
     </ClCompile>
     <Link>
-      <OutputFile>$(UNREAL_SYSTEM_DIR)\D3D9DrvRTX.dll</OutputFile>
-      <AdditionalDependencies>$(UNREAL_SDK_DIR)\Core\Lib\Core.lib;$(UNREAL_SDK_DIR)\Engine\Lib\Engine.lib;$(UNREAL_SDK_DIR)\Render\Lib\Render.lib;winmm.lib;d3dx9.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <OutputFile>$(UNREAL_INSTALL_DIR)\System\D3D9DrvRTX.dll</OutputFile>
+      <AdditionalDependencies>Core.lib;Engine.lib;Render.lib;winmm.lib;d3dx9.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateMapFile>true</GenerateMapFile>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <ProgramDatabaseFile>.\Lib/D3D9Drv.pdb</ProgramDatabaseFile>
@@ -45,8 +45,8 @@
     <BuildMacro Include="UNREAL_SDK_DIR">
       <Value>$(UNREAL_SDK_DIR)</Value>
     </BuildMacro>
-    <BuildMacro Include="UNREAL_SYSTEM_DIR">
-      <Value>$(UNREAL_SYSTEM_DIR)</Value>
+    <BuildMacro Include="UNREAL_INSTALL_DIR">
+      <Value>$(UNREAL_INSTALL_DIR)</Value>
     </BuildMacro>
     <BuildMacro Include="UNREAL_EXE_NAME">
       <Value>$(UNREAL_EXE_NAME)</Value>

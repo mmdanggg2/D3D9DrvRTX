@@ -3,24 +3,36 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33213.308
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "D3D9Drv", "D3D9Drv.vcxproj", "{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "D3D9DrvRTX", "D3D9Drv.vcxproj", "{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		ASAN|Win32 = ASAN|Win32
+		ASAN|x64 = ASAN|x64
 		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
 		EditContinue|Win32 = EditContinue|Win32
+		EditContinue|x64 = EditContinue|x64
 		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.ASAN|Win32.ActiveCfg = ASAN|Win32
 		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.ASAN|Win32.Build.0 = ASAN|Win32
+		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.ASAN|x64.ActiveCfg = ASAN|x64
+		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.ASAN|x64.Build.0 = ASAN|x64
 		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.Debug|Win32.ActiveCfg = Debug|Win32
 		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.Debug|Win32.Build.0 = Debug|Win32
+		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.Debug|x64.ActiveCfg = Debug|x64
+		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.Debug|x64.Build.0 = Debug|x64
 		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.EditContinue|Win32.ActiveCfg = EditContinue|Win32
 		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.EditContinue|Win32.Build.0 = EditContinue|Win32
+		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.EditContinue|x64.ActiveCfg = EditContinue|x64
+		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.EditContinue|x64.Build.0 = EditContinue|x64
 		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.Release|Win32.ActiveCfg = Release|Win32
 		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.Release|Win32.Build.0 = Release|Win32
+		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.Release|x64.ActiveCfg = Release|x64
+		{D0BCAFD6-A6FC-4F74-9D18-52E96790850A}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

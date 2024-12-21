@@ -368,7 +368,11 @@ void UD3D9RenderDevice::StaticConstructor() {
 			) == IDYES
 		) {
 			GConfig->SetString(TEXT("Engine.Engine"), TEXT("Render"), TEXT("D3D9DrvRTX.D3D9Render"));
+#if UNREAL_GOLD_OLDUNREAL
+			appRequestExit(0, TEXT("Exiting after Render config change"));
+#else
 			appRequestExit(0);
+#endif
 		}
 	}
 
@@ -994,7 +998,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 
 	//Special extensions validation for init only config pass
 	if (!m_dxt1TextureCap) SupportsTC = 0;
-#ifdef UTGLR_UNREAL_227_BUILD
+#ifdef UNREAL_GOLD_OLDUNREAL
 	if (!m_dxt3TextureCap) SupportsTC = 0;
 	if (!m_dxt5TextureCap) SupportsTC = 0;
 #endif;
@@ -1456,7 +1460,11 @@ UBOOL UD3D9RenderDevice::Init(UViewport* InViewport, INT NewX, INT NewY, INT New
 	check(m_hDC);
 
 	if (!SetRes(NewX, NewY, NewColorBytes, Fullscreen)) {
+#if UNREAL_GOLD_OLDUNREAL
+		return FailedInitf(*LocalizeError("ResFailed"));
+#else
 		return FailedInitf(LocalizeError("ResFailed"));
+#endif
 	}
 
 	// Default to a state for drawing ui
@@ -1856,7 +1864,7 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 	m_currentFrameCount++;
 
 	//Check for optional frame rate limit
-#if !UNREAL_TOURNAMENT_OLDUNREAL
+#if !UNREAL_TOURNAMENT_OLDUNREAL && !UNREAL_GOLD_OLDUNREAL
 	if (FrameRateLimit >= 20) {
 		FTime curFrameTimestamp;
 		DOUBLE timeDiff;
@@ -3247,14 +3255,25 @@ static UTexture* getTextureWithoutNext(UTexture* texture, FTime time, FLOAT frac
 	while (index-- > 0)
 		texture = texture->AnimNext;
 	UTexture* oldNext = texture->AnimNext;
-	UTexture* oldCur = texture->AnimCur;
 	texture->AnimNext = NULL;
+
+#if UNREAL_GOLD_OLDUNREAL
+	UTexture* oldCur = texture->AnimCurrent;
+	texture->AnimCurrent = NULL;
+
+	UTexture* renderTexture = texture->Get();
+
+	texture->AnimCurrent = oldCur;
+#else
+	UTexture* oldCur = texture->AnimCur;
 	texture->AnimCur = NULL;
 
 	UTexture* renderTexture = texture->Get(time);
 
-	texture->AnimNext = oldNext;
 	texture->AnimCur = oldCur;
+#endif
+
+	texture->AnimNext = oldNext;
 
 	return renderTexture;
 }
@@ -3303,13 +3322,23 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	if (actor->DrawType == DT_SpriteAnimOnce) {
 		renderTexture = getTextureWithoutNext(texture, currTime, actor->LifeFraction());
 	} else {
+#if UNREAL_GOLD_OLDUNREAL
+		renderTexture = texture->Get();
+#else
 		renderTexture = texture->Get(currTime);
+#endif
 	}
 
 	FTextureInfo texInfo;
+#if UNREAL_GOLD_OLDUNREAL
+	texInfo = *renderTexture->GetTexture(-1, this);
+#else
 	renderTexture->Lock(texInfo, currTime, -1, this);
+#endif
 	renderSpriteGeo(frame, actor->Location + actor->PrePivot, drawScale, texInfo, getBasePolyFlags(actor), color);
+#if !UNREAL_GOLD_OLDUNREAL
 	renderTexture->Unlock(texInfo);
+#endif
 	unguard;
 }
 
@@ -3519,7 +3548,11 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		FVector* allSamples = New<FVector>(GMem, numVerts + meshLod->SpecialVerts);
 		// First samples are special coordinates
 		samples = &allSamples[meshLod->SpecialVerts];
+#if UNREAL_GOLD_OLDUNREAL
+		meshLod->GetFrame(allSamples, sizeof(samples[0]), GMath.UnitCoords, actor);
+#else
 		meshLod->GetFrame(allSamples, sizeof(samples[0]), GMath.UnitCoords, actor, numVerts);
+#endif
 		numTris = meshLod->Faces.Num();
 #if UTGLR_HP_ENGINE
 		if (specialCoord && !specialCoord->enabled && mesh->IsA(USkeletalMesh::StaticClass())) {
@@ -3577,7 +3610,11 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		if (GIsEditor && (baseFlags & PF_Selected)) {
 			color = color * 0.4 + FVector(0.0, 0.6, 0.0);
 		}
+#if UNREAL_GOLD_OLDUNREAL
+		UTexture* tex = actor->Texture->Get();
+#else
 		UTexture* tex = actor->Texture->Get(currentTime);
+#endif
 		for (INT i = 0; i < numVerts; i++) {
 			FVector& sample = samples[i];
 			if (actor->bRandomFrame) {
@@ -3594,9 +3631,15 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 				FVector point = DXVecToFVec(xpoint);
 
 				FTextureInfo texInfo;
+#if UNREAL_GOLD_OLDUNREAL
+				texInfo = *tex->GetTexture(-1, this);
+#else
 				tex->Lock(texInfo, currentTime, -1, this);
+#endif
 				renderSpriteGeo(frame, point, actor->DrawScale, texInfo, baseFlags, color);
+#if !UNREAL_GOLD_OLDUNREAL
 				tex->Unlock(texInfo);
+#endif
 			}
 		}
 		return;
@@ -3615,10 +3658,18 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		} else if (!tex) {
 			continue;
 		}
+#if UNREAL_GOLD_OLDUNREAL
+		tex = tex->Get();
+#else
 		tex = tex->Get(currentTime);
+#endif
 		if (textures.insert(i, tex)) {
 			FTextureInfo texInfo{};
+#if UNREAL_GOLD_OLDUNREAL
+			texInfo = *textures.at(i)->GetTexture(-1, this);
+#else
 			textures.at(i)->Lock(texInfo, currentTime, -1, this);
+#endif
 			texInfos.insert(i, texInfo);
 		} else {
 			texInfos.insert(i, texInfos.at(textures.getIndex(tex)));
@@ -3635,7 +3686,11 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	if (!envTex) {
 		return;
 	}
+#if UNREAL_GOLD_OLDUNREAL
+	envTexInfo = *envTex->GetTexture(-1, this);
+#else
 	envTex->Lock(envTexInfo, currentTime, -1, this);
+#endif
 
 	bool fatten = actor->Fatness != 128;
 	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
@@ -3782,9 +3837,13 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	for (UTexture* tex : textures) {
 		if (!tex)
 			continue;
+#if !UNREAL_GOLD_OLDUNREAL
 		tex->Unlock(texInfos.at(textures.getIndex(tex)));
 	}
 	envTex->Unlock(envTexInfo);
+#else
+	}
+#endif
 
 	unguard;
 }
@@ -4178,13 +4237,21 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 	// Sort faces into surface/flag groups
 	for (int i = 0; i < model->Polys->Element.Num(); i++) {
 		FPoly* poly = &model->Polys->Element(i);
+#if UNREAL_GOLD_OLDUNREAL
+		UTexture* tex = poly->Texture ? poly->Texture->Get() : viewport->Actor->Level->DefaultTexture;
+#else
 		UTexture* tex = poly->Texture ? poly->Texture->Get(viewport->CurrentTime) : viewport->Actor->Level->DefaultTexture;
+#endif
 		if (!tex) continue;
 		DWORD flags = poly->PolyFlags;
 		FTextureInfo* texInfo;
 		if (!textureInfos.count(tex)) {
 			texInfo = &textureInfos[tex];
+#if UNREAL_GOLD_OLDUNREAL
+			*texInfo = *tex->GetTexture(-1, this);
+#else
 			tex->Lock(*texInfo, frame->Viewport->CurrentTime, -1, this);
+#endif
 		} else {
 			texInfo = &textureInfos[tex];
 		}
@@ -4201,12 +4268,12 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 
 		bool append = false;
 		for (FPoly* poly : entry.second) {
-			FSavedPoly* sPoly = (FSavedPoly*)New<BYTE>(GDynMem, sizeof(FSavedPoly) + poly->NumVertices * sizeof(FTransform*));
+			FSavedPoly* sPoly = (FSavedPoly*)New<BYTE>(URender::VectorMem, sizeof(FSavedPoly) + poly->NumVertices * sizeof(FTransform*));
 			sPoly->NumPts = poly->NumVertices;
 			sPoly->Next = NULL;
 			for (int i = 0; i < sPoly->NumPts; i++) {
 				int iDest = invertFaces ? (sPoly->NumPts - 1) - i : i;
-				FTransform* trans = new(GDynMem)FTransform;
+				FTransform* trans = new(URender::VectorMem)FTransform;
 				trans->Point = poly->Vertex[i];
 				sPoly->Pts[iDest] = trans;
 			}
@@ -4239,9 +4306,11 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 		RenderPasses();
 	}
 
+#if !UNREAL_GOLD_OLDUNREAL
 	for (std::pair<UTexture* const, FTextureInfo>& entry : textureInfos) {
 		entry.first->Unlock(entry.second);
 	}
+#endif
 	unguard;
 }
 
@@ -4379,7 +4448,11 @@ void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* l
 
 	UTexture* tex = zone->Level->DefaultTexture;
 	FTextureInfo texInfo;
+#if UNREAL_GOLD_OLDUNREAL
+	texInfo = *tex->GetTexture(-1, this);
+#else
 	tex->Lock(texInfo, 0.0, -1, this);
+#endif
 
 	FRenderVert v1{};
 	v1.Point = FVector(0, 0, 5) + hashToNormalVector(locHash);
@@ -4425,7 +4498,9 @@ void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* l
 
 	RenderPasses();
 
+#if !UNREAL_GOLD_OLDUNREAL
 	tex->Unlock(texInfo);
+#endif
 
 	unguard;
 }
@@ -4437,7 +4512,7 @@ INT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FRenderVe
 
 	// I was promised to be given triangles
 	assert(vertices.size() % 3 == 0);
-	int tris = vertices.size() / 3;
+	size_t tris = vertices.size() / 3;
 
 	for (int i = 0; i < tris; i++) {
 		INT numPts = 3;
@@ -4544,7 +4619,11 @@ void UD3D9RenderDevice::GetStats(TCHAR* Result) {
 	unguard;
 }
 
+#if UNREAL_GOLD_OLDUNREAL
+void UD3D9RenderDevice::ReadPixels(FColor* Pixels, UBOOL bGammaCorrectOutput) {
+#else
 void UD3D9RenderDevice::ReadPixels(FColor* Pixels) {
+#endif
 	guard(UD3D9RenderDevice::ReadPixels);
 
 	INT x, y;
@@ -5101,6 +5180,9 @@ bool UD3D9RenderDevice::BindTexture(DWORD texNum, FTexInfo& Tex, FTextureInfo& I
 #if UNREAL_TOURNAMENT_OLDUNREAL
 			pBind->RealtimeChangeCount = Info.Texture ? Info.Texture->RealtimeChangeCount : 0;
 #endif
+#if UNREAL_GOLD_OLDUNREAL
+			pBind->RealtimeChangeCount = Info.Texture ? Info.RenderTag : 0;
+#endif
 
 			//Cache texture info for the new texture
 			CacheTextureInfo(pBind, Info, PolyFlags);
@@ -5231,13 +5313,21 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 		}
 	}
 
-#if UNREAL_TOURNAMENT_OLDUNREAL
+#if UNREAL_TOURNAMENT_OLDUNREAL || UNREAL_GOLD_OLDUNREAL
 	if (Info.Texture)
 	{
-		if (pBind->RealtimeChangeCount != Info.Texture->RealtimeChangeCount)
+#if UNREAL_TOURNAMENT_OLDUNREAL
+		if (pBind->RealtimeChangeCount != Info.Texture->RealtimeChangeCount) {
 			pBind->RealtimeChangeCount = Info.Texture->RealtimeChangeCount;
-		else
+		}
+#elif UNREAL_GOLD_OLDUNREAL
+		if (pBind->RealtimeChangeCount != Info.RenderTag) {
+			pBind->RealtimeChangeCount = Info.RenderTag;
+		}
+#endif
+		else {
 			Info.bRealtimeChanged = 0;
+		}
 	}
 #endif
 
@@ -5402,7 +5492,7 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 					break;
 
 				default:
-#if UNREAL_TOURNAMENT_OLDUNREAL
+#if UNREAL_TOURNAMENT_OLDUNREAL || UNREAL_GOLD_OLDUNREAL
 					switch (Info.Format) {
 					case TEXF_BGRA8:
 						guard(ConvertBGRA8);
@@ -5605,7 +5695,7 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 				pBind->texFormat = D3DFMT_DXT1;
 			}
 			break;
-#if UNREAL_TOURNAMENT_OLDUNREAL || UTGLR_UNREAL_227_BUILD
+#if UNREAL_TOURNAMENT_OLDUNREAL || UNREAL_GOLD_OLDUNREAL
 		case TEXF_DXT3: 
 			pBind->texType = TEX_TYPE_COMPRESSED_DXT3; 
 			pBind->texFormat = D3DFMT_DXT3;
@@ -5623,7 +5713,7 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 	if (pBind->texType != TEX_TYPE_NONE) {
 		//Using compressed texture
 	}
-#if UNREAL_TOURNAMENT_OLDUNREAL
+#if UNREAL_TOURNAMENT_OLDUNREAL || UNREAL_GOLD_OLDUNREAL
 	else if (FIsPalettizedFormat(Info.Format)) {
 #else
 	else if (Info.Palette) {
@@ -6419,7 +6509,7 @@ void UD3D9RenderDevice::RenderPassesExec(void) {
 	//	assert(MultiDrawCountArray[PolyNum] == 3);
 	//	//m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos + MultiDrawFirstArray[PolyNum], MultiDrawCountArray[PolyNum] - 2);
 	//}
-	int ptCount = m_csVertexArray.size();
+	size_t ptCount = m_csVertexArray.size();
 	INT bufferPos = getVertBufferPos(ptCount);
 	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, bufferPos, ptCount / 3);
 
@@ -6468,7 +6558,7 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 	//Check for additional enabled texture units that should be disabled
 	DisableSubsequentTextures(m_rpPassCount);
 
-	int ptCount = m_csVertexArray.size();
+	size_t ptCount = m_csVertexArray.size();
 	//Make sure at least m_csPtCount entries are left in the vertex buffers
 	if ((m_curVertexBufferPos + ptCount) >= VERTEX_BUFFER_SIZE) {
 		FlushVertexBuffers();

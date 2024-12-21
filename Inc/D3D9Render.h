@@ -22,7 +22,11 @@ class UD3D9Render : public URender {
 	
 	// URenderBase interface
 	void DrawWorld(FSceneNode* Frame) override;
+#if UNREAL_GOLD_OLDUNREAL
+	void DrawActor(FSceneNode* Frame, AActor* Actor, FDynamicSprite* Sprite = NULL) override;
+#else
 	void DrawActor(FSceneNode* Frame, AActor* Actor) override;
+#endif
 
 #if !UTGLR_NO_DECALS
 	void ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSurf* surf, FSavedPoly* poly, std::vector<FTransTexture>& decalPoints);

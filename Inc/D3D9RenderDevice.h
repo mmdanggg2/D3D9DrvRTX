@@ -38,7 +38,7 @@
 	#define PF_AlphaBlend 0x020000
 #endif
 
-#if !UNREAL_TOURNAMENT_OLDUNREAL
+#if !UNREAL_TOURNAMENT_OLDUNREAL && !UNREAL_GOLD_OLDUNREAL
 typedef DWORD PTRINT;
 #endif
 
@@ -150,6 +150,8 @@ struct FCachedTexture {
 	BYTE dynamicTexBits;
 #if UNREAL_TOURNAMENT_OLDUNREAL
 	INT RealtimeChangeCount;
+#elif UNREAL_GOLD_OLDUNREAL
+	UINT RealtimeChangeCount;
 #endif
 	tex_params_t texParams;
 	D3DFORMAT texFormat;
@@ -350,7 +352,7 @@ class SurfKeyBucketVector : public std::vector<SurfKeyBucket<K, T>> {
 public:
 
 	inline std::vector<T>& get(K tex, DWORD flags) {
-		const unsigned int size = this->size();
+		const size_t size = this->size();
 		for (unsigned int i = 0; i < size; i++) {
 			auto& entry = (*this)[i];
 			if (entry.tex == tex && entry.flags == flags) {
@@ -911,7 +913,11 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void PushHit(const BYTE* Data, INT Count) override;
 	void PopHit(INT Count, UBOOL bForce) override;
 	void GetStats(TCHAR* Result) override;
+#if UNREAL_GOLD_OLDUNREAL
+	void ReadPixels(FColor* Pixels, UBOOL bGammaCorrectOutput) override;
+#else
 	void ReadPixels(FColor* Pixels) override;
+#endif
 	void EndFlash() override;
 
 	void SetSceneNode(FSceneNode* Frame) override;

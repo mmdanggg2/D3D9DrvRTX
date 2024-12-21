@@ -191,9 +191,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 	UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
 
-	FMemMark sceneMark(GSceneMem);
 	FMemMark memMark(GMem);
-	FMemMark dynMark(GDynMem);
+	//FMemMark sceneMark(GSceneMem);
+	//FMemMark dynMark(GDynMem);
 	FMemMark vectorMark(VectorMem);
 
 	if (Engine->Audio && !GIsEditor) {
@@ -303,9 +303,11 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 	d3d9Dev->endWorldDraw(frame);
 
+#if !UNREAL_GOLD_OLDUNREAL
 	for (std::pair<UTexture* const, FTextureInfo>& entry : lockedTextures) {
 		entry.first->Unlock(entry.second);
 	}
+#endif
 
 	// Render view model actor and extra HUD stuff
 	if (!GIsEditor && playerActor && (viewport->Actor->ShowFlags & SHOW_Actors)) {
@@ -315,8 +317,8 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	}
 
 	memMark.Pop();
-	dynMark.Pop();
-	sceneMark.Pop();
+	//dynMark.Pop();
+	//sceneMark.Pop();
 	vectorMark.Pop();
 	unguard;
 }
@@ -380,7 +382,11 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 				FTextureInfo* texInfo;
 				if (!lockedTextures.count(texture)) {
 					texInfo = &lockedTextures[texture];
+#if UNREAL_GOLD_OLDUNREAL
+					*texInfo = *texture->GetTexture(-1, d3d9Dev);
+#else
 					texture->Lock(*texInfo, frame->Viewport->CurrentTime, -1, d3d9Dev);
+#endif
 				}
 				else {
 					texInfo = &lockedTextures[texture];
@@ -497,14 +503,22 @@ void UD3D9Render::getSurfaceDecals(FSceneNode* frame, const SurfaceData& surface
 		const FDecal* decal = &surf.Decals(i);
 		UTexture* texture;
 		if (decal->Actor->Texture) {
+#if UNREAL_GOLD_OLDUNREAL
+			texture = decal->Actor->Texture->Get();
+#else
 			texture = decal->Actor->Texture->Get(viewport->CurrentTime);
+#endif
 		} else {
 			texture = viewport->Actor->Level->DefaultTexture;
 		}
 		FTextureInfo* texInfo;
 		if (!lockedTextures.count(texture)) {
 			texInfo = &lockedTextures[texture];
+#if UNREAL_GOLD_OLDUNREAL
+			*texInfo = *texture->GetTexture(-1, viewport->RenDev);
+#else
 			texture->Lock(*texInfo, viewport->CurrentTime, -1, viewport->RenDev);
+#endif
 		} else {
 			texInfo = &lockedTextures[texture];
 		}
@@ -720,7 +734,11 @@ float* const UD3D9Render::prevFrameMaxZ = ((float*)&UD3D9Render::Stamp) - 196;
 float* const UD3D9Render::currFrameMaxZ = ((float*)&UD3D9Render::MaxLeafLights) - 1;
 #endif
 
+#if UNREAL_GOLD_OLDUNREAL
+void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor, FDynamicSprite* Sprite) {
+#else
 void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor) {
+#endif
 	guard(UD3D9Render::DrawActor);
 	if (!GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
 		Super::DrawActor(frame, actor);
