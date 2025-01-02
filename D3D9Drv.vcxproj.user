@@ -1,22 +1,42 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LocalDebuggerCommand>$(UNREAL_SYSTEM_DIR)\$(UNREAL_EXE_NAME)</LocalDebuggerCommand>
+    <LocalDebuggerCommand>$(UNREAL_INSTALL_DIR)\System\$(UNREAL_EXE_NAME)</LocalDebuggerCommand>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArguments></LocalDebuggerCommandArguments>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LocalDebuggerCommand>$(UNREAL_INSTALL_DIR)\System64\$(UNREAL_EXE_NAME)</LocalDebuggerCommand>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerCommandArguments></LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='EditContinue|Win32'">
-    <LocalDebuggerCommand>$(UNREAL_SYSTEM_DIR)\$(UNREAL_EXE_NAME)</LocalDebuggerCommand>
+    <LocalDebuggerCommand>$(UNREAL_INSTALL_DIR)\System\$(UNREAL_EXE_NAME)</LocalDebuggerCommand>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArguments></LocalDebuggerCommandArguments>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='EditContinue|x64'">
+    <LocalDebuggerCommand>$(UNREAL_INSTALL_DIR)\System64\$(UNREAL_EXE_NAME)</LocalDebuggerCommand>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerCommandArguments></LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommand>$(UNREAL_SYSTEM_DIR)\$(UNREAL_EXE_NAME)</LocalDebuggerCommand>
+    <LocalDebuggerCommand>$(UNREAL_INSTALL_DIR)\System\$(UNREAL_EXE_NAME)</LocalDebuggerCommand>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArguments></LocalDebuggerCommandArguments>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LocalDebuggerCommand>$(UNREAL_INSTALL_DIR)\System64\$(UNREAL_EXE_NAME)</LocalDebuggerCommand>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerCommandArguments></LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ASAN|Win32'">
-    <LocalDebuggerCommand>$(UNREAL_SYSTEM_DIR)\$(UNREAL_EXE_NAME)</LocalDebuggerCommand>
+    <LocalDebuggerCommand>$(UNREAL_INSTALL_DIR)\System\$(UNREAL_EXE_NAME)</LocalDebuggerCommand>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArguments></LocalDebuggerCommandArguments>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ASAN|x64'">
+    <LocalDebuggerCommand>$(UNREAL_INSTALL_DIR)\System64\$(UNREAL_EXE_NAME)</LocalDebuggerCommand>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerCommandArguments></LocalDebuggerCommandArguments>
   </PropertyGroup>

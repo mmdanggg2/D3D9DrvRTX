@@ -38,9 +38,10 @@ def switch_game(game_code: str):
 	print(f"Switching to '{colored(game_code, 'cyan')}'")
 	subprocess.run([f"{game_code}.bat"], shell=True, check=True)
 
-def build(version: str | None = None):
+def build(version: str | None = None, x64: bool = False):
 	solution_path = VS_PROJECT_PATH / "D3D9Drv.sln"
 	configuration = "Release"
+	platform = "x64" if x64 else "Win32"
 	
 	# Build the Visual Studio solution
 	build_command = [
@@ -50,6 +51,7 @@ def build(version: str | None = None):
 		"-target:Rebuild",
 		"-m",
 		f"-p:Configuration={configuration}",
+		f"-p:Platform={platform}"
 	]
 	if version:
 		# Eww stinky, just shove this in here since the rc has it anyway.
@@ -57,10 +59,10 @@ def build(version: str | None = None):
 			f.write(f'\n#define VERSION_EXTRA "{version}"\n')
 	subprocess.run(build_command, shell=True, check=True)
 
-def zip_build(build_name: str, version_path: Path):
+def zip_build(build_name: str, version_path: Path, x64: bool = False):
 	# Set the files to include in the ZIP file
 	files_to_zip = [
-		VS_PROJECT_PATH / "install" / "System" / "D3D9DrvRTX.dll",
+		VS_PROJECT_PATH / "install" / ("System64" if x64 else "System") / "D3D9DrvRTX.dll",
 		VS_PROJECT_PATH / "Config" / "D3D9DrvRTX.ini",
 		VS_PROJECT_PATH / "Config" / "D3D9DrvRTX.int",
 		VS_PROJECT_PATH / "Config" / "D3D9DrvRTX_hash_tex_blacklist.txt",
@@ -94,6 +96,7 @@ games_codes = [
 	"UT_469d",
 	"UT_436",
 	"Unreal_226",
+	"Unreal_227k_12",
 	"DeusEx",
 	"Nerf",
 	"Rune",
@@ -107,3 +110,8 @@ for game_code in games_codes:
 	build_name = f"D3D9DrvRTX-{game_code}-{version}"
 	zip_build(build_name, version_path)
 	print()
+	if game_code == "Unreal_227k_12":
+		build(args.version_extra, x64=True)
+		build_name = f"D3D9DrvRTX-{game_code}-x64-{version}"
+		zip_build(build_name, version_path, x64=True)
+		print()
