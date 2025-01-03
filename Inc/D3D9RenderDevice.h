@@ -1218,6 +1218,10 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	}
 	// Renders a mesh actor
 	void renderMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord = nullptr);
+
+#if UNREAL_GOLD_OLDUNREAL
+	void renderStaticMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord = nullptr);
+#endif
 #if RUNE
 	// Renders a skeletal mesh actor
 	void renderSkeletalMeshActor(FSceneNode* frame, AActor* actor, const FCoords* parentCoord = nullptr);

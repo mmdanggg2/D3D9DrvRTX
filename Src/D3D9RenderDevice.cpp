@@ -3481,6 +3481,13 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	if (!mesh)
 		return;
 
+#if UNREAL_GOLD_OLDUNREAL
+	if (mesh->IsA(UStaticMesh::StaticClass())) {
+		renderStaticMeshActor(frame, actor, specialCoord);
+		return;
+	}
+#endif
+
 	//dout << "rendering actor " << actor->GetName() << std::endl;
 	XMMATRIX actorMatrix = XMMatrixIdentity();
 
@@ -3847,6 +3854,205 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 	unguard;
 }
+
+#if UNREAL_GOLD_OLDUNREAL
+void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord) {
+#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: renderStaticMeshActor = " << si++ << std::endl;
+	}
+#endif
+	using namespace DirectX;
+	guard(UD3D9RenderDevice::renderStaticMeshActor);
+	EndBuffering();
+	UStaticMesh* mesh = Cast<UStaticMesh>(actor->Mesh);
+	if (!mesh)
+		return;
+
+	//dout << "rendering actor " << actor->GetName() << std::endl;
+	XMMATRIX actorMatrix = XMMatrixIdentity();
+
+	FVector adjustLoc(0, 0, 0);
+	bool renderAsParticles = actor->bParticles;
+
+	if (!renderAsParticles) {
+		XMMATRIX matScale = XMMatrixScaling(actor->DrawScale, actor->DrawScale, actor->DrawScale);
+		actorMatrix *= matScale;
+	}
+	if (specialCoord && specialCoord->enabled) {
+		actorMatrix *= FCoordToDXMat(specialCoord->coord);
+		actorMatrix *= FCoordToDXMat(specialCoord->baseCoord);
+	}
+	else {
+		XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(actor->Location + actor->PrePivot + adjustLoc));
+		XMMATRIX matRot = FRotToDXRotMat(actor->Rotation);
+		actorMatrix *= matRot;
+		actorMatrix *= matLoc;
+	}
+
+	FTime currentTime = frame->Viewport->CurrentTime;
+	DWORD baseFlags = getBasePolyFlags(actor);
+
+	if (renderAsParticles) {
+		FLOAT lux = Clamp(actor->ScaleGlow * 0.5f + actor->AmbientGlow / 256.f, 0.f, 1.f);
+		FPlane color = FVector(lux, lux, lux);
+		if (GIsEditor && (baseFlags & PF_Selected)) {
+			color = color * 0.4 + FVector(0.0, 0.6, 0.0);
+		}
+		UTexture* tex = actor->Texture->Get();
+		for (INT i = 0; i < mesh->SMVerts.Num(); i++) {
+			FVector& sample = mesh->SMVerts(i);
+			if (actor->bRandomFrame) {
+				tex = actor->MultiSkins[appCeil((&sample - &mesh->SMVerts(0)) / 3.f) % 8];
+				if (tex) {
+					tex = getTextureWithoutNext(tex, currentTime, actor->LifeFraction());
+				}
+			}
+			if (tex) {
+
+				// Transform the local-space point into world-space
+				XMVECTOR xpoint = FVecToDXVec(sample);
+				xpoint = XMVector3Transform(xpoint, actorMatrix);
+				FVector point = DXVecToFVec(xpoint);
+
+				FTextureInfo texInfo;
+				texInfo = *tex->GetTexture(-1, this);
+				renderSpriteGeo(frame, point, actor->DrawScale, texInfo, baseFlags, color);
+			}
+		}
+		return;
+	}
+
+	UniqueValueArray<UTexture*> textures(mesh->Textures.Num());
+	UniqueValueArray<FTextureInfo> texInfos(mesh->Textures.Num());
+	UTexture* envTex = nullptr;
+	FTextureInfo envTexInfo;
+
+	// Lock all mesh textures
+	for (int i = 0; i < mesh->Textures.Num(); i++) {
+		UTexture* tex = mesh->GetTexture(i, actor);
+		if (!tex && actor->Texture) {
+			tex = actor->Texture;
+		}
+		else if (!tex) {
+			continue;
+		}
+		tex = tex->Get();
+		if (textures.insert(i, tex)) {
+			FTextureInfo texInfo{};
+			texInfo = *textures.at(i)->GetTexture(-1, this);
+			texInfos.insert(i, texInfo);
+		}
+		else {
+			texInfos.insert(i, texInfos.at(textures.getIndex(tex)));
+		}
+		envTex = tex;
+	}
+	if (actor->Texture) {
+		envTex = actor->Texture;
+	}
+	else if (actor->Region.Zone && actor->Region.Zone->EnvironmentMap) {
+		envTex = actor->Region.Zone->EnvironmentMap;
+	}
+	else if (actor->Level->EnvironmentMap) {
+		envTex = actor->Level->EnvironmentMap;
+	}
+	if (!envTex) {
+		return;
+	}
+	envTexInfo = *envTex->GetTexture(-1, this);
+
+	bool fatten = actor->Fatness != 128;
+	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
+
+	// Calculate normals
+	mesh->CalcSMNormals();
+
+	XMMATRIX screenSpaceMat = actorMatrix * FCoordToDXMat(frame->Uncoords);
+
+	SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets;
+	surfaceBuckets.reserve(mesh->SMGroups.Num());
+
+	// Process all triangles on the mesh
+	for (INT i = 0; i < mesh->SMTris.Num(); i++) {
+		FStaticMeshTri& tri = mesh->SMTris(i);
+		FStaticMeshTexGroup& group = mesh->SMGroups(tri.GroupIndex);
+		INT texIdx = group.Texture;
+		DWORD polyFlags = group.RealPolyFlags;
+
+		polyFlags |= baseFlags;
+
+		bool environMapped = polyFlags & PF_Environment;
+		FTextureInfo* texInfo = &envTexInfo;
+		if (!environMapped && texInfos.has(texIdx)) {
+			texInfo = &texInfos.at(texIdx);
+		}
+		if (!texInfo->Texture) {
+			continue;
+		}
+		float scaleU = texInfo->UScale * texInfo->USize;
+		float scaleV = texInfo->VScale * texInfo->VSize;
+
+		// Sort triangles into surface/flag groups
+		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(texInfo, polyFlags);
+		pointsVec.reserve(mesh->SMTris.Num() * 3);
+		for (INT j = 0; j < 3; j++) {
+			FRenderVert& vert = pointsVec.emplace_back();
+			vert.Point = mesh->SMVerts(tri.iVertex[j]);
+			vert.Normal = mesh->SMNormals(i);
+			vert.U = tri.Tex[j].U * scaleU;
+			vert.V = tri.Tex[j].V * scaleV;
+			if (fatten) {
+				vert.Point += vert.Normal * fatness;
+			}
+
+			// Calculate the environment UV mapping
+			if (environMapped) {
+				calcEnvMapping(vert, screenSpaceMat, frame, scaleU, scaleV);
+			}
+		}
+	}
+
+	D3DMATRIX d3dMatrix = ToD3DMATRIX(actorMatrix);
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &d3dMatrix);
+
+	bool isViewModel = GUglyHackFlags & 0x1;
+	D3DVIEWPORT9 vpPrev;
+	if (isViewModel) {
+		D3DVIEWPORT9 vp;
+		m_d3dDevice->GetViewport(&vp);
+		vpPrev = vp;
+		vp.MaxZ = 0.1f;// Remix can pick this up for view model detection
+		m_d3dDevice->SetViewport(&vp);
+	}
+
+	// Batch render each group of tris
+	for (const auto& entry : surfaceBuckets) {
+		FTextureInfo* texInfo = entry.tex;
+		DWORD polyFlags = entry.flags;
+
+		BufferTriangleSurfaceGeometry(entry.bucket);
+
+		//Initialize render passes state information
+		m_rpPassCount = 0;
+		m_rpTMUnits = TMUnits;
+		m_rpForceSingle = false;
+		m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
+
+		AddRenderPass(texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
+
+		RenderPasses();
+	}
+
+	if (isViewModel) {
+		m_d3dDevice->SetViewport(&vpPrev);
+		m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
+	}
+
+	unguard;
+}
+#endif
 
 #if RUNE
 void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor, const FCoords* parentCoord) {
