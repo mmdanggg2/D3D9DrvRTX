@@ -14,7 +14,7 @@ This is a custom render device for the Unreal Engine, optimized for use with NVI
 
 ## Requirements
 - One of the supported games
-- [RTX Remix](https://github.com/NVIDIAGameWorks/rtx-remix) Runtime v0.5+ (Installed in `System` folder)
+- [RTX Remix](https://github.com/NVIDIAGameWorks/rtx-remix) Runtime v0.6+ (Installed in `System` folder)
 
 ## Installation
 - [Installation Tutorial video](https://youtu.be/XEe-pyZ3J9g)
