@@ -174,6 +174,38 @@ void UD3D9Render::SurfaceData::calculateSurfaceFacet(ULevel* level, const DWORD 
 	}
 }
 
+static bool getRenderInterfaceActors(AActor* actor, FSceneNode* frame, std::vector<AActor*>& actorsFound) {
+	UClass*& iterClass = actor->RenderIteratorClass;
+	URenderIterator*& iface = actor->RenderInterface;
+	if (iterClass) {
+		if (!iface || !iface->IsValid()) {
+			iface = ConstructObject<URenderIterator>(iterClass, actor);
+		}
+#if UNREAL_GOLD_OLDUNREAL
+		for (AActor* a = iface->OnGetActors(frame); a; a = a->Target) {
+#else
+#if UTGLR_RENDERITERATOR_ACTOR_INIT
+		iface->Init(frame->Viewport->Actor);
+#else
+		iface->Init(frame);
+#endif
+		for (iface->First(); !iface->IsDone(); iface->Next()) {
+			AActor* a = iface->CurrentItem();
+#endif
+			actorsFound.push_back(a);
+		}
+#if !UTGLR_RENDERITERATOR_ACTOR_INIT && !UNREAL_GOLD_OLDUNREAL
+		iface->UnInit();
+#endif
+		return true;
+	}
+	else if (iface) {
+		iface->Destroy();
+		iface = nullptr;
+	}
+	return false;
+}
+
 void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	guard(UD3D9Render::DrawWorld);
 	if (!GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
@@ -196,6 +228,8 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	//FMemMark dynMark(GDynMem);
 	FMemMark vectorMark(VectorMem);
 
+	//dout << "Starting frame" << std::endl;
+
 	if (Engine->Audio && !GIsEditor) {
 		Engine->Audio->RenderAudioGeometry(frame);
 	}
@@ -205,8 +239,6 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	if (!viewport->Actor->bBehindView) {
 		playerActor = viewport->Actor->ViewTarget ? viewport->Actor->ViewTarget : viewport->Actor;
 	}
-
-	//dout << "Starting frame" << std::endl;
 
 	FrameActors objs;
 	objs.lights.reserve(frame->Level->Actors.Num());
@@ -252,9 +284,16 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				continue;
 			}
 #endif
+			if (getRenderInterfaceActors(actor, frame, objs.actors)) {
+				continue;
+			}
+			if (actor->DrawType == DT_Brush) {
+				continue;
+			}
 			objs.actors.push_back(actor);
 		}
 	}
+
 #if RUNE
 	// Allows frame->Sprite to be populated
 	*prevFrameMaxZ = *currFrameMaxZ;
@@ -344,6 +383,9 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 		visibleActors.insert(sprite->Actor);
 	}
 	for (AActor* actor : objs.actors) {
+		if (actor->Region.ZoneNumber == 0) {
+			frame->Level->SetActorZone(actor, 1, 0);
+		}
 		if (visibleZoneBits[actor->Region.ZoneNumber]) {
 			visibleActors.insert(actor);
 		}
@@ -480,6 +522,11 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 		FDynamicSprite sprite(actor);
 		DrawParticleSystem(frame, &sprite);
 	}
+	else
+#endif
+#if UNREAL_GOLD_OLDUNREAL
+	d3d9Dev->setCompatMatrix(frame);
+	if (actor->OverrideMeshRender(frame)) {	}
 	else
 #endif
 	if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (frame->Viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
