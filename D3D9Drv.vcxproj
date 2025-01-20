@@ -279,7 +279,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <StructMemberAlignment>Default</StructMemberAlignment>
     </ClCompile>
     <ResourceCompile>
