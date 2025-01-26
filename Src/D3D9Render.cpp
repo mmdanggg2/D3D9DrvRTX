@@ -525,6 +525,23 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 	else
 #endif
 #if UNREAL_GOLD_OLDUNREAL
+	if (actor->RealBasedActors) {
+		if (actor->DrawType == DT_Mesh && actor->Mesh && actor->MeshInstance) {
+			actor->MeshInstance->UpdateAttachments(false);
+		}
+		for (INT i = 0; i < actor->RealBasedActors->Num(); i++) {
+			AActor* const& childActor = (*actor->RealBasedActors)(i);
+			if (childActor->bOnlyDrawWithBase || (!childActor->bHardAttach && childActor->AttachedBone.GetIndex() != 0)) {
+				if (childActor->bHidden && !(GUglyHackFlags & 0x40)) continue;
+				if (childActor->bHardAttach && childActor->AttachedBone.GetIndex() == 0) {
+					FCheckResult checkResult{};
+					childActor->XLevel->MoveActor(childActor, FVector(), FRotator(), checkResult);
+				}
+				drawActorSwitch(frame, d3d9Dev, childActor);
+			}
+		}
+	}
+
 	d3d9Dev->setCompatMatrix(frame);
 	if (actor->OverrideMeshRender(frame)) {	}
 	else
@@ -791,12 +808,12 @@ void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor) {
 		Super::DrawActor(frame, actor);
 		return;
 	}
+	// dout << "Drawing actor! " << actor->GetName() << std::endl;
 	UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
 	// TODO: fix this muzzle flash schtuff
 	d3d9Dev->executeBufferedTileDraws();
 	d3d9Dev->startWorldDraw(frame);
 	drawActorSwitch(frame, d3d9Dev, actor);
-	//dout << "Drawing actor! " << actor->GetName() << std::endl;
 	d3d9Dev->endWorldDraw(frame);
 	unguard;
 }
