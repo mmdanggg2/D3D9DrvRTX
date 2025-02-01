@@ -250,7 +250,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		AActor* actor = frame->Level->Actors(iActor);
 		if (!actor) continue;
 		if (actor->LightType != LT_None) {
-#if UTGLR_HP_ENGINE
+#if UTGLR_HAS_DARK_LIGHT
 			if (!actor->bDarkLight)
 #endif
 			objs.lights.push_back(actor);
