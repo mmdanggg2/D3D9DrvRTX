@@ -3869,6 +3869,11 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 	UStaticMesh* mesh = Cast<UStaticMesh>(actor->Mesh);
 	if (!mesh)
 		return;
+	
+	mesh->SMTris.Load();
+	if (!mesh->SMTris.Num()) {
+		return;
+	}
 
 	//dout << "rendering actor " << actor->GetName() << std::endl;
 	XMMATRIX actorMatrix = XMMatrixIdentity();
@@ -3967,7 +3972,9 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
 
 	// Calculate normals
-	mesh->CalcSMNormals();
+	if (!mesh->SMNormals.Num()) {
+		mesh->CalcSMNormals();
+	}
 
 	XMMATRIX screenSpaceMat = actorMatrix * FCoordToDXMat(frame->Uncoords);
 
