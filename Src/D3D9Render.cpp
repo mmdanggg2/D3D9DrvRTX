@@ -531,6 +531,9 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 		}
 		for (INT i = 0; i < actor->RealBasedActors->Num(); i++) {
 			AActor* const& childActor = (*actor->RealBasedActors)(i);
+			// block actors which should have already been iterated
+			if (childActor->RenderIteratorClass) continue;
+
 			if (childActor->bOnlyDrawWithBase || (!childActor->bHardAttach && childActor->AttachedBone.GetIndex() != 0)) {
 				if (childActor->bHidden && !(GUglyHackFlags & 0x40)) continue;
 				if (childActor->bHardAttach && childActor->AttachedBone.GetIndex() == 0) {
