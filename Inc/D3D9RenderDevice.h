@@ -263,11 +263,10 @@ struct FGLMapDot {
 };
 
 struct FRenderVert {
-	FRenderVert() {};
-	FRenderVert(const FTransTexture& tt) : Point(tt.Point), Normal(tt.Normal), U(tt.U), V(tt.V) {}
 	FVector Point{};
 	FVector Normal{};
 	FLOAT U{}, V{};
+	DWORD Color{0xFFFFFFFF};
 };
 
 // https://stackoverflow.com/a/57595105/5233018
@@ -429,7 +428,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	//Current vertex declaration state tracking
 	IDirect3DVertexDeclaration9 *m_curVertexDecl;
 	//Vertex and primary color
-	std::vector<FGLVertexNormTex> m_csVertexArray;
+	std::vector<FRenderVert> m_csVertexArray;
 	IDirect3DVertexBuffer9 *m_d3dVertexColorBuffer;
 	FGLVertexColor *m_pVertexColorArray;
 	INT m_vertexTempBufferSize;

@@ -4719,29 +4719,11 @@ void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* l
 }
 
 INT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FRenderVert>& vertices) {
-	// Buffer "static" geometry.
-	m_csVertexArray.clear();
-	m_csVertexArray.reserve(vertices.size());
-
 	// I was promised to be given triangles
 	assert(vertices.size() % 3 == 0);
-	size_t tris = vertices.size() / 3;
 
-	for (int i = 0; i < tris; i++) {
-		INT numPts = 3;
-		for (int j = 0; j < numPts; j++) {
-			const FRenderVert& vert = vertices[(i * 3) + j];
-			FGLVertexNormTex* bufVert = &m_csVertexArray.emplace_back();
-			bufVert->vert.x = vert.Point.X;
-			bufVert->vert.y = vert.Point.Y;
-			bufVert->vert.z = vert.Point.Z;
-			bufVert->norm.x = vert.Normal.X;
-			bufVert->norm.y = vert.Normal.Y;
-			bufVert->norm.z = vert.Normal.Z;
-			bufVert->tex.u = vert.U;
-			bufVert->tex.v = vert.V;
-		};
-	}
+	// Buffer "static" geometry.
+	m_csVertexArray = vertices;
 
 	return m_csVertexArray.size();
 }
@@ -6786,15 +6768,14 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 
 	//Write vertex and color
 	FGLVertexColor *pVertexColorArray = m_pVertexColorArray;
-	DWORD rpColor = 0xFFFFFFFF;
-	for (FGLVertexNormTex& vert : m_csVertexArray) {
-		pVertexColorArray->x = vert.vert.x;
-		pVertexColorArray->y = vert.vert.y;
-		pVertexColorArray->z = vert.vert.z;
-		pVertexColorArray->norm.x = vert.norm.x;
-		pVertexColorArray->norm.y = vert.norm.y;
-		pVertexColorArray->norm.z = vert.norm.z;
-		pVertexColorArray->color = rpColor;
+	for (FRenderVert& vert : m_csVertexArray) {
+		pVertexColorArray->x = vert.Point.X;
+		pVertexColorArray->y = vert.Point.Y;
+		pVertexColorArray->z = vert.Point.Z;
+		pVertexColorArray->norm.x = vert.Normal.X;
+		pVertexColorArray->norm.y = vert.Normal.Y;
+		pVertexColorArray->norm.z = vert.Normal.Z;
+		pVertexColorArray->color = vert.Color;
 		pVertexColorArray++;
 	}
 
@@ -6807,9 +6788,9 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 		FLOAT VMult = TexInfo[t].VMult;
 		FGLTexCoord *pTexCoord = m_pTexCoordArray[t];
 
-		for (FGLVertexNormTex& vert : m_csVertexArray) {
-			pTexCoord->u = (vert.tex.u - UPan) * UMult;
-			pTexCoord->v = (vert.tex.v - VPan) * VMult;
+		for (FRenderVert& vert : m_csVertexArray) {
+			pTexCoord->u = (vert.U - UPan) * UMult;
+			pTexCoord->v = (vert.V - VPan) * VMult;
 
 			pTexCoord++;
 		};
@@ -6862,25 +6843,27 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 		};
 
 		do {
-			FGLVertexNormTex& v1 = m_csVertexArray.emplace_back();
-			v1.vert = { hubPoint->X, hubPoint->Y, hubPoint->Z };
-			v1.norm = { 0.0f, 0.0f, 0.0f };
-			v1.tex = hubPtTex;
+			FRenderVert& v1 = m_csVertexArray.emplace_back();
+			v1.Point = *hubPoint;
+			v1.Normal = { 0.0f, 0.0f, 0.0f };
+			v1.U = hubPtTex.u;
+			v1.V = hubPtTex.v;
 
-			FGLVertexNormTex& v2 = m_csVertexArray.emplace_back();
-			v2.vert = { secondPoint->X, secondPoint->Y, secondPoint->Z };
-			v2.norm = { 0.0f, 0.0f, 0.0f };
-			v2.tex = secondPtTex;
+			FRenderVert& v2 = m_csVertexArray.emplace_back();
+			v2.Point = *secondPoint;
+			v2.Normal = { 0.0f, 0.0f, 0.0f };
+			v2.U = secondPtTex.u;
+			v2.V = secondPtTex.v;
 
 			const FVector* point = &(*pPts++)->Point;
-			FGLVertexNormTex& v3 = m_csVertexArray.emplace_back();
-			v3.vert = { point->X, point->Y, point->Z };
-			v3.norm = { 0.0f, 0.0f, 0.0f };
-			v3.tex.u = (Facet.MapCoords.XAxis | *point) - csDot.u;
-			v3.tex.v = (Facet.MapCoords.YAxis | *point) - csDot.v;
+			FRenderVert& v3 = m_csVertexArray.emplace_back();
+			v3.Point = *point;
+			v3.Normal = { 0.0f, 0.0f, 0.0f };
+			v3.U = (Facet.MapCoords.XAxis | *point) - csDot.u;
+			v3.V = (Facet.MapCoords.YAxis | *point) - csDot.v;
 
 			secondPoint = point;
-			secondPtTex = v3.tex;
+			secondPtTex = { v3.U, v3.V };
 		} while (--numPolys != 0);
 	}
 
