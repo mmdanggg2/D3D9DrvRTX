@@ -547,7 +547,8 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 	}
 
 	d3d9Dev->setCompatMatrix(frame);
-	if (actor->OverrideMeshRender(frame)) {	}
+	// Terrain actor vftable can be nullptr so check first!
+	if (*((void**)actor) && actor->OverrideMeshRender(frame)) {}
 	else
 #endif
 	if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (frame->Viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {

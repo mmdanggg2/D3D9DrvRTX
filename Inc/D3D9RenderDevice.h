@@ -1220,6 +1220,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 #if UNREAL_GOLD_OLDUNREAL
 	void renderStaticMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord = nullptr);
+	void renderTerrainMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord = nullptr);
 #endif
 #if RUNE
 	// Renders a skeletal mesh actor
