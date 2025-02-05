@@ -209,59 +209,68 @@ template <typename T>
 class UniqueValueArray {
 public:
 	UniqueValueArray(int reserve) {
-		value_map.reserve(reserve);
-		unique_values.reserve(reserve);
+		valueMap.reserve(reserve);
+		uniqueValues.reserve(reserve);
 	}
 
-	bool insert(int index, T value) {
-		auto result = unique_values.insert(value);
-		for (auto& entry : value_map) {
-			if (entry.first == index) {
-				entry.second = const_cast<T*>(&(*result.first));
+	bool insert(int index, const T& value) {
+		int uniqueIdx = -1;
+		for (int i = 0; i < uniqueValues.size(); i++) {
+			if (uniqueValues[i] == value) {
+				uniqueIdx = i;
+				break;
 			}
 		}
-		value_map.push_back(std::make_pair(index, const_cast<T*>(&(*result.first))));
-		return result.second;
+		bool newVal = false;
+		if (uniqueIdx == -1) {
+			uniqueIdx = uniqueValues.size();
+			uniqueValues.push_back(value);
+			newVal = true;
+		}
+		if (index >= valueMap.size()) {
+			valueMap.resize(index + 1, -1);
+		}
+		valueMap[index] = uniqueIdx;
+		return newVal;
 	}
 
 	T& at(int index) {
-		for (auto& entry : value_map) {
-			if (entry.first == index) {
-				return *entry.second;
-			}
+		if (index < valueMap.size()) {
+			int uniqueIdx = valueMap[index];
+			if (uniqueIdx != -1) return uniqueValues[uniqueIdx];
 		}
 		throw std::out_of_range("Invalid index");
 	}
 
 	bool has(int index) {
-		for (auto& entry : value_map) {
-			if (entry.first == index) {
-				return true;
-			}
+		if (index < valueMap.size()) {
+			int uniqueIdx = valueMap[index];
+			if (uniqueIdx != -1) return true;
 		}
 		return false;
 	}
 
 	int getIndex(T value) {
-		for (auto& pair : value_map) {
-			if (*pair.second == value) {
-				return pair.first;
+		for (int i = 0; i < valueMap.size(); i++) {
+			int uniqueIdx = valueMap[i];
+			if (uniqueIdx != -1 && uniqueValues[uniqueIdx] == value) {
+				return i;
 			}
 		}
 		return -1;
 	}
 
 	auto begin() {
-		return unique_values.begin();
+		return uniqueValues.begin();
 	}
 
 	auto end() {
-		return unique_values.end();
+		return uniqueValues.end();
 	}
 
 private:
-	std::vector<std::pair<int, T*>> value_map;
-	std::unordered_set<T> unique_values;
+	std::vector<int> valueMap;
+	std::vector<T> uniqueValues;
 };
 
 static inline DirectX::XMMATRIX ToXMMATRIX(const D3DMATRIX& d3dMatrix) {
