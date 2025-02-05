@@ -3712,12 +3712,10 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	bool fatten = actor->Fatness != 128;
 	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
 
-	FVector* normals = New<FVector>(GMem, numVerts);
+	FVector* normals = NewZeroed<FVector>(GMem, numVerts);
 
 	// Calculate normals
-	for (int i = 0; i < numVerts; i++) {
-		normals[i] = FVector(0, 0, 0);
-	}
+	// Already zeroed on new
 	for (int i = 0; i < numTris; i++) {
 		int sampleIdx[3];
 		if (isLod) {
@@ -3755,6 +3753,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets;
 	surfaceBuckets.reserve(numTris);
 
+	int vertMaxCount = numTris * 3;
 	// Process all triangles on the mesh
 	for (INT i = 0; i < numTris; i++) {
 		INT sampleIdx[3];
@@ -3797,7 +3796,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 		// Sort triangles into surface/flag groups
 		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(texInfo, polyFlags);
-		pointsVec.reserve(numTris*3);
+		pointsVec.reserve(vertMaxCount);
 		for (INT j = 0; j < 3; j++) {
 			FRenderVert& vert = pointsVec.emplace_back();
 			vert.Point = samples[sampleIdx[j]];
@@ -3851,15 +3850,13 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
 	}
 
+#if !UNREAL_GOLD_OLDUNREAL
 	for (UTexture* tex : textures) {
 		if (!tex)
 			continue;
-#if !UNREAL_GOLD_OLDUNREAL
 		tex->Unlock(texInfos.at(textures.getIndex(tex)));
 	}
 	envTex->Unlock(envTexInfo);
-#else
-	}
 #endif
 
 	unguard;
@@ -3991,6 +3988,7 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 	SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets;
 	surfaceBuckets.reserve(mesh->SMGroups.Num());
 
+	INT vertMaxCount = mesh->SMGroups.Num();
 	// Process all triangles on the mesh
 	for (INT i = 0; i < mesh->SMTris.Num(); i++) {
 		FStaticMeshTri& tri = mesh->SMTris(i);
@@ -4013,7 +4011,7 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 
 		// Sort triangles into surface/flag groups
 		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(texInfo, polyFlags);
-		pointsVec.reserve(mesh->SMTris.Num() * 3);
+		pointsVec.reserve(vertMaxCount);
 		for (INT j = 0; j < 3; j++) {
 			FRenderVert& vert = pointsVec.emplace_back();
 			vert.Point = mesh->SMVerts(tri.iVertex[j]);
@@ -4253,6 +4251,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets;
 	surfaceBuckets.reserve(numTris);
 	
+	int vertMaxCount = numTris * 3;
 	// Process all triangles on the mesh
 	for (INT i = 0; i < numTris; i++) {
 		Triangle& tri = mesh->tris(i);
@@ -4272,7 +4271,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 
 		// Sort triangles into surface/flag groups
 		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(texInfo, polyFlags);
-		pointsVec.reserve(numTris * 3);
+		pointsVec.reserve(vertMaxCount);
 		STAT(clockFast(GStat.SkelLightTime))
 		for (INT j = 0; j < 3; j++) {
 			const INT idx = actor->bMirrored ? 2 - j : j;
