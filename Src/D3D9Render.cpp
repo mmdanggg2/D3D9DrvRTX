@@ -377,6 +377,7 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 		}
 	}
 	for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
+		if (sprite->Actor->RenderIteratorClass) continue;
 		if (!isSky) {
 			visibleZoneBits[sprite->Actor->Region.ZoneNumber] = true;
 		}
@@ -535,7 +536,7 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 			if (childActor->RenderIteratorClass) continue;
 
 			if (childActor->bOnlyDrawWithBase || (!childActor->bHardAttach && childActor->AttachedBone.GetIndex() != 0)) {
-				if (childActor->bHidden && !(GUglyHackFlags & 0x40)) continue;
+				if (childActor->bHidden && !(GUglyHackFlags & HACKFLAGS_DrawHiddenActor)) continue;
 				if (childActor->bHardAttach && childActor->AttachedBone.GetIndex() == 0) {
 					FCheckResult checkResult{};
 					childActor->XLevel->MoveActor(childActor, FVector(), FRotator(), checkResult);
