@@ -928,6 +928,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	m_d3dpp.BackBufferHeight = NewY;
 	m_d3dpp.BackBufferFormat = d3ddm.Format;
 	m_d3dpp.EnableAutoDepthStencil = TRUE;
+	m_d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
 
 	//Check if should be full screen
 	if (Fullscreen) {
