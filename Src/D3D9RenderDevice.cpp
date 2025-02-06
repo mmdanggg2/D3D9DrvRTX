@@ -335,11 +335,11 @@ IMPLEMENT_CLASS(UD3D9RenderDevice);
 
 
 static void SC_AddBoolConfigParam(DWORD BitMaskOffset, const TCHAR* pName, UBOOL& param, ECppProperty EC_CppProperty, INT InOffset, UBOOL defaultValue) {
-#if !UNREAL_TOURNAMENT_OLDUNREAL
-	param = (((defaultValue) != 0) ? 1 : 0) << BitMaskOffset; //Doesn't exactly work like a UBOOL "// Boolean 0 (false) or 1 (true)."
-#else
+#if UNREAL_TOURNAMENT_OLDUNREAL || UNREAL_GOLD_OLDUNREAL
 	// stijn: we no longer need the manual bitmask shifting in patch 469
 	param = defaultValue;
+#else
+	param = (((defaultValue) != 0) ? 1 : 0) << BitMaskOffset; //Doesn't exactly work like a UBOOL "// Boolean 0 (false) or 1 (true)."
 #endif
 	new(UD3D9RenderDevice::StaticClass(), pName, RF_Public)UBoolProperty(EC_CppProperty, InOffset, TEXT("Options"), CPF_Config);
 }
@@ -420,7 +420,8 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddIntConfigParam(TEXT("DynamicTexIdRecycleLevel"), CPP_PROPERTY_LOCAL(DynamicTexIdRecycleLevel), 100);
 	SC_AddBoolConfigParam(0,  TEXT("TexDXT1ToDXT3"), CPP_PROPERTY_LOCAL(TexDXT1ToDXT3), 0);
 	SC_AddIntConfigParam(TEXT("FrameRateLimit"), CPP_PROPERTY_LOCAL(FrameRateLimit), 0);
-	SC_AddBoolConfigParam(3,  TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
+	SC_AddBoolConfigParam(4, TEXT("SmoothMaskedTextures"), CPP_PROPERTY_LOCAL(SmoothMaskedTextures), 0);
+	SC_AddBoolConfigParam(3, TEXT("NonSolidTranslucentHack"), CPP_PROPERTY_LOCAL(NonSolidTranslucentHack), 1);
 	SC_AddBoolConfigParam(2, TEXT("EnableSkyBoxRendering"), CPP_PROPERTY_LOCAL(EnableSkyBoxRendering), 1);
 	SC_AddBoolConfigParam(1, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 0);
 	SC_AddBoolConfigParam(0, TEXT("EnableHashTextures"), CPP_PROPERTY_LOCAL(EnableHashTextures), 1);
@@ -6662,7 +6663,7 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags, bool isUI) {
 				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
 				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
 			}
-			else if ((blendFlags & PF_NotSolid) && !(blendFlags & PF_TwoSided)) {
+			else if ((blendFlags & PF_NotSolid) && !(blendFlags & PF_TwoSided) && NonSolidTranslucentHack) {
 				// Make non solid surfaces translucent so that light can shine through them
 				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
 				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
