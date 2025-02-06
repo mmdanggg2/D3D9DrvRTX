@@ -363,6 +363,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 }
 
 void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, ModelFacets& modelFacets, FrameActors& objs, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures, bool isSky) {
+	guard(UD3D9Render::drawFrame);
 	// Add all actors in view and also any in zones that are visible
 	std::unordered_set<AActor*> visibleActors;
 	std::unordered_set<ABrush*> visibleMovers;
@@ -485,6 +486,7 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 			}
 		}
 	}
+	unguardf((TEXT("(isSky = %i)"), isSky));
 }
 
 void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, ParentCoord* parentCoord)
@@ -560,7 +562,7 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 	if (actor->IsA(APawn::StaticClass())) {
 		drawPawnExtras(frame, d3d9Dev, (APawn*)actor, specialCoord);
 	}
-	unguardf((actor->GetFullName()));
+	unguardf((TEXT("(%ls)"), actor->GetFullName()));
 }
 
 #if !UTGLR_NO_DECALS
