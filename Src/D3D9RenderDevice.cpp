@@ -3824,8 +3824,22 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		}
 	}
 
-	D3DMATRIX d3dMatrix = ToD3DMATRIX(actorMatrix);
-	m_d3dDevice->SetTransform(D3DTS_WORLD, &d3dMatrix);
+	renderSurfaceBuckets(surfaceBuckets, &ToD3DMATRIX(actorMatrix));
+
+#if !UNREAL_GOLD_OLDUNREAL
+	for (UTexture* tex : textures) {
+		if (!tex)
+			continue;
+		tex->Unlock(texInfos.at(textures.getIndex(tex)));
+	}
+	envTex->Unlock(envTexInfo);
+#endif
+
+	unguard;
+}
+
+void UD3D9RenderDevice::renderSurfaceBuckets(SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets, D3DMATRIX* actorMatrix) {
+	m_d3dDevice->SetTransform(D3DTS_WORLD, actorMatrix);
 
 	bool isViewModel = GUglyHackFlags & 0x1;
 	D3DVIEWPORT9 vpPrev;
@@ -3859,17 +3873,6 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		m_d3dDevice->SetViewport(&vpPrev);
 		m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
 	}
-
-#if !UNREAL_GOLD_OLDUNREAL
-	for (UTexture* tex : textures) {
-		if (!tex)
-			continue;
-		tex->Unlock(texInfos.at(textures.getIndex(tex)));
-	}
-	envTex->Unlock(envTexInfo);
-#endif
-
-	unguard;
 }
 
 #if UNREAL_GOLD_OLDUNREAL
@@ -4041,41 +4044,7 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 		}
 	}
 
-	D3DMATRIX d3dMatrix = ToD3DMATRIX(actorMatrix);
-	m_d3dDevice->SetTransform(D3DTS_WORLD, &d3dMatrix);
-
-	bool isViewModel = GUglyHackFlags & 0x1;
-	D3DVIEWPORT9 vpPrev;
-	if (isViewModel) {
-		D3DVIEWPORT9 vp;
-		m_d3dDevice->GetViewport(&vp);
-		vpPrev = vp;
-		vp.MaxZ = 0.1f;// Remix can pick this up for view model detection
-		m_d3dDevice->SetViewport(&vp);
-	}
-
-	// Batch render each group of tris
-	for (const auto& entry : surfaceBuckets) {
-		FTextureInfo* texInfo = entry.tex;
-		DWORD polyFlags = entry.flags;
-
-		BufferTriangleSurfaceGeometry(entry.bucket);
-
-		//Initialize render passes state information
-		m_rpPassCount = 0;
-		m_rpTMUnits = TMUnits;
-		m_rpForceSingle = false;
-		m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
-
-		AddRenderPass(texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
-
-		RenderPasses();
-	}
-
-	if (isViewModel) {
-		m_d3dDevice->SetViewport(&vpPrev);
-		m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
-	}
+	renderSurfaceBuckets(surfaceBuckets, &ToD3DMATRIX(actorMatrix));
 
 	unguard;
 }
@@ -4203,41 +4172,7 @@ void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor,
 		}
 	}
 
-	D3DMATRIX d3dMatrix = ToD3DMATRIX(actorMatrix);
-	m_d3dDevice->SetTransform(D3DTS_WORLD, &d3dMatrix);
-
-	bool isViewModel = GUglyHackFlags & 0x1;
-	D3DVIEWPORT9 vpPrev;
-	if (isViewModel) {
-		D3DVIEWPORT9 vp;
-		m_d3dDevice->GetViewport(&vp);
-		vpPrev = vp;
-		vp.MaxZ = 0.1f;// Remix can pick this up for view model detection
-		m_d3dDevice->SetViewport(&vp);
-	}
-
-	// Batch render each group of tris
-	for (auto& entry : surfaceBuckets) {
-		FTextureInfo* texInfo = entry.tex;
-		DWORD polyFlags = entry.flags;
-
-		BufferTriangleSurfaceGeometry(entry.bucket);
-
-		//Initialize render passes state information
-		m_rpPassCount = 0;
-		m_rpTMUnits = TMUnits;
-		m_rpForceSingle = false;
-		m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
-
-		AddRenderPass(texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
-
-		RenderPasses();
-	}
-
-	if (isViewModel) {
-		m_d3dDevice->SetViewport(&vpPrev);
-		m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
-	}
+	renderSurfaceBuckets(surfaceBuckets, &ToD3DMATRIX(actorMatrix));
 
 	unguard;
 }
@@ -4470,45 +4405,11 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 
 	STAT(unclockFast(GStat.SkelClipTime));
 
-	D3DMATRIX d3dMatrix = ToD3DMATRIX(actorMatrix);
-	m_d3dDevice->SetTransform(D3DTS_WORLD, &d3dMatrix);
-
-	bool isViewModel = GUglyHackFlags & 0x1;
-	D3DVIEWPORT9 vpPrev;
-	if (isViewModel) {
-		D3DVIEWPORT9 vp;
-		m_d3dDevice->GetViewport(&vp);
-		vpPrev = vp;
-		vp.MaxZ = 0.1f;// Remix can pick this up for view model detection
-		m_d3dDevice->SetViewport(&vp);
-	}
-
 	STAT(clockFast(GStat.SkelRasterTime));
 
-	// Batch render each group of tris
-	for (const SurfKeyBucket<FTextureInfo*, FRenderVert>& entry : surfaceBuckets) {
-		FTextureInfo* texInfo = entry.tex;
-		DWORD polyFlags = entry.flags;
-
-		BufferTriangleSurfaceGeometry(entry.bucket);
-
-		//Initialize render passes state information
-		m_rpPassCount = 0;
-		m_rpTMUnits = TMUnits;
-		m_rpForceSingle = false;
-		m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
-
-		AddRenderPass(texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
-
-		RenderPasses();
-	}
+	renderSurfaceBuckets(surfaceBuckets, &ToD3DMATRIX(actorMatrix));
 
 	STAT(unclockFast(GStat.SkelRasterTime));
-
-	if (isViewModel) {
-		m_d3dDevice->SetViewport(&vpPrev);
-		m_d3dDevice->SetTransform(D3DTS_WORLD, &identityMatrix);
-	}
 
 	for (UTexture* tex : textures) {
 		if (!tex)
