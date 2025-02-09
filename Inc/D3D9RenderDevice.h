@@ -1236,8 +1236,12 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	// Renders a magic shape for anchoring stuff to the sky box
 	void renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* location);
 
+	struct ActorRenderData {
+		SurfKeyBucketVector<UTexture*, FRenderVert> surfaceBuckets;
+		D3DMATRIX actorMatrix;
+	};
 	// Given a set of verts and textures, render them with the actor matrix.
-	void renderSurfaceBuckets(SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets, D3DMATRIX* actorMatrix);
+	void renderSurfaceBuckets(const ActorRenderData& renderData, FTime);
 
 	void fillHashTexture(FTexConvertCtx convertContext, FTextureInfo& tex);
 	bool shouldGenHashTexture(const FTextureInfo& tex);

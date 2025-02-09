@@ -238,12 +238,12 @@ public:
 		return newVal;
 	}
 
-	T& at(int index) {
+	T* at(int index) {
 		if (index < valueMap.size()) {
 			int uniqueIdx = valueMap[index];
-			if (uniqueIdx != -1) return uniqueValues[uniqueIdx];
+			if (uniqueIdx != -1) return &uniqueValues[uniqueIdx];
 		}
-		throw std::out_of_range("Invalid index");
+		return nullptr;
 	}
 
 	bool has(int index) {
@@ -3671,9 +3671,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	}
 
 	UniqueValueArray<UTexture*> textures(mesh->Textures.Num());
-	UniqueValueArray<FTextureInfo> texInfos(mesh->Textures.Num());
 	UTexture* envTex = nullptr;
-	FTextureInfo envTexInfo;
 
 	// Lock all mesh textures
 	for (int i = 0; i < mesh->Textures.Num(); i++) {
@@ -3688,17 +3686,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 #else
 		tex = tex->Get(currentTime);
 #endif
-		if (textures.insert(i, tex)) {
-			FTextureInfo texInfo{};
-#if UNREAL_GOLD_OLDUNREAL
-			texInfo = *textures.at(i)->GetTexture(-1, this);
-#else
-			textures.at(i)->Lock(texInfo, currentTime, -1, this);
-#endif
-			texInfos.insert(i, texInfo);
-		} else {
-			texInfos.insert(i, texInfos.at(textures.getIndex(tex)));
-		}
+		textures.insert(i, tex);
 		envTex = tex;
 	}
 	if (actor->Texture) {
@@ -3711,11 +3699,6 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 	if (!envTex) {
 		return;
 	}
-#if UNREAL_GOLD_OLDUNREAL
-	envTexInfo = *envTex->GetTexture(-1, this);
-#else
-	envTex->Lock(envTexInfo, currentTime, -1, this);
-#endif
 
 	bool fatten = actor->Fatness != 128;
 	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
@@ -3758,7 +3741,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 	XMMATRIX screenSpaceMat = actorMatrix * FCoordToDXMat(frame->Uncoords);
 
-	SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets;
+	SurfKeyBucketVector<UTexture*, FRenderVert> surfaceBuckets;
 	surfaceBuckets.reserve(numTris);
 
 	int vertMaxCount = numTris * 3;
@@ -3792,18 +3775,20 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 		polyFlags |= baseFlags;
 
 		bool environMapped = polyFlags & PF_Environment;
-		FTextureInfo* texInfo = &envTexInfo;
-		if (!environMapped && texInfos.has(texIdx)) {
-			texInfo = &texInfos.at(texIdx);
+		UTexture** tex = textures.at(texIdx);
+		if (environMapped || !tex) {
+			tex = &envTex;
 		}
-		if (!texInfo->Texture) {
-			continue;
-		}
-		float scaleU = texInfo->UScale * texInfo->USize / 256.0;
-		float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
+#if UNREAL_GOLD_OLDUNREAL
+		float scaleU = (*tex)->DrawScale * (*tex)->USize / 256.0;
+		float scaleV = (*tex)->DrawScale * (*tex)->VSize / 256.0;
+#else
+		float scaleU = (*tex)->Scale * (*tex)->USize / 256.0;
+		float scaleV = (*tex)->Scale * (*tex)->VSize / 256.0;
+#endif
 
 		// Sort triangles into surface/flag groups
-		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(texInfo, polyFlags);
+		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(*tex, polyFlags);
 		pointsVec.reserve(vertMaxCount);
 		for (INT j = 0; j < 3; j++) {
 			FRenderVert& vert = pointsVec.emplace_back();
@@ -3823,23 +3808,14 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 			vert.V *= scaleV;
 		}
 	}
-
-	renderSurfaceBuckets(surfaceBuckets, &ToD3DMATRIX(actorMatrix));
-
-#if !UNREAL_GOLD_OLDUNREAL
-	for (UTexture* tex : textures) {
-		if (!tex)
-			continue;
-		tex->Unlock(texInfos.at(textures.getIndex(tex)));
-	}
-	envTex->Unlock(envTexInfo);
-#endif
+	ActorRenderData renderData{surfaceBuckets, ToD3DMATRIX(actorMatrix)};
+	renderSurfaceBuckets(renderData, currentTime);
 
 	unguard;
 }
 
-void UD3D9RenderDevice::renderSurfaceBuckets(SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets, D3DMATRIX* actorMatrix) {
-	m_d3dDevice->SetTransform(D3DTS_WORLD, actorMatrix);
+void UD3D9RenderDevice::renderSurfaceBuckets(const ActorRenderData& renderData, FTime currentTime) {
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &renderData.actorMatrix);
 
 	bool isViewModel = GUglyHackFlags & 0x1;
 	D3DVIEWPORT9 vpPrev;
@@ -3852,8 +3828,8 @@ void UD3D9RenderDevice::renderSurfaceBuckets(SurfKeyBucketVector<FTextureInfo*, 
 	}
 
 	// Batch render each group of tris
-	for (const auto& entry : surfaceBuckets) {
-		FTextureInfo* texInfo = entry.tex;
+	for (const auto& entry : renderData.surfaceBuckets) {
+		UTexture* tex = entry.tex;
 		DWORD polyFlags = entry.flags;
 
 		BufferTriangleSurfaceGeometry(entry.bucket);
@@ -3864,7 +3840,20 @@ void UD3D9RenderDevice::renderSurfaceBuckets(SurfKeyBucketVector<FTextureInfo*, 
 		m_rpForceSingle = false;
 		m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
 
-		AddRenderPass(texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
+		FTextureInfo* texInfoPtr;
+#if UNREAL_GOLD_OLDUNREAL
+		texInfoPtr = tex->GetTexture(-1, this);
+#else
+		FTextureInfo texInfo{};
+		tex->Lock(texInfo, currentTime, -1, this);
+		texInfoPtr = &texInfo;
+#endif
+
+		AddRenderPass(texInfoPtr, polyFlags & ~PF_FlatShaded, 0.0f);
+
+#if !UNREAL_GOLD_OLDUNREAL
+		tex->Unlock(texInfo);
+#endif
 
 		RenderPasses();
 	}
@@ -3950,9 +3939,7 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 	}
 
 	UniqueValueArray<UTexture*> textures(mesh->Textures.Num());
-	UniqueValueArray<FTextureInfo> texInfos(mesh->Textures.Num());
 	UTexture* envTex = nullptr;
-	FTextureInfo envTexInfo;
 
 	// Lock all mesh textures
 	for (int i = 0; i < mesh->Textures.Num(); i++) {
@@ -3964,14 +3951,7 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 			continue;
 		}
 		tex = tex->Get();
-		if (textures.insert(i, tex)) {
-			FTextureInfo texInfo{};
-			texInfo = *textures.at(i)->GetTexture(-1, this);
-			texInfos.insert(i, texInfo);
-		}
-		else {
-			texInfos.insert(i, texInfos.at(textures.getIndex(tex)));
-		}
+		textures.insert(i, tex);
 		envTex = tex;
 	}
 	if (actor->Texture) {
@@ -3986,7 +3966,6 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 	if (!envTex) {
 		return;
 	}
-	envTexInfo = *envTex->GetTexture(-1, this);
 
 	bool fatten = actor->Fatness != 128;
 	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
@@ -3998,7 +3977,7 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 
 	XMMATRIX screenSpaceMat = actorMatrix * FCoordToDXMat(frame->Uncoords);
 
-	SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets;
+	SurfKeyBucketVector<UTexture*, FRenderVert> surfaceBuckets;
 	surfaceBuckets.reserve(mesh->SMGroups.Num());
 
 	INT vertMaxCount = mesh->SMGroups.Num();
@@ -4012,18 +3991,15 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 		polyFlags |= baseFlags;
 
 		bool environMapped = polyFlags & PF_Environment;
-		FTextureInfo* texInfo = &envTexInfo;
-		if (!environMapped && texInfos.has(texIdx)) {
-			texInfo = &texInfos.at(texIdx);
+		UTexture** tex = textures.at(texIdx);
+		if (environMapped || !tex) {
+			tex = &envTex;
 		}
-		if (!texInfo->Texture) {
-			continue;
-		}
-		float scaleU = texInfo->UScale * texInfo->USize;
-		float scaleV = texInfo->VScale * texInfo->VSize;
+		float scaleU = (*tex)->DrawScale * (*tex)->USize;
+		float scaleV = (*tex)->DrawScale * (*tex)->VSize;
 
 		// Sort triangles into surface/flag groups
-		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(texInfo, polyFlags);
+		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(*tex, polyFlags);
 		pointsVec.reserve(vertMaxCount);
 		for (INT j = 0; j < 3; j++) {
 			FRenderVert& vert = pointsVec.emplace_back();
@@ -4044,7 +4020,8 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 		}
 	}
 
-	renderSurfaceBuckets(surfaceBuckets, &ToD3DMATRIX(actorMatrix));
+	ActorRenderData renderData{ surfaceBuckets, ToD3DMATRIX(actorMatrix) };
+	renderSurfaceBuckets(renderData, currentTime);
 
 	unguard;
 }
@@ -4092,14 +4069,7 @@ void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor,
 			continue;
 		}
 		tex = tex->Get();
-		if (textures.insert(i, tex)) {
-			FTextureInfo texInfo{};
-			texInfo = *textures.at(i)->GetTexture(-1, this);
-			texInfos.insert(i, texInfo);
-		}
-		else {
-			texInfos.insert(i, texInfos.at(textures.getIndex(tex)));
-		}
+		textures.insert(i, tex);
 		envTex = tex;
 	}
 	if (actor->Texture) {
@@ -4124,7 +4094,7 @@ void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor,
 	FTerrainQuad* quad = &mesh->TerrainQuads(actor->LatentInt);
 	FTerrainTris* tris = &mesh->TerrainTris(quad->TrisOffset);
 
-	SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets;
+	SurfKeyBucketVector<UTexture*, FRenderVert> surfaceBuckets;
 	surfaceBuckets.reserve(quad->Verts.Num());
 
 	INT vertMaxCount = quad->NumTris * 3;
@@ -4137,18 +4107,15 @@ void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor,
 		polyFlags |= tri.IsAlpha() ? (baseFlags | PF_AlphaBlend) : baseFlags;
 
 		bool environMapped = polyFlags & PF_Environment;
-		FTextureInfo* texInfo = &envTexInfo;
-		if (!environMapped && texInfos.has(texIdx)) {
-			texInfo = &texInfos.at(texIdx);
+		UTexture** tex = textures.at(texIdx);
+		if (environMapped || !tex) {
+			tex = &envTex;
 		}
-		if (!texInfo->Texture) {
-			continue;
-		}
-		float scaleU = texInfo->UScale * texInfo->USize;
-		float scaleV = texInfo->VScale * texInfo->VSize;
+		float scaleU = (*tex)->DrawScale * (*tex)->USize;
+		float scaleV = (*tex)->DrawScale * (*tex)->VSize;
 
 		// Sort triangles into surface/flag groups
-		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(texInfo, polyFlags);
+		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(*tex, polyFlags);
 		pointsVec.reserve(vertMaxCount);
 		for (INT j = 0; j < 3; j++) {
 			FTerrainVert& terrainVert = mesh->TerrainVerts(quad->Verts(tri.RenderVerts[j]));
@@ -4172,7 +4139,8 @@ void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor,
 		}
 	}
 
-	renderSurfaceBuckets(surfaceBuckets, &ToD3DMATRIX(actorMatrix));
+	ActorRenderData renderData{surfaceBuckets, ToD3DMATRIX(actorMatrix)};
+	renderSurfaceBuckets(renderData, currentTime);
 
 	unguard;
 }
