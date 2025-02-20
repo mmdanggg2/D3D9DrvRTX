@@ -494,9 +494,11 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 	guard(UD3D9Render::drawActorSwitch);
 	SpecialCoord specialCoord{};
 #if RUNE
-	if (actor->IsA(ATrigger::StaticClass())) {
+	ATrigger* trigger = Cast<ATrigger>(actor);
+	if (trigger && trigger->TriggerType == TT_Sight) {
 		// "Draw" triggers because for some unholy reason trigger logic is in the render module
 		FDynamicSprite sprite(actor);
+		d3d9Dev->setCompatMatrix(frame);
 		DrawActorSprite(frame, &sprite, GMath.UnitCoords);
 		return;
 	}
