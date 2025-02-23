@@ -437,6 +437,7 @@
     <ClInclude Include="Inc\D3D9Render.h" />
     <ClInclude Include="Inc\D3D9RenderDevice.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="Inc\vectorUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="D3D9DrvRTX.rc" />
