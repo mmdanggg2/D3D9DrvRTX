@@ -269,6 +269,56 @@ struct FRenderVert {
 	DWORD Color{0xFFFFFFFF};
 };
 
+static inline UTexture* getTextureWithoutNext(UTexture* texture, FTime time, FLOAT fraction) {
+	INT count = 1;
+	for (UTexture* next = texture->AnimNext; next && next != texture; next = next->AnimNext)
+		count++;
+	INT index = Clamp(appFloor(fraction * count), 0, count - 1);
+	while (index-- > 0)
+		texture = texture->AnimNext;
+	UTexture* oldNext = texture->AnimNext;
+	texture->AnimNext = NULL;
+
+#if UNREAL_GOLD_OLDUNREAL
+	UTexture* oldCur = texture->AnimCurrent;
+	texture->AnimCurrent = NULL;
+
+	UTexture* renderTexture = texture->Get();
+
+	texture->AnimCurrent = oldCur;
+#else
+	UTexture* oldCur = texture->AnimCur;
+	texture->AnimCur = NULL;
+
+	UTexture* renderTexture = texture->Get(time);
+
+	texture->AnimCur = oldCur;
+#endif
+
+	texture->AnimNext = oldNext;
+
+	return renderTexture;
+}
+
+static inline DWORD getBasePolyFlags(AActor* actor) {
+	DWORD basePolyFlags = 0;
+	if (actor->Style == STY_Masked) {
+		basePolyFlags |= PF_Masked;
+	}
+	else if (actor->Style == STY_Translucent) {
+		basePolyFlags |= PF_Translucent;
+	}
+	else if (actor->Style == STY_Modulated) {
+		basePolyFlags |= PF_Modulated;
+	}
+
+	if (actor->bNoSmooth) basePolyFlags |= PF_NoSmooth;
+	if (actor->bSelected) basePolyFlags |= PF_Selected;
+	if (actor->bMeshEnviroMap) basePolyFlags |= PF_Environment;
+
+	return basePolyFlags;
+}
+
 // https://stackoverflow.com/a/57595105/5233018
 template <typename T, typename... Rest>
 void hash_combine(std::size_t& seed, const T& v, const Rest&... rest) {

@@ -423,6 +423,7 @@
     </Bscmake>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Src\D3D9Render_mesh_processing.cpp" />
     <ClCompile Include="Src\c_gclip.cpp" />
     <ClCompile Include="Src\D3D9DebugUtils.cpp" />
     <ClCompile Include="Src\D3D9DrvRTX.cpp" />

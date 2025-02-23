@@ -16,6 +16,9 @@
     <ClCompile Include="Src\D3D9RenderDevice.cpp">
       <Filter>Src</Filter>
     </ClCompile>
+    <ClCompile Include="Src\D3D9Render_mesh_processing.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h" />
