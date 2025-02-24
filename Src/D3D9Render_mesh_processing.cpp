@@ -99,7 +99,6 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 #endif
 	using namespace DirectX;
 	guard(UD3D9RenderDevice::renderMeshActor);
-	EndBuffering();
 	UMesh* mesh = actor->Mesh;
 	if (!mesh)
 		return;
@@ -441,7 +440,6 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 #endif
 	using namespace DirectX;
 	guard(UD3D9RenderDevice::renderStaticMeshActor);
-	EndBuffering();
 	UStaticMesh* mesh = Cast<UStaticMesh>(actor->Mesh);
 	if (!mesh)
 		return;
@@ -605,7 +603,6 @@ void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor,
 	typedef UTerrainMesh::FTerrainTris FTerrainTris;
 	typedef UTerrainMesh::FTerrainVert FTerrainVert;
 	guard(UD3D9RenderDevice::renderTerrainMeshActor);
-	EndBuffering();
 	UTerrainMesh* mesh = Cast<UTerrainMesh>(actor->Mesh);
 	if (!mesh)
 		return;
@@ -723,7 +720,6 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 #endif
 	using namespace DirectX;
 	guard(UD3D9RenderDevice::renderSkeletalMeshActor);
-	EndBuffering();
 	USkelModel* skelModel = actor->Skeletal;
 
 	if (!skelModel)

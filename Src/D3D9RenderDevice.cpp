@@ -3147,7 +3147,6 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	}
 #endif
 	guard(UD3D9RenderDevice::renderSprite);
-	EndBuffering();
 
 	FPlane color = (GIsEditor && actor->bSelected) ? FPlane(.5, .9, .5, 0) : FPlane(1, 1, 1, 0);
 	if (actor->ScaleGlow != 1.0) {
@@ -3235,6 +3234,7 @@ void UD3D9RenderDevice::updateQuadBuffer(DWORD color) {
 void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScaleU, FLOAT drawScaleV, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color) {
 	guard(UD3D9RenderDevice::renderSpriteGeo);
 	using namespace DirectX;
+	EndBuffering();
 
 	FLOAT XScale = drawScaleU * texInfo.USize;
 	FLOAT YScale = drawScaleV * texInfo.VSize;
