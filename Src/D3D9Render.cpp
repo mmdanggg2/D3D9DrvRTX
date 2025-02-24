@@ -482,15 +482,18 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 			bTranslucent |= actor->Style == STY_AlphaBlend;
 #endif
 			if ((pass == RPASS::NONSOLID && bTranslucent) || (pass == RPASS::SOLID && !bTranslucent)) {
-				drawActorSwitch(frame, d3d9Dev, actor);
+				RenderList renderList;
+				drawActorSwitch(frame, d3d9Dev, actor, renderList);
+				for (const ActorRenderData& renderData : renderList) {
+					d3d9Dev->renderSurfaceBuckets(renderData, frame->Viewport->CurrentTime);
+				}
 			}
 		}
 	}
 	unguardf((TEXT("(isSky = %i)"), isSky));
 }
 
-void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, ParentCoord* parentCoord)
-{
+void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, RenderList& renderList, ParentCoord* parentCoord) {
 	guard(UD3D9Render::drawActorSwitch);
 	SpecialCoord specialCoord{};
 #if RUNE
@@ -507,7 +510,7 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 		return;
 	}
 	if (actor->DrawType == DT_SkeletalMesh) {
-		drawSkeletalActor(frame, d3d9Dev, actor, parentCoord);
+		drawSkeletalActor(frame, d3d9Dev, actor, renderList, parentCoord);
 	}
 	else if (actor->DrawType == DT_ParticleSystem && actor->IsA(AParticleSystem::StaticClass())) {
 		AParticleSystem* particle = static_cast<AParticleSystem*>(actor);
@@ -545,7 +548,7 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 					FCheckResult checkResult{};
 					childActor->XLevel->MoveActor(childActor, FVector(), FRotator(), checkResult);
 				}
-				drawActorSwitch(frame, d3d9Dev, childActor);
+				drawActorSwitch(frame, d3d9Dev, childActor, renderList);
 			}
 		}
 	}
@@ -559,10 +562,10 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 		d3d9Dev->renderSprite(frame, actor);
 	}
 	else if (actor->DrawType == DT_Mesh) {
-		d3d9Dev->renderMeshActor(frame, actor, &specialCoord);
+		d3d9Dev->renderMeshActor(frame, actor ,renderList, &specialCoord);
 	}
 	if (actor->IsA(APawn::StaticClass())) {
-		drawPawnExtras(frame, d3d9Dev, (APawn*)actor, specialCoord);
+		drawPawnExtras(frame, d3d9Dev, (APawn*)actor, renderList, specialCoord);
 	}
 	unguardf((TEXT("(%ls)"), actor->GetFullName()));
 }
@@ -704,7 +707,7 @@ void UD3D9Render::ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSu
 }
 #endif
 
-void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord) {
+void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, RenderList& renderList, SpecialCoord& specialCoord) {
 #if !RUNE
 #if HARRY_POTTER_2
 	if (specialCoord.exists) {
@@ -721,7 +724,7 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 		FLOAT origDrawScale = weapon->DrawScale;
 		weapon->Mesh = weapon->ThirdPersonMesh;
 		weapon->DrawScale = weapon->ThirdPersonScale;
-		d3d9Dev->renderMeshActor(frame, weapon, &specialCoord);
+		d3d9Dev->renderMeshActor(frame, weapon, renderList, &specialCoord);
 #if UNREAL_TOURNAMENT
 		if (weapon->bSteadyFlash3rd) {
 			weapon->bSteadyToggle = !weapon->bSteadyToggle;
@@ -743,7 +746,7 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 			weapon->AnimSequence = NAME_All;
 			weapon->AnimFrame = appFrand();
 			weapon->bUnlit = true;
-			d3d9Dev->renderMeshActor(frame, weapon, &specialCoord);
+			d3d9Dev->renderMeshActor(frame, weapon, renderList, &specialCoord);
 			weapon->Style = origStyle;
 			weapon->Texture = origTexture;
 			weapon->bParticles = origParticles;
@@ -767,7 +770,7 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 		float dist = Clamp(2.0f + 20.0f * GMath.SinTab(flag->Rotation.Pitch), 2.0f, 3.0f);
 		flag->Location = pawn->Location - dist * pawn->CollisionRadius * pawn->Rotation.Vector() + FVector(0, 0, 0.7 * pawn->BaseEyeHeight);
 		flag->Rotation = pawn->Rotation;
-		d3d9Dev->renderMeshActor(frame, flag);
+		d3d9Dev->renderMeshActor(frame, flag, renderList);
 		flag->Location = origLoc;
 		flag->Rotation = origRot;
 	}
@@ -775,8 +778,8 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 }
 
 #if RUNE
-void UD3D9Render::drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, const ParentCoord* parentCoord) {
-	d3d9Dev->renderSkeletalMeshActor(frame, actor, parentCoord ? &parentCoord->worldCoord : nullptr);
+void UD3D9Render::drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, RenderList& renderList, const ParentCoord* parentCoord) {
+	d3d9Dev->renderSkeletalMeshActor(frame, actor, renderList, parentCoord ? &parentCoord->worldCoord : nullptr);
 	USkelModel* skel = actor->Skeletal;
 	if (!skel) return;
 	skel->GetFrame(actor, parentCoord ? parentCoord->localCoord : GMath.UnitCoords, 0, nullptr); // Updates the skel position with the real actor coords
@@ -798,7 +801,7 @@ void UD3D9Render::drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9De
 			child->GetLevel()->FarMoveActor(child, particleLoc, 1, 1);
 		}
 		childCoords.localCoord = coords / child->Location;
-		drawActorSwitch(frame, d3d9Dev, child, &childCoords);
+		drawActorSwitch(frame, d3d9Dev, child, renderList, &childCoords);
 	}
 }
 
@@ -822,7 +825,11 @@ void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor) {
 	// TODO: fix this muzzle flash schtuff
 	d3d9Dev->executeBufferedTileDraws();
 	d3d9Dev->startWorldDraw(frame);
-	drawActorSwitch(frame, d3d9Dev, actor);
+	RenderList renderList;
+	drawActorSwitch(frame, d3d9Dev, actor, renderList);
+	for (const ActorRenderData& renderData : renderList) {
+		d3d9Dev->renderSurfaceBuckets(renderData, frame->Viewport->CurrentTime);
+	}
 	d3d9Dev->endWorldDraw(frame);
 	unguard;
 }

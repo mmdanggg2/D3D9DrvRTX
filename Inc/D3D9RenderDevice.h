@@ -424,6 +424,13 @@ struct SpecialCoord {
 	bool enabled = false;
 };
 
+struct ActorRenderData {
+	SurfKeyBucketVector<UTexture*, FRenderVert> surfaceBuckets;
+	D3DMATRIX actorMatrix;
+};
+
+typedef std::vector<ActorRenderData> RenderList;
+
 constexpr const TCHAR* vertexBufferFailMessage = TEXT(
 	"CreateVertexBuffer failed (0x%08X)\n"
 	"This was likely caused by an error in RTX Remix."
@@ -1266,16 +1273,17 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	inline void renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScale, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color) {
 		renderSpriteGeo(frame, location, drawScale, drawScale, texInfo, basePolyFlags, color);
 	}
+
 	// Renders a mesh actor
-	void renderMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord = nullptr);
+	void renderMeshActor(FSceneNode* frame, AActor* actor, RenderList& renderList, SpecialCoord* specialCoord = nullptr);
 
 #if UNREAL_GOLD_OLDUNREAL
-	void renderStaticMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord = nullptr);
-	void renderTerrainMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord = nullptr);
+	void renderStaticMeshActor(FSceneNode* frame, AActor* actor, RenderList& renderList, SpecialCoord* specialCoord = nullptr);
+	void renderTerrainMeshActor(FSceneNode* frame, AActor* actor, RenderList& renderList, SpecialCoord* specialCoord = nullptr);
 #endif
 #if RUNE
 	// Renders a skeletal mesh actor
-	void renderSkeletalMeshActor(FSceneNode* frame, AActor* actor, const FCoords* parentCoord = nullptr);
+	void renderSkeletalMeshActor(FSceneNode* frame, AActor* actor, RenderList& renderList, const FCoords* parentCoord = nullptr);
 	// Renders a particleSystem actor
 	void renderParticleSystemActor(FSceneNode* frame, AParticleSystem* actor, const FCoords& parentCoord);
 #endif
@@ -1285,13 +1293,8 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void renderLights(FSceneNode* frame, std::vector<AActor*> lightActors);
 	// Renders a magic shape for anchoring stuff to the sky box
 	void renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* location);
-
-	struct ActorRenderData {
-		SurfKeyBucketVector<UTexture*, FRenderVert> surfaceBuckets;
-		D3DMATRIX actorMatrix;
-	};
 	// Given a set of verts and textures, render them with the actor matrix.
-	void renderSurfaceBuckets(const ActorRenderData& renderData, FTime);
+	void renderSurfaceBuckets(const ActorRenderData& renderData, FTime currentTime);
 
 	void fillHashTexture(FTexConvertCtx convertContext, FTextureInfo& tex);
 	bool shouldGenHashTexture(const FTextureInfo& tex);

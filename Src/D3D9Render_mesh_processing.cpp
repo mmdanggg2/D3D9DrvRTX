@@ -90,7 +90,7 @@ static void calcEnvMapping(FRenderVert& vert, const DirectX::XMMATRIX& screenSpa
 	vert.V = (XMVectorGetY(envNorm) + 1.0) * 0.5 * 256.0;
 }
 
-void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord) {
+void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, RenderList& renderList, SpecialCoord* specialCoord) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 	{
 		static int si;
@@ -105,11 +105,11 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 #if UNREAL_GOLD_OLDUNREAL
 	if (mesh->IsA(UStaticMesh::StaticClass())) {
-		renderStaticMeshActor(frame, actor, specialCoord);
+		renderStaticMeshActor(frame, actor, renderList, specialCoord);
 		return;
 	}
 	else if (mesh->IsA(UTerrainMesh::StaticClass())) {
-		renderTerrainMeshActor(frame, actor, specialCoord);
+		renderTerrainMeshActor(frame, actor, renderList, specialCoord);
 		return;
 	}
 #endif
@@ -355,7 +355,9 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 
 	XMMATRIX screenSpaceMat = actorMatrix * FCoordToDXMat(frame->Uncoords);
 
-	SurfKeyBucketVector<UTexture*, FRenderVert> surfaceBuckets;
+	ActorRenderData& renderData = renderList.emplace_back();
+	renderData.actorMatrix = ToD3DMATRIX(actorMatrix);
+	SurfKeyBucketVector<UTexture*, FRenderVert>& surfaceBuckets = renderData.surfaceBuckets;
 	surfaceBuckets.reserve(numTris);
 
 	int vertMaxCount = numTris * 3;
@@ -423,8 +425,6 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Specia
 			vert.V *= scaleV;
 		}
 	}
-	ActorRenderData renderData{ surfaceBuckets, ToD3DMATRIX(actorMatrix) };
-	renderSurfaceBuckets(renderData, currentTime);
 
 	unguard;
 }
@@ -542,7 +542,9 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 
 	XMMATRIX screenSpaceMat = actorMatrix * FCoordToDXMat(frame->Uncoords);
 
-	SurfKeyBucketVector<UTexture*, FRenderVert> surfaceBuckets;
+	ActorRenderData& renderData = renderList.emplace_back();
+	renderData.actorMatrix = ToD3DMATRIX(actorMatrix);
+	SurfKeyBucketVector<UTexture*, FRenderVert>& surfaceBuckets = renderData.surfaceBuckets;
 	surfaceBuckets.reserve(mesh->SMGroups.Num());
 
 	INT vertMaxCount = mesh->SMGroups.Num();
@@ -585,13 +587,10 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 		}
 	}
 
-	ActorRenderData renderData{ surfaceBuckets, ToD3DMATRIX(actorMatrix) };
-	renderSurfaceBuckets(renderData, currentTime);
-
 	unguard;
 }
 
-void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor, SpecialCoord* specialCoord) {
+void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor, RenderList& renderList, SpecialCoord* specialCoord) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 	{
 		static int si;
@@ -619,9 +618,7 @@ void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor,
 	DWORD baseFlags = getBasePolyFlags(actor);
 
 	UniqueValueArray<UTexture*> textures(mesh->Textures.Num());
-	UniqueValueArray<FTextureInfo> texInfos(mesh->Textures.Num());
 	UTexture* envTex = nullptr;
-	FTextureInfo envTexInfo;
 
 	// Lock all mesh textures
 	for (int i = 0; i < mesh->Textures.Num(); i++) {
@@ -648,7 +645,6 @@ void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor,
 	if (!envTex) {
 		return;
 	}
-	envTexInfo = *envTex->GetTexture(-1, this);
 
 	bool fatten = actor->Fatness != 128;
 	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
@@ -658,7 +654,9 @@ void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor,
 	FTerrainQuad* quad = &mesh->TerrainQuads(actor->LatentInt);
 	FTerrainTris* tris = &mesh->TerrainTris(quad->TrisOffset);
 
-	SurfKeyBucketVector<UTexture*, FRenderVert> surfaceBuckets;
+	ActorRenderData& renderData = renderList.emplace_back();
+	renderData.actorMatrix = ToD3DMATRIX(actorMatrix);
+	SurfKeyBucketVector<UTexture*, FRenderVert>& surfaceBuckets = renderData.surfaceBuckets;
 	surfaceBuckets.reserve(quad->Verts.Num());
 
 	INT vertMaxCount = quad->NumTris * 3;
@@ -703,15 +701,12 @@ void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor,
 		}
 	}
 
-	ActorRenderData renderData{ surfaceBuckets, ToD3DMATRIX(actorMatrix) };
-	renderSurfaceBuckets(renderData, currentTime);
-
 	unguard;
 }
 #endif
 
 #if RUNE
-void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor, const FCoords* parentCoord) {
+void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor, RenderList& renderList, const FCoords* parentCoord) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 	{
 		static int si;
@@ -819,7 +814,6 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	STAT(clockFast(GStat.SkelSetupTime));
 
 	UniqueValueArray<UTexture*> textures(NUM_POLYGROUPS);
-	UniqueValueArray<FTextureInfo> texInfos(NUM_POLYGROUPS);
 
 	// Lock all mesh textures
 	for (int i = 0; i < NUM_POLYGROUPS; i++) {
@@ -839,14 +833,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 			continue;
 		}
 		tex = tex->Get(currentTime);
-		if (textures.insert(i, tex)) {
-			FTextureInfo texInfo{};
-			textures.at(i)->Lock(texInfo, currentTime, -1, this);
-			texInfos.insert(i, texInfo);
-		}
-		else {
-			texInfos.insert(i, texInfos.at(textures.getIndex(tex)));
-		}
+		textures.insert(i, tex);
 		if (actor->Style == STY_AlphaBlend) {
 			tex->Alpha = actor->AlphaScale;
 		}
@@ -890,7 +877,9 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 
 	XMMATRIX screenSpaceMat = actorMatrix * FCoordToDXMat(frame->Uncoords);
 
-	SurfKeyBucketVector<FTextureInfo*, FRenderVert> surfaceBuckets;
+	ActorRenderData& renderData = renderList.emplace_back();
+	renderData.actorMatrix = ToD3DMATRIX(actorMatrix);
+	SurfKeyBucketVector<UTexture*, FRenderVert>& surfaceBuckets = renderData.surfaceBuckets;
 	surfaceBuckets.reserve(numTris);
 
 	int vertMaxCount = numTris * 3;
@@ -904,15 +893,15 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 
 		if (polyFlags & PF_Invisible) continue;
 
-		FTextureInfo* texInfo = &texInfos.at(texIdx);
-		if (!texInfo->Texture) {
+		UTexture** tex = textures.at(texIdx);
+		if (!tex) {
 			continue;
 		}
-		float scaleU = texInfo->UScale * texInfo->USize / 256.0;
-		float scaleV = texInfo->VScale * texInfo->VSize / 256.0;
+		float scaleU = (*tex)->Scale * (*tex)->USize / 256.0;
+		float scaleV = (*tex)->Scale * (*tex)->VSize / 256.0;
 
 		// Sort triangles into surface/flag groups
-		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(texInfo, polyFlags);
+		std::vector<FRenderVert>& pointsVec = surfaceBuckets.get(*tex, polyFlags);
 		pointsVec.reserve(vertMaxCount);
 		STAT(clockFast(GStat.SkelLightTime))
 			for (INT j = 0; j < 3; j++) {
@@ -937,18 +926,6 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	}
 
 	STAT(unclockFast(GStat.SkelClipTime));
-
-	STAT(clockFast(GStat.SkelRasterTime));
-
-	renderSurfaceBuckets(surfaceBuckets, &ToD3DMATRIX(actorMatrix));
-
-	STAT(unclockFast(GStat.SkelRasterTime));
-
-	for (UTexture* tex : textures) {
-		if (!tex)
-			continue;
-		tex->Unlock(texInfos.at(textures.getIndex(tex)));
-	}
 
 	STAT(unclockFast(GStat.SkelRenderTime));
 

@@ -62,12 +62,12 @@ private:
 	};
 	typedef SurfKeyBucketVector<FTextureInfo*, std::vector<FTransTexture>> DecalMap;
 	void getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets);
-	void drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, ParentCoord* parentCoord = nullptr);
-	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, SpecialCoord& specialCoord);
+	void drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, RenderList& renderList, ParentCoord* parentCoord = nullptr);
+	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, RenderList& renderList, SpecialCoord& specialCoord);
 	void getSurfaceDecals(FSceneNode* frame, const SurfaceData& surfaceData, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures);
 	void drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, ModelFacets& modelFacets, FrameActors& objs, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures, bool isSky = false);
 #if RUNE
-	void drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, const ParentCoord* parentCoord);
+	void drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, RenderList& renderList, const ParentCoord* parentCoord);
 	// These seem to be non exported global variables that are swapped about in the original URender::DrawWorld
 	// currFrameMaxZ seems to set in OccludeFrame to the furthest bsp vert
 	static float* const currFrameMaxZ;
