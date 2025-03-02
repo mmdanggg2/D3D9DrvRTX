@@ -5459,6 +5459,10 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags, bool isUI) {
 		blendFlags &= ~PF_Occlude;
 	}
 
+	if ((blendFlags & PF_NotSolid) && ((blendFlags & PF_TwoSided) || !NonSolidTranslucentHack)) {
+		blendFlags &= ~PF_NotSolid;
+	}
+
 	// Detect changes in the blending modes.
 	DWORD Xor = m_curBlendFlags ^ blendFlags;
 
@@ -5499,7 +5503,7 @@ void UD3D9RenderDevice::SetBlendNoCheck(DWORD blendFlags, bool isUI) {
 				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
 				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
 			}
-			else if ((blendFlags & PF_NotSolid) && !(blendFlags & PF_TwoSided) && NonSolidTranslucentHack) {
+			else if (blendFlags & PF_NotSolid) {
 				// Make non solid surfaces translucent so that light can shine through them
 				m_d3dDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
 				m_d3dDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
