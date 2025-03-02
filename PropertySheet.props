@@ -4,7 +4,7 @@
   <PropertyGroup Label="UserMacros">
     <UNREAL_SDK_DIR>.\sdk</UNREAL_SDK_DIR>
     <UNREAL_INSTALL_DIR>.\install</UNREAL_INSTALL_DIR>
-    <UNREAL_EXE_NAME>Unreal.exe</UNREAL_EXE_NAME>
+    <UNREAL_EXE_NAME>UnrealTournament.exe</UNREAL_EXE_NAME>
   </PropertyGroup>
   <PropertyGroup>
     <IncludePath>$(DXSDK_DIR)Include;$(IncludePath)</IncludePath>
@@ -30,7 +30,7 @@
       <StructMemberAlignment>4Bytes</StructMemberAlignment>
       <FloatingPointModel>Fast</FloatingPointModel>
       <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;WINDOWS_IGNORE_PACKING_MISMATCH;NOMINMAX;_UNICODE;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
     </ClCompile>
     <Link>
       <OutputFile>$(UNREAL_INSTALL_DIR)\System\D3D9DrvRTX.dll</OutputFile>
