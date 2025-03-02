@@ -22,8 +22,25 @@ void UD3D9Render::StaticConstructor() {
 	cachedLevelModel.facetsMem.Init(8192);
 #endif
 	cachedLevelModel.facetsMemMark = FMemMark(cachedLevelModel.facetsMem);
+
+#if ENABLE_THREADING
+	std::atexit(UD3D9Render::atExitThreadCleanup);
+	for (int i = 0; i < PROCESS_ACTOR_THREADS; ++i) {
+		processActorThreads.emplace_back(&UD3D9Render::processActorsThread, i);
+	}
+#endif
 	unguard;
 }
+
+void UD3D9Render::atExitThreadCleanup() {
+	stopProcessing = true;
+	taskCV.notify_all();
+	for (std::thread& t : processActorThreads) {
+		t.join();
+	}
+}
+
+std::vector<std::thread> UD3D9Render::processActorThreads;
 
 decltype(UD3D9Render::cachedLevelModel) UD3D9Render::cachedLevelModel;
 
@@ -86,7 +103,7 @@ void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacet
 
 		// Sort into opaque and non passes
 		RPASS pass = (flags & PF_NoOcclude) ? RPASS::NONSOLID : RPASS::SOLID;
-		for (ZoneNodes& zoneNodes: surfaceNodes[iSurf]) {
+		for (ZoneNodes& zoneNodes : surfaceNodes[iSurf]) {
 			SurfaceData& surfData = modelFacets.facetPairs[zoneNodes.zone][pass].get(texture, flags).emplace_back();
 			surfData.iSurf = iSurf;
 			surfData.nodes = std::move(zoneNodes.nodes);
@@ -224,8 +241,6 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
 
 	FMemMark memMark(GMem);
-	//FMemMark sceneMark(GSceneMem);
-	//FMemMark dynMark(GDynMem);
 	FMemMark vectorMark(VectorMem);
 
 	//dout << "Starting frame" << std::endl;
@@ -356,8 +371,6 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	}
 
 	memMark.Pop();
-	//dynMark.Pop();
-	//sceneMark.Pop();
 	vectorMark.Pop();
 	unguard;
 }
@@ -392,6 +405,36 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 			visibleActors.insert(actor);
 		}
 	}
+
+#if ENABLE_THREADING
+	std::vector<AActor*> renderActors(visibleActors.begin(), visibleActors.end());
+	constexpr size_t numThreads = PROCESS_ACTOR_THREADS;
+	size_t actorsPerThread = visibleActors.size() / numThreads;
+	size_t remainder = visibleActors.size() % numThreads;
+	size_t startIdx = 0;
+
+	{
+		std::lock_guard lock(taskMutex);
+		for (size_t i = 0; i < numThreads; ++i) {
+			size_t threadActors = actorsPerThread + (i < remainder ? 1 : 0);
+			if (threadActors == 0) continue;
+			size_t endIdx = startIdx + threadActors;
+
+			taskQueue.emplace_back(
+				frame,
+				d3d9Dev,
+				this,
+				std::vector<AActor*>{renderActors.begin() + startIdx, renderActors.begin() + endIdx}
+			);
+
+			tasksRemaining++;
+			taskCV.notify_one();
+
+			startIdx = endIdx;
+		}
+	}
+#endif
+
 	// Add all connected zones to render adjacent level geo
 	QWORD visibleZoneMask = visibleZoneBits.to_ullong();
 	while (visibleZoneMask) {
@@ -426,6 +469,7 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 				FTextureInfo* texInfo;
 				if (!lockedTextures.count(texture)) {
 					texInfo = &lockedTextures[texture];
+					std::lock_guard mLock(memMutex);
 #if UNREAL_GOLD_OLDUNREAL
 					*texInfo = *texture->GetTexture(-1, d3d9Dev);
 #else
@@ -460,6 +504,7 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 		// Render all the decals
 		for (const auto& decalsPair : decalMap) {
 			FTextureInfo* const& texInfo = decalsPair.tex;
+			std::lock_guard rLock(renderMutex);
 			for (std::vector<FTransTexture> decal : decalsPair.bucket) {
 				int numPts = decal.size();
 				FTransTexture** pointsPtrs = new FTransTexture * [numPts];
@@ -476,20 +521,25 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 				d3d9Dev->renderMover(frame, mover);
 			}
 		}
-		for (AActor* actor : visibleActors) {
-			UBOOL bTranslucent = actor->Style == STY_Translucent;
-#if RUNE
-			bTranslucent |= actor->Style == STY_AlphaBlend;
-#endif
-			if ((pass == RPASS::NONSOLID && bTranslucent) || (pass == RPASS::SOLID && !bTranslucent)) {
-				RenderList renderList;
-				drawActorSwitch(frame, d3d9Dev, actor, renderList);
-				for (const ActorRenderData& renderData : renderList) {
-					d3d9Dev->renderSurfaceBuckets(renderData, frame->Viewport->CurrentTime);
-				}
-			}
-		}
 	}
+
+#if ENABLE_THREADING
+	// Wait for actor renders to finish
+	{
+		std::unique_lock<std::mutex> lock(resultMutex);
+		resultCV.wait(lock, [] { return tasksRemaining == 0; });
+	}
+#else
+	RenderList renderList;
+	for (AActor* actor : visibleActors) {
+		drawActorSwitch(frame, d3d9Dev, actor, renderList);
+		for (const ActorRenderData& renderData : renderList) {
+			d3d9Dev->renderSurfaceBuckets(renderData, frame->Viewport->CurrentTime);
+		}
+		renderList.clear();
+	}
+#endif
+
 	unguardf((TEXT("(isSky = %i)"), isSky));
 }
 
@@ -501,6 +551,7 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 	if (trigger && trigger->TriggerType == TT_Sight) {
 		// "Draw" triggers because for some unholy reason trigger logic is in the render module
 		FDynamicSprite sprite(actor);
+		std::scoped_lock locks(renderMutex, memMutex);
 		d3d9Dev->setCompatMatrix(frame);
 		DrawActorSprite(frame, &sprite, GMath.UnitCoords);
 		return;
@@ -518,6 +569,7 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 			d3d9Dev->renderParticleSystemActor(frame, (AParticleSystem*)actor, parentCoord ? parentCoord->localCoord : GMath.UnitCoords);
 		}
 		else {
+			std::scoped_lock locks(renderMutex, memMutex);
 			d3d9Dev->setCompatMatrix(frame);
 			DrawParticleSystem(frame, actor, nullptr, parentCoord ? parentCoord->localCoord : GMath.UnitCoords);
 		}
@@ -526,6 +578,7 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 #endif
 #if UTGLR_HP_ENGINE
 	if (actor->DrawType == DT_Particles) {
+		std::scoped_lock locks(renderMutex, memMutex);
 		d3d9Dev->setCompatMatrix(frame);
 		FDynamicSprite sprite(actor);
 		DrawParticleSystem(frame, &sprite);
@@ -553,16 +606,23 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 		}
 	}
 
-	d3d9Dev->setCompatMatrix(frame);
-	// Terrain actor vftable can be nullptr so check first!
-	if (*((void**)actor) && actor->OverrideMeshRender(frame)) {}
+	bool skipActor = false;
+	{
+		std::scoped_lock locks(renderMutex, memMutex);
+		d3d9Dev->setCompatMatrix(frame);
+		// Terrain actor vftable can be nullptr so check first!
+		if (*((void**)actor) && actor->OverrideMeshRender(frame)) {
+			skipActor = true;
+		}
+	}
+	if (skipActor) {}
 	else
 #endif
 	if ((actor->DrawType == DT_Sprite || actor->DrawType == DT_SpriteAnimOnce || (frame->Viewport->Actor->ShowFlags & SHOW_ActorIcons)) && actor->Texture) {
 		d3d9Dev->renderSprite(frame, actor);
 	}
 	else if (actor->DrawType == DT_Mesh) {
-		d3d9Dev->renderMeshActor(frame, actor ,renderList, &specialCoord);
+		d3d9Dev->renderMeshActor(frame, actor, renderList, &specialCoord);
 	}
 	if (actor->IsA(APawn::StaticClass())) {
 		drawPawnExtras(frame, d3d9Dev, (APawn*)actor, renderList, specialCoord);
@@ -579,6 +639,7 @@ void UD3D9Render::getSurfaceDecals(FSceneNode* frame, const SurfaceData& surface
 		const FDecal* decal = &surf.Decals(i);
 		UTexture* texture;
 		if (decal->Actor->Texture) {
+			std::lock_guard mLock(memMutex);
 #if UNREAL_GOLD_OLDUNREAL
 			texture = decal->Actor->Texture->Get();
 #else
@@ -590,6 +651,7 @@ void UD3D9Render::getSurfaceDecals(FSceneNode* frame, const SurfaceData& surface
 		FTextureInfo* texInfo;
 		if (!lockedTextures.count(texture)) {
 			texInfo = &lockedTextures[texture];
+			std::lock_guard mLock(memMutex);
 #if UNREAL_GOLD_OLDUNREAL
 			*texInfo = *texture->GetTexture(-1, viewport->RenDev);
 #else
@@ -711,6 +773,7 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 #if !RUNE
 #if HARRY_POTTER_2
 	if (specialCoord.exists) {
+		std::lock_guard mLock(memMutex);
 		FCoords wsCoords = specialCoord.worldCoord;
 		wsCoords.YAxis = -wsCoords.YAxis;
 		pawn->WeaponLoc = wsCoords.Origin;
@@ -719,6 +782,8 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 #endif
 	AInventory* weapon = pawn->Weapon;
 	if (specialCoord.exists && weapon && weapon->ThirdPersonMesh) {
+		// Lock render too because we might lock render inside renderMesh->renderSprite while another thread that locked render waits on mem.
+		std::scoped_lock locks(renderMutex, memMutex);
 		specialCoord.enabled = true;
 		UMesh* origMesh = weapon->Mesh;
 		FLOAT origDrawScale = weapon->DrawScale;
@@ -763,6 +828,8 @@ void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, 
 #endif // !RUNE
 #if !UTGLR_NO_PLAYER_FLAG
 	if (pawn->PlayerReplicationInfo && pawn->PlayerReplicationInfo->HasFlag) {
+		// Lock render too because we might lock render inside renderMesh->renderSprite while another thread that locked render waits on mem.
+		std::scoped_lock locks(renderMutex, memMutex);
 		AActor* flag = pawn->PlayerReplicationInfo->HasFlag;
 
 		FVector origLoc = flag->Location;
@@ -782,11 +849,13 @@ void UD3D9Render::drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9De
 	d3d9Dev->renderSkeletalMeshActor(frame, actor, renderList, parentCoord ? &parentCoord->worldCoord : nullptr);
 	USkelModel* skel = actor->Skeletal;
 	if (!skel) return;
+	std::unique_lock mLock(memMutex);
 	skel->GetFrame(actor, parentCoord ? parentCoord->localCoord : GMath.UnitCoords, 0, nullptr); // Updates the skel position with the real actor coords
+	mLock.unlock();
 	for (int i = 0; i < skel->numjoints; i++) {
 		AActor* child = actor->JointChild[i];
 		if (!child || child->bHidden) continue;
-
+		mLock.lock();
 		ParentCoord childCoords;
 		FCacheItem* cacheItem = nullptr;
 		DynSkel* dynSkel = skel->LockDSkel(actor, cacheItem);
@@ -801,6 +870,7 @@ void UD3D9Render::drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9De
 			child->GetLevel()->FarMoveActor(child, particleLoc, 1, 1);
 		}
 		childCoords.localCoord = coords / child->Location;
+		mLock.unlock();
 		drawActorSwitch(frame, d3d9Dev, child, renderList, &childCoords);
 	}
 }

@@ -9,6 +9,9 @@
 #include <array>
 #include <unordered_map>
 
+#define PROCESS_ACTOR_THREADS 3
+#define ENABLE_THREADING 1
+
 class UD3D9Render : public URender {
 #if UTGLR_ALT_DECLARE_CLASS
 	DECLARE_CLASS(UD3D9Render, URender, CLASS_Config);
@@ -66,6 +69,21 @@ private:
 	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, RenderList& renderList, SpecialCoord& specialCoord);
 	void getSurfaceDecals(FSceneNode* frame, const SurfaceData& surfaceData, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures);
 	void drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, ModelFacets& modelFacets, FrameActors& objs, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures, bool isSky = false);
+
+	struct ProcessActorTask {
+		FSceneNode* frame;
+		UD3D9RenderDevice* d3d9Dev;
+		class UD3D9Render* render;
+		std::vector<AActor*> actors;
+	};
+	static std::vector<ProcessActorTask> taskQueue;
+	static std::mutex taskMutex, resultMutex;
+	static std::condition_variable taskCV, resultCV;
+	static std::atomic<int> tasksRemaining;
+	static std::atomic<bool> stopProcessing;
+	static std::vector<std::thread> processActorThreads;
+	static void processActorsThread(int threadNum);
+	static void atExitThreadCleanup();
 #if RUNE
 	void drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, RenderList& renderList, const ParentCoord* parentCoord);
 	// These seem to be non exported global variables that are swapped about in the original URender::DrawWorld

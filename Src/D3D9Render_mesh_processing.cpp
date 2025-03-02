@@ -7,6 +7,45 @@
 
 #pragma warning(disable : 4018)
 
+void UD3D9Render::processActorsThread(int threadNum) {
+	ProcessActorTask task;
+	std::vector<ActorRenderData> renderList;
+	renderList.reserve(5);
+	while (!stopProcessing) {
+		{
+			std::unique_lock<std::mutex> lock(taskMutex);
+			taskCV.wait(lock, [] { return !taskQueue.empty() || stopProcessing; });
+
+			if (stopProcessing) break; // Exit if stopping
+
+			task = std::move(taskQueue.back());
+			taskQueue.pop_back();
+		}
+
+		for (AActor* actor : task.actors) {
+			task.render->drawActorSwitch(task.frame, task.d3d9Dev, actor, renderList);
+		}
+
+		for (ActorRenderData& renderData : renderList) {
+			task.d3d9Dev->renderSurfaceBuckets(renderData, task.frame->Viewport->CurrentTime);
+		}
+		{
+			std::lock_guard lock(resultMutex);
+			tasksRemaining--;
+		}
+		resultCV.notify_one();
+		renderList.clear();
+	}
+};
+
+std::recursive_mutex memMutex;
+std::recursive_mutex renderMutex;
+std::vector<UD3D9Render::ProcessActorTask> UD3D9Render::taskQueue;
+std::mutex UD3D9Render::taskMutex, UD3D9Render::resultMutex;
+std::condition_variable UD3D9Render::taskCV, UD3D9Render::resultCV;
+std::atomic<int> UD3D9Render::tasksRemaining(0);
+std::atomic<bool> UD3D9Render::stopProcessing(false);
+
 // Class to hold multiple unique T objects, accessable by multiple indices
 template <typename T>
 class UniqueValueArray {
@@ -150,6 +189,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 		actorMatrix *= matLoc;
 	}
 
+	std::unique_lock mLock(memMutex);
 	// The old switcheroo, trick the game to not transform the mesh verts to object position
 	FVector origLoc = actor->Location;
 	FVector origPrePiv = actor->PrePivot;
@@ -235,6 +275,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 	actor->bAlignBottomAlways = origAlignBotAlways;
 #endif
 #endif
+	mLock.unlock();
 
 	FTime currentTime = frame->Viewport->CurrentTime;
 	DWORD baseFlags = getBasePolyFlags(actor);
@@ -245,11 +286,13 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 		if (GIsEditor && (baseFlags & PF_Selected)) {
 			color = color * 0.4 + FVector(0.0, 0.6, 0.0);
 		}
+		mLock.lock();
 #if UNREAL_GOLD_OLDUNREAL
 		UTexture* tex = actor->Texture->Get();
 #else
 		UTexture* tex = actor->Texture->Get(currentTime);
 #endif
+		mLock.unlock();
 		for (INT i = 0; i < numVerts; i++) {
 			FVector& sample = samples[i];
 			if (actor->bRandomFrame) {
@@ -266,11 +309,13 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 				FVector point = DXVecToFVec(xpoint);
 
 				FTextureInfo texInfo;
+				mLock.lock();
 #if UNREAL_GOLD_OLDUNREAL
 				texInfo = *tex->GetTexture(-1, this);
 #else
 				tex->Lock(texInfo, currentTime, -1, this);
 #endif
+				mLock.unlock();
 				renderSpriteGeo(frame, point, actor->DrawScale, texInfo, baseFlags, color);
 #if !UNREAL_GOLD_OLDUNREAL
 				tex->Unlock(texInfo);
@@ -292,11 +337,13 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 		else if (!tex) {
 			continue;
 		}
+		mLock.lock();
 #if UNREAL_GOLD_OLDUNREAL
 		tex = tex->Get();
 #else
 		tex = tex->Get(currentTime);
 #endif
+		mLock.unlock();
 		textures.insert(i, tex);
 		envTex = tex;
 	}
@@ -316,7 +363,9 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 	bool fatten = actor->Fatness != 128;
 	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
 
+	mLock.lock();
 	FVector* normals = NewZeroed<FVector>(GMem, numVerts);
+	mLock.unlock();
 
 	// Calculate normals
 	// Already zeroed on new
@@ -444,10 +493,12 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 	if (!mesh)
 		return;
 
+	std::unique_lock mLock(memMutex);
 	mesh->SMTris.Load();
 	if (!mesh->SMTris.Num()) {
 		return;
 	}
+	mLock.unlock();
 
 	//dout << "rendering actor " << actor->GetName() << std::endl;
 	XMMATRIX actorMatrix = XMMatrixIdentity();
@@ -479,7 +530,9 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 		if (GIsEditor && (baseFlags & PF_Selected)) {
 			color = color * 0.4 + FVector(0.0, 0.6, 0.0);
 		}
+		mLock.lock();
 		UTexture* tex = actor->Texture->Get();
+		mLock.unlock();
 		for (INT i = 0; i < mesh->SMVerts.Num(); i++) {
 			FVector& sample = mesh->SMVerts(i);
 			if (actor->bRandomFrame) {
@@ -496,7 +549,9 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 				FVector point = DXVecToFVec(xpoint);
 
 				FTextureInfo texInfo;
+				mLock.lock();
 				texInfo = *tex->GetTexture(-1, this);
+				mLock.unlock();
 				renderSpriteGeo(frame, point, actor->DrawScale, texInfo, baseFlags, color);
 			}
 		}
@@ -515,7 +570,9 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 		else if (!tex) {
 			continue;
 		}
+		mLock.lock();
 		tex = tex->Get();
+		mLock.unlock();
 		textures.insert(i, tex);
 		envTex = tex;
 	}
@@ -537,7 +594,9 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 
 	// Calculate normals
 	if (!mesh->SMNormals.Num()) {
+		mLock.lock();
 		mesh->CalcSMNormals();
+		mLock.unlock();
 	}
 
 	XMMATRIX screenSpaceMat = actorMatrix * FCoordToDXMat(frame->Uncoords);
@@ -629,7 +688,9 @@ void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor,
 		else if (!tex) {
 			continue;
 		}
+		std::unique_lock mLock(memMutex);
 		tex = tex->Get();
+		mLock.unlock();
 		textures.insert(i, tex);
 		envTex = tex;
 	}
@@ -746,6 +807,10 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 		actorMatrix *= matLoc;
 	}
 
+	int numVerts = mesh->numverts;
+	int numTris = mesh->numtris;
+
+	std::unique_lock mLock(memMutex);
 	// The old switcheroo, trick the game to not transform the mesh verts to object position
 	FVector origLoc = actor->Location;
 	FVector origPrePiv = actor->PrePivot;
@@ -756,17 +821,14 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	actor->Rotation = FRotator(0, 0, 0);
 	actor->DrawScale = 1.0f;
 
-	int numVerts = mesh->numverts;
-	int numTris = mesh->numtris;
-
 	FVector* deformed = New<FVector>(GMem, numVerts);
-
 	skelModel->GetFrame(actor, GMath.UnitCoords, 0.0f, deformed);
 
 	actor->Location = origLoc;
 	actor->PrePivot = origPrePiv;
 	actor->Rotation = origRot;
 	actor->DrawScale = origScale;
+	mLock.unlock();
 
 	FTime currentTime = frame->Viewport->CurrentTime;
 	DWORD baseFlags = getBasePolyFlags(actor);
@@ -777,7 +839,9 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 		if (!actor->Texture) {
 			return;
 		}
+		mLock.lock();
 		UTexture* tex = actor->Texture->Get(currentTime);
+		mLock.unlock();
 		FLOAT lux = Clamp(actor->ScaleGlow * 0.5f + actor->AmbientGlow / 256.f, 0.f, 1.f);
 		FPlane color = FVector(lux, lux, lux);
 		if (!actor->ColorAdjust.IsZero()) {
@@ -802,7 +866,9 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 				FVector point = DXVecToFVec(xpoint);
 
 				FTextureInfo texInfo;
+				mLock.lock();
 				tex->Lock(texInfo, currentTime, -1, this);
+				mLock.unlock();
 				renderSpriteGeo(frame, point, actor->DrawScale, texInfo, baseFlags, color);
 				tex->Unlock(texInfo);
 			}
@@ -819,6 +885,7 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	for (int i = 0; i < NUM_POLYGROUPS; i++) {
 		UTexture* tex = actor->SkelGroupSkins[i];
 		if (!tex && mesh->PolyGroupSkinNames[i] != NAME_None) {
+			mLock.lock();
 			tex = (UTexture*)StaticLoadObject(
 				UTexture::StaticClass(),
 				usedSkel->GetOuter(),
@@ -827,19 +894,22 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 				LOAD_NoFail,
 				NULL
 			);
+			mLock.unlock();
 		}
 
 		if (!tex) {
 			continue;
 		}
+		mLock.lock();
 		tex = tex->Get(currentTime);
-		textures.insert(i, tex);
 		if (actor->Style == STY_AlphaBlend) {
 			tex->Alpha = actor->AlphaScale;
 		}
 		else {
 			tex->Alpha = 1;
 		}
+		mLock.unlock();
+		textures.insert(i, tex);
 	}
 
 	bool fatten = actor->Fatness != 128;
@@ -848,7 +918,9 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 	STAT(unclockFast(GStat.SkelSetupTime));
 	STAT(clockFast(GStat.SkelDecimateTime));
 
+	mLock.lock();
 	FVector* normals = New<FVector>(GMem, numVerts);
+	mLock.unlock();
 
 	// Calculate normals
 	for (int i = 0; i < numVerts; i++) {

@@ -30,6 +30,7 @@
 #include <map>
 #include <deque>
 #include <vector>
+#include <mutex>
 
 #include "c_gclip.h"
 
@@ -91,6 +92,8 @@ typedef IDirect3D9 * (WINAPI * LPDIRECT3DCREATE9)(UINT SDKVersion);
 //Must be at least 2000
 #define VERTEX_BUFFER_SIZE	1000	// permanent small draw call buffer
 
+extern std::recursive_mutex memMutex;
+extern std::recursive_mutex renderMutex;
 
 /*-----------------------------------------------------------------------------
 	D3D9Drv.
@@ -274,6 +277,7 @@ struct FRenderVert {
 static_assert(std::is_trivially_copyable<FRenderVert>::value, "FRenderVert must be trivially copyable");
 
 static inline UTexture* getTextureWithoutNext(UTexture* texture, FTime time, FLOAT fraction) {
+	std::lock_guard mLock(memMutex);
 	INT count = 1;
 	for (UTexture* next = texture->AnimNext; next && next != texture; next = next->AnimNext)
 		count++;

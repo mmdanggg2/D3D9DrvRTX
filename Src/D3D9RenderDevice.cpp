@@ -2026,6 +2026,7 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 #endif
 	guard(UD3D9RenderDevice::drawLevelSurfaces);
 
+	std::lock_guard rLock(renderMutex);
 	EndBuffering();
 	StartBuffering(BV_TYPE_NONE);
 
@@ -3160,24 +3161,29 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	//	if (!texture)
 	//		texture = GetDefault<AActor>()->Texture;
 	//}
+	std::unique_lock mLock(memMutex, std::defer_lock);
 	FTime currTime = frame->Viewport->CurrentTime;
 	UTexture* renderTexture;
 	if (actor->DrawType == DT_SpriteAnimOnce) {
 		renderTexture = getTextureWithoutNext(texture, currTime, actor->LifeFraction());
 	} else {
+		mLock.lock();
 #if UNREAL_GOLD_OLDUNREAL
 		renderTexture = texture->Get();
 #else
 		renderTexture = texture->Get(currTime);
 #endif
+		mLock.unlock();
 	}
 
 	FTextureInfo texInfo;
+	mLock.lock();
 #if UNREAL_GOLD_OLDUNREAL
 	texInfo = *renderTexture->GetTexture(-1, this);
 #else
 	renderTexture->Lock(texInfo, currTime, -1, this);
 #endif
+	mLock.unlock();
 	renderSpriteGeo(frame, actor->Location + actor->PrePivot, drawScale, texInfo, getBasePolyFlags(actor), color);
 #if !UNREAL_GOLD_OLDUNREAL
 	renderTexture->Unlock(texInfo);
@@ -3234,7 +3240,6 @@ void UD3D9RenderDevice::updateQuadBuffer(DWORD color) {
 void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& location, FLOAT drawScaleU, FLOAT drawScaleV, FTextureInfo& texInfo, DWORD basePolyFlags, FPlane color) {
 	guard(UD3D9RenderDevice::renderSpriteGeo);
 	using namespace DirectX;
-	EndBuffering();
 
 	FLOAT XScale = drawScaleU * texInfo.USize;
 	FLOAT YScale = drawScaleV * texInfo.VSize;
@@ -3259,8 +3264,6 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 	mat *= matLoc;
 	D3DMATRIX actorMatrix = ToD3DMATRIX(mat);
 
-	m_d3dDevice->SetTransform(D3DTS_WORLD, &actorMatrix);
-
 	if (color.X > 1.0) color.X = 1.0;
 	if (color.Y > 1.0) color.Y = 1.0;
 	if (color.Z > 1.0) color.Z = 1.0;
@@ -3269,6 +3272,10 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 
 	// Modulated seems to need white vert colours
 	DWORD d3dColor = flags & PF_Modulated ? 0xFFFFFFFF : D3DCOLOR_COLORVALUE(color.X, color.Y, color.Z, 1.0f);
+
+	std::lock_guard rLock(renderMutex);
+	EndBuffering();
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &actorMatrix);
 
 	updateQuadBuffer(d3dColor);
 
@@ -3298,6 +3305,8 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 }
 
 void UD3D9RenderDevice::renderSurfaceBuckets(const ActorRenderData& renderData, FTime currentTime) {
+	std::lock_guard rLock(renderMutex);
+	EndBuffering();
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &renderData.actorMatrix);
 
 	bool isViewModel = GUglyHackFlags & 0x1;
@@ -3324,6 +3333,7 @@ void UD3D9RenderDevice::renderSurfaceBuckets(const ActorRenderData& renderData, 
 		m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
 
 		FTextureInfo* texInfoPtr;
+		std::unique_lock mLock(memMutex);
 #if UNREAL_GOLD_OLDUNREAL
 		texInfoPtr = tex->GetTexture(-1, this);
 #else
@@ -3331,6 +3341,7 @@ void UD3D9RenderDevice::renderSurfaceBuckets(const ActorRenderData& renderData, 
 		tex->Lock(texInfo, currentTime, -1, this);
 		texInfoPtr = &texInfo;
 #endif
+		mLock.unlock();
 
 		AddRenderPass(texInfoPtr, polyFlags & ~PF_FlatShaded, 0.0f);
 
@@ -3357,9 +3368,7 @@ void UD3D9RenderDevice::renderParticleSystemActor(FSceneNode* frame, AParticleSy
 #endif
 	guard(UD3D9RenderDevice::renderParticleSystemActor);
 
-	EndBuffering();
-
-	actor->SystemCoords = parentCoord;
+	actor->SystemCoords =  parentCoord;
 	if (!actor->HasValidCoords) {
 		actor->HasValidCoords = true;
 		for (int i = 0; i < actor->ParticleCount; i++) {
@@ -3378,8 +3387,6 @@ void UD3D9RenderDevice::renderParticleSystemActor(FSceneNode* frame, AParticleSy
 		if (actor->bRelativeToSystem && !actor->bCarriedItem) {
 			location += actor->Location;
 		}
-		UTexture* tex = actor->ParticleTexture[particle.TextureIndex]->Get(curTime);
-		FTextureInfo texInfo;
 		DWORD polyFlags;
 		switch (particle.Style) {
 		case STY_Masked:
@@ -3397,16 +3404,19 @@ void UD3D9RenderDevice::renderParticleSystemActor(FSceneNode* frame, AParticleSy
 		default:
 			polyFlags = 0;
 		}
+		std::unique_lock mLock(memMutex);
+		UTexture* tex = actor->ParticleTexture[particle.TextureIndex]->Get(curTime);
+		FTextureInfo texInfo;
 		FPlane colour = FPlane(actor->ScaleGlow, actor->ScaleGlow, actor->ScaleGlow, 1);
 		if (polyFlags & PF_Environment) {
 			tex->Alpha = particle.Alpha.X;
-		}
-		else {
+		} else {
 			colour *= particle.Alpha;
 			tex->Alpha = 1.0f;
 		}
-		polyFlags |= PF_TwoSided;
 		tex->Lock(texInfo, curTime, -1, this);
+		mLock.unlock();
+		polyFlags |= PF_TwoSided;
 		renderSpriteGeo(frame, location, particle.XScale, particle.YScale, texInfo, polyFlags, colour);
 		tex->Unlock(texInfo);
 	}
@@ -3428,8 +3438,6 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 		return;
 	}
 
-	EndBuffering();
-
 	XMMATRIX matPrePiv = XMMatrixTranslationFromVector(FVecToDXVec(-mover->PrePivot));
 	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(mover->Location));
 	XMMATRIX matRot = FRotToDXRotMat(mover->Rotation);
@@ -3443,8 +3451,6 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 	mat *= matPostScale;
 	mat *= matLoc;
 	D3DMATRIX actorMatrix = reinterpret_cast<D3DMATRIX&>(mat);
-
-	m_d3dDevice->SetTransform(D3DTS_WORLD, &actorMatrix);
 
 	// Calculate if the mover has been inversely scaled and needs the normals correcting.
 	XMVECTOR overallScaleDX, _unused;
@@ -3463,21 +3469,25 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 	// Sort faces into surface/flag groups
 	for (int i = 0; i < model->Polys->Element.Num(); i++) {
 		FPoly* poly = &model->Polys->Element(i);
+		std::unique_lock mLock(memMutex);
 #if UNREAL_GOLD_OLDUNREAL
 		UTexture* tex = poly->Texture ? poly->Texture->Get() : viewport->Actor->Level->DefaultTexture;
 #else
 		UTexture* tex = poly->Texture ? poly->Texture->Get(viewport->CurrentTime) : viewport->Actor->Level->DefaultTexture;
 #endif
+		mLock.unlock();
 		if (!tex) continue;
 		DWORD flags = poly->PolyFlags;
 		FTextureInfo* texInfo;
 		if (!textureInfos.count(tex)) {
 			texInfo = &textureInfos[tex];
+			mLock.lock();
 #if UNREAL_GOLD_OLDUNREAL
 			*texInfo = *tex->GetTexture(-1, this);
 #else
 			tex->Lock(*texInfo, frame->Viewport->CurrentTime, -1, this);
 #endif
+			mLock.unlock();
 		} else {
 			texInfo = &textureInfos[tex];
 		}
@@ -3487,6 +3497,11 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 		polys[SurfKey(texInfo, flags)].push_back(poly);
 	}
 
+	std::lock_guard rLock(renderMutex);
+
+	EndBuffering();
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &actorMatrix);
+
 	// Batch draw each group of faces
 	for (std::pair<const SurfKey, std::vector<FPoly*>>& entry : polys) {
 		FTextureInfo* texInfo = entry.first.first;
@@ -3494,10 +3509,12 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 
 		bool append = false;
 		for (FPoly* poly : entry.second) {
+			std::unique_lock mLock(memMutex);
 			FSavedPoly* sPoly = (FSavedPoly*)New<BYTE>(URender::VectorMem, sizeof(FSavedPoly) + poly->NumVertices * sizeof(FTransform*));
 			sPoly->NumPts = poly->NumVertices;
 			sPoly->Next = NULL;
 			FTransform* trans = New<FTransform>(URender::VectorMem, sPoly->NumPts);
+			mLock.unlock();
 			for (int i = 0; i < sPoly->NumPts; i++) {
 				int iDest = invertFaces ? (sPoly->NumPts - 1) - i : i;
 				trans[i].Point = poly->Vertex[i];
