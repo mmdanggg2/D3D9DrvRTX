@@ -3497,11 +3497,11 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 			FSavedPoly* sPoly = (FSavedPoly*)New<BYTE>(URender::VectorMem, sizeof(FSavedPoly) + poly->NumVertices * sizeof(FTransform*));
 			sPoly->NumPts = poly->NumVertices;
 			sPoly->Next = NULL;
+			FTransform* trans = New<FTransform>(URender::VectorMem, sPoly->NumPts);
 			for (int i = 0; i < sPoly->NumPts; i++) {
 				int iDest = invertFaces ? (sPoly->NumPts - 1) - i : i;
-				FTransform* trans = new(URender::VectorMem)FTransform;
-				trans->Point = poly->Vertex[i];
-				sPoly->Pts[iDest] = trans;
+				trans[i].Point = poly->Vertex[i];
+				sPoly->Pts[iDest] = &trans[i];
 			}
 
 			FSurfaceFacet facet{};
