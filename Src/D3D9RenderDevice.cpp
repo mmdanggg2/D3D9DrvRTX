@@ -3681,19 +3681,19 @@ void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* l
 #endif
 
 	FRenderVert v1{};
-	v1.Point = FVector(0, 0, 5) + hashToNormalVector(locHash);
+	v1.Point() = FVector(0, 0, 5) + hashToNormalVector(locHash);
 	v1.U = 0.5 * texInfo.USize;
 	v1.V = 1.0 * texInfo.VSize;
 	FRenderVert v2{};
-	v2.Point = FVector(5, 0, 0);
+	v2.Point() = FVector(5, 0, 0);
 	v2.U = 0.5 * texInfo.USize;
 	v2.V = 0.25 * texInfo.VSize;
 	FRenderVert v3{};
-	v3.Point = FVector(0, 5, 0) + hashToNormalVector(rotHash);
+	v3.Point() = FVector(0, 5, 0) + hashToNormalVector(rotHash);
 	v3.U = 1.0 * texInfo.USize;
 	v3.V = 0.0 * texInfo.VSize;
 	FRenderVert v4{};
-	v4.Point = FVector(0, -5, 0);
+	v4.Point() = FVector(0, -5, 0);
 	v4.U = 0.0 * texInfo.USize;
 	v4.V = 0.0 * texInfo.VSize;
 
@@ -5782,12 +5782,10 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 	//Write vertex and color
 	FGLVertexColor *pVertexColorArray = m_pVertexColorArray;
 	for (FRenderVert& vert : m_csVertexArray) {
-		pVertexColorArray->x = vert.Point.X;
-		pVertexColorArray->y = vert.Point.Y;
-		pVertexColorArray->z = vert.Point.Z;
-		pVertexColorArray->norm.x = vert.Normal.X;
-		pVertexColorArray->norm.y = vert.Normal.Y;
-		pVertexColorArray->norm.z = vert.Normal.Z;
+		pVertexColorArray->x = vert.pos.x;
+		pVertexColorArray->y = vert.pos.y;
+		pVertexColorArray->z = vert.pos.z;
+		pVertexColorArray->norm = vert.norm;
 		pVertexColorArray->color = vert.Color;
 		pVertexColorArray++;
 	}
@@ -5857,21 +5855,21 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 
 		do {
 			FRenderVert& v1 = m_csVertexArray.emplace_back();
-			v1.Point = *hubPoint;
-			v1.Normal = { 0.0f, 0.0f, 0.0f };
+			v1.Point() = *hubPoint;
+			v1.Normal() = {0.0f, 0.0f, 0.0f};
 			v1.U = hubPtTex.u;
 			v1.V = hubPtTex.v;
 
 			FRenderVert& v2 = m_csVertexArray.emplace_back();
-			v2.Point = *secondPoint;
-			v2.Normal = { 0.0f, 0.0f, 0.0f };
+			v2.Point() = *secondPoint;
+			v2.Normal() = {0.0f, 0.0f, 0.0f};
 			v2.U = secondPtTex.u;
 			v2.V = secondPtTex.v;
 
 			const FVector* point = &(*pPts++)->Point;
 			FRenderVert& v3 = m_csVertexArray.emplace_back();
-			v3.Point = *point;
-			v3.Normal = { 0.0f, 0.0f, 0.0f };
+			v3.Point() = *point;
+			v3.Normal() = {0.0f, 0.0f, 0.0f};
 			v3.U = (Facet.MapCoords.XAxis | *point) - csDot.u;
 			v3.V = (Facet.MapCoords.YAxis | *point) - csDot.v;
 

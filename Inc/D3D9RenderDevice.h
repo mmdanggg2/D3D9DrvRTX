@@ -263,11 +263,15 @@ struct FGLMapDot {
 };
 
 struct FRenderVert {
-	FVector Point{};
-	FVector Normal{};
+	FGLVertex pos{};
+	FGLNormal norm{};
 	FLOAT U{}, V{};
 	DWORD Color{0xFFFFFFFF};
+
+	FVector& Point() { return *reinterpret_cast<FVector*>(&pos); }
+	FVector& Normal() { return *reinterpret_cast<FVector*>(&norm); }
 };
+static_assert(std::is_trivially_copyable<FRenderVert>::value, "FRenderVert must be trivially copyable");
 
 static inline UTexture* getTextureWithoutNext(UTexture* texture, FTime time, FLOAT fraction) {
 	INT count = 1;
