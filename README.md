@@ -5,7 +5,7 @@ This is a custom render device for the Unreal Engine, optimized for use with NVI
 
 ## Currently Supported Games
 - Unreal Tournament ([OldUnreal v469d](https://github.com/OldUnreal/UnrealTournamentPatches/releases) and v436)
-- Unreal (v226)
+- Unreal ([OldUnreal v227k_12](https://github.com/OldUnreal/Unreal-testing/releases) and v226)
 - Deus Ex (v1112fm)
 - Nerf Arena Blast (v300)
 - Rune (v107)
@@ -31,10 +31,16 @@ This is a custom render device for the Unreal Engine, optimized for use with NVI
 	...
 	Render=D3D9DrvRTX.D3D9Render
 	```
+
 ### Harry Potter 1/2 installation
-For the Harry Potter games, the .ini files are located in the documents folder and they must be manually edited as described above as there is no render device selection menu.
+For the Harry Potter games, the .ini files are located in the documents folder and they must be manually edited as described above because there is no render device selection menu.
 - `%USERPROFILE%\Documents\Harry Potter\HP.ini` for Philosophers Stone
 - `%USERPROFILE%\Documents\Harry Potter II\Game.ini` for Chamber of Secrets
+
+### Unreal 227k_12 64 bit installation
+Unreal v227k_12 comes with a 64 bit version of the game that is within `System64`. Installation of D3D9DrvRTX is much the same except you need to extract the files from the `Unreal_227k_12-x64` zip into the `System64` directory.
+
+However, installation of RTX Remix is different for 64-bit games. Instead of extracting the zip directly into the folder you must extract **only the contents of `.trex`** directly into `System64`.
 
 ## Usage
 After installation, start the game, and it should now be using the RTX Remix optimized render device.
@@ -48,6 +54,8 @@ The RTX specific options are listed here:
 - `LightMultiplier`: Global light brightness multiplier.
 - `LightRadiusDivisor`: The LightRadius is divided by this value before being exponentiated.
 - `LightRadiusExponent`: LightRadius is raised to the power of this value before being multiplied with the brightness.
+- `NonSolidTranslucentHack`: Makes non-solid level geometry render as translucent to allow lights to shine through it.
+
 - `EnableSkyBoxRendering`: Enables rendering of the skybox zone (if one is found) before the main view.
 - `EnableSkyBoxAnchors`: Enables the special mesh at the camera's position, generated for anchoring the skybox in remix.
 - `EnableHashTextures`: Enables specially generated textures with a stable hash in place of procedurally generated ones.
@@ -66,9 +74,9 @@ The RTX specific options are listed here:
 	This is to approximate the light radius cutoff effect of the regular renderer, which is not possible to achive with physically based lights. `brightnessSetting` is the value of the in game brightness slider * 2, where the slider's middle value (0.5) multiples light brighnesses by 1.0
 
 ## Developer setup
-You will need to have Visual Studio installed with the windows sdk, as well as the Direct3D 9 SDK.
+You will need to have Visual Studio installed with the Windows SDK, as well as the Direct3D 9 SDK.
 
-For each game, copy an installation of that game into the `installs`. UT 469d for example would go in `installs/install_ut469d`, where the game code matches the names in `sdks`.
+For each game, copy an installation of that game into the `installs` directory. UT 469d for example would go in `installs/install_ut469d/`, where the game code matches the names in `sdks`.
 
 To set the current game, simply run the corresponding .bat file in `scripts`. This creates `sdk` and `install` directory symlinks to the appropriate folders in `sdks` and `installs`. The vs project is setup to use the `sdk` folder for headers and libs, and save the built dll into `install/System`
 
