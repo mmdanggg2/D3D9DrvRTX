@@ -3298,6 +3298,7 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 }
 
 void UD3D9RenderDevice::renderSurfaceBuckets(const ActorRenderData& renderData, FTime currentTime) {
+	EndBuffering();
 	m_d3dDevice->SetTransform(D3DTS_WORLD, &renderData.actorMatrix);
 
 	bool isViewModel = GUglyHackFlags & 0x1;
@@ -3356,8 +3357,6 @@ void UD3D9RenderDevice::renderParticleSystemActor(FSceneNode* frame, AParticleSy
 	}
 #endif
 	guard(UD3D9RenderDevice::renderParticleSystemActor);
-
-	EndBuffering();
 
 	actor->SystemCoords = parentCoord;
 	if (!actor->HasValidCoords) {
