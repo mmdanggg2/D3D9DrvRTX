@@ -31,6 +31,7 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;WINDOWS_IGNORE_PACKING_MISMATCH;NOMINMAX;_UNICODE;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <OutputFile>$(UNREAL_INSTALL_DIR)\System\D3D9DrvRTX.dll</OutputFile>
