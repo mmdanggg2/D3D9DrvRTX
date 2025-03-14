@@ -6,7 +6,6 @@
 
 #include <cmath>
 #include <fstream>
-#include <codecvt>
 
 using json = nlohmann::json;
 
@@ -41,11 +40,50 @@ void RTXAnchorPingPong::Tick(float deltaTime) {
 	location = pathStart + pathDirection * (pathLocation < pathLengthReal ? pathLocation : pathLength - pathLocation);
 }
 
-std::wstring s2ws(const std::string& string) {
-	using convert_typeX = std::codecvt_utf8<wchar_t>;
-	std::wstring_convert<convert_typeX, wchar_t> converterX;
+std::wstring s2ws(const std::string& str) {
+	if (str.empty()) {
+		return L"";
+	}
 
-	return converterX.from_bytes(string);
+	// Calculate the required buffer size
+	int size_needed = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
+	if (size_needed <= 0) {
+		throw std::runtime_error("MultiByteToWideChar failed");
+	}
+
+	// Allocate the buffer
+	std::wstring result(size_needed - 1, 0); // -1 because size_needed includes null terminator
+
+	// Perform the conversion
+	int chars_converted = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &result[0], size_needed);
+	if (chars_converted <= 0) {
+		throw std::runtime_error("MultiByteToWideChar failed");
+	}
+
+	return result;
+}
+
+std::string ws2s(const std::wstring& wstr) {
+	if (wstr.empty()) {
+		return "";
+	}
+
+	// Calculate the required buffer size
+	int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, NULL, 0, NULL, NULL);
+	if (size_needed <= 0) {
+		throw std::runtime_error("WideCharToMultiByte failed");
+	}
+
+	// Allocate the buffer
+	std::string result(size_needed - 1, 0); // -1 because size_needed includes null terminator
+
+	// Perform the conversion
+	int bytes_written = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &result[0], size_needed, NULL, NULL);
+	if (bytes_written <= 0) {
+		throw std::runtime_error("WideCharToMultiByte failed");
+	}
+
+	return result;
 }
 
 void from_json(const json& j, FVector& p) {
@@ -61,7 +99,7 @@ std::string toLower(const std::string& s) {
 	return lower;
 }
 
-std::string normalize_string(const std::string& input) {
+std::string normalize_level_name(const std::string& input) {
 	// 1. Replace backslashes with forward slashes
 	std::string s = input;
 	std::string::size_type pos = 0;
@@ -101,20 +139,17 @@ std::string normalize_string(const std::string& input) {
 
 
 	// 4. Convert to lowercase
-	std::transform(result.begin(), result.end(), result.begin(),
-		[](unsigned char c) { return std::tolower(c); });
-
-	return result;
+	return toLower(result);
 }
 
-void loadLevelJson(const std::string& rawLevelName, std::vector<std::unique_ptr<RTXAnchor>>& anchors) {
+void loadLevelJson(const TCHAR* rawLevelName, std::vector<std::unique_ptr<RTXAnchor>>& anchors) {
 	std::wstring fileName = L"D3D9DrvRTX_level_properties.json";
 	std::ifstream file = std::ifstream(fileName);
 	if (!file.is_open()) {
 		debugf(TEXT("Could not open RTX level properties file '%s'!"), fileName.c_str());
 		return;
 	}
-	std::string levelName = normalize_string(rawLevelName);
+	std::string levelName = normalize_level_name(ws2s(rawLevelName));
 	try {
 		json configJson = json::parse(file);
 		json levelObj;

@@ -64,4 +64,4 @@ public:
 	void Tick(float deltaTime) override;
 };
 
-void loadLevelJson(const std::string& levelName, std::vector<std::unique_ptr<RTXAnchor>>& anchors);
+void loadLevelJson(const TCHAR* levelName, std::vector<std::unique_ptr<RTXAnchor>>& anchors);
