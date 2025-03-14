@@ -35,7 +35,7 @@ def get_version():
 		raise RuntimeError("No version found!")
 
 def switch_game(game_code: str):
-	print(f"Switching to '{colored(game_code, 'cyan')}'")
+	print(f"Switching to '{colored(game_code, 'cyan')}'", flush=True)
 	subprocess.run([f"{game_code}.bat"], shell=True, check=True)
 
 def build(version: str | None = None, x64: bool = False):
@@ -109,9 +109,9 @@ for game_code in games_codes:
 	build(args.version_extra)
 	build_name = f"D3D9DrvRTX-{game_code}-{version}"
 	zip_build(build_name, version_path)
-	print()
+	print(flush=True)
 	if game_code == "Unreal_227k_12":
 		build(args.version_extra, x64=True)
 		build_name = f"D3D9DrvRTX-{game_code}-x64-{version}"
 		zip_build(build_name, version_path, x64=True)
-		print()
+		print(flush=True)
