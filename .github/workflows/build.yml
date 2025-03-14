@@ -2,9 +2,7 @@ name: Build D3D9DrvRTX
 
 on:
   push:
-    branches: [ master ]
   pull_request:
-    branches: [ master ]
 
 env:
   # Path to the solution file relative to the root of the project.
