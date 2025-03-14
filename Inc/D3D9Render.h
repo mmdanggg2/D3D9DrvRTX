@@ -2,6 +2,7 @@
 
 #include "D3D9DebugUtils.h"
 #include "D3D9RenderDevice.h"
+#include "RTXLevelProperties.h"
 
 #include <Render.h>
 
@@ -47,10 +48,12 @@ private:
 	};
 	static struct {
 		ULevel* currentLevel;
+		FTime lastLevelTime;
+		std::vector<std::unique_ptr<RTXAnchor>> anchors;
 		ModelFacets facets;
 		FMemStack facetsMem;
 		FMemMark facetsMemMark;
-	} cachedLevelModel;
+	} currentLevelData;
 	struct FrameActors {
 		std::vector<AActor*> actors;
 		std::vector<ABrush*> movers;
@@ -61,6 +64,7 @@ private:
 		FCoords localCoord;
 	};
 	typedef SurfKeyBucketVector<FTextureInfo*, std::vector<FTransTexture>> DecalMap;
+	void onLevelChange(FSceneNode* frame);
 	void getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets);
 	void drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, RenderList& renderList, ParentCoord* parentCoord = nullptr);
 	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, RenderList& renderList, SpecialCoord& specialCoord);

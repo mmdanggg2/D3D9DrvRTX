@@ -3708,6 +3708,88 @@ void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* l
 	unguard;
 }
 
+void UD3D9RenderDevice::renderRTXAnchor(const RTXAnchor& anchor, UTexture* texture) {
+#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: renderSkyZoneAnchor = " << si++ << std::endl;
+	}
+#endif
+	guard(UD3D9RenderDevice::renderSkyZoneAnchor);
+	using namespace DirectX;
+
+	EndBuffering();
+
+	XMMATRIX actorMatrix = XMMatrixIdentity();
+
+	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(anchor.getLocation()));
+	XMMATRIX matRot = XMMatrixRotationRollPitchYawFromVector(FVecToDXVec(anchor.getRotation()));
+	actorMatrix *= matRot;
+	actorMatrix *= matLoc;
+
+	D3DMATRIX d3dMatrix = ToD3DMATRIX(actorMatrix);
+	m_d3dDevice->SetTransform(D3DTS_WORLD, &d3dMatrix);
+
+	FVector hash_vector = hashToNormalVector(anchor.getHash());
+
+	FTextureInfo texInfo;
+#if UNREAL_GOLD_OLDUNREAL
+	texInfo = *texture->GetTexture(-1, this);
+#else
+	texture->Lock(texInfo, 0.0, -1, this);
+#endif
+
+	FRenderVert v1{};
+	v1.pos = FVector(0, 0, 5) + hash_vector;
+	v1.U = 0.5 * texInfo.USize;
+	v1.V = 1.0 * texInfo.VSize;
+	FRenderVert v2{};
+	v2.pos = FVector(5, 0, 0);
+	v2.U = 0.5 * texInfo.USize;
+	v2.V = 0.25 * texInfo.VSize;
+	FRenderVert v3{};
+	v3.pos = FVector(0, 5, 0) - hash_vector;
+	v3.U = 1.0 * texInfo.USize;
+	v3.V = 0.0 * texInfo.VSize;
+	FRenderVert v4{};
+	v4.pos = FVector(0, -5, 0);
+	v4.U = 0.0 * texInfo.USize;
+	v4.V = 0.0 * texInfo.VSize;
+
+	std::vector<FRenderVert> verts;
+	verts.push_back(v1);
+	verts.push_back(v2);
+	verts.push_back(v3);
+
+	verts.push_back(v1);
+	verts.push_back(v4);
+	verts.push_back(v2);
+
+	verts.push_back(v2);
+	verts.push_back(v4);
+	verts.push_back(v3);
+
+	DWORD polyFlags = PF_Occlude;
+
+	BufferTriangleSurfaceGeometry(verts);
+
+	//Initialize render passes state information
+	m_rpPassCount = 0;
+	m_rpTMUnits = TMUnits;
+	m_rpForceSingle = false;
+	m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
+
+	AddRenderPass(&texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
+
+	RenderPasses();
+
+#if !UNREAL_GOLD_OLDUNREAL
+	texture->Unlock(texInfo);
+#endif
+
+	unguard;
+}
+
 UINT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FRenderVert>& vertices) {
 	// I was promised to be given triangles
 	assert(vertices.size() % 3 == 0);

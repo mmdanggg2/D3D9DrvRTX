@@ -20,6 +20,7 @@
 //#define D3D9_DEBUG
 
 #include "D3D9DebugUtils.h"
+#include "RTXLevelProperties.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -1292,6 +1293,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void renderLights(FSceneNode* frame, std::vector<AActor*> lightActors);
 	// Renders a magic shape for anchoring stuff to the sky box
 	void renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* location);
+	void renderRTXAnchor(const RTXAnchor& anchor, UTexture* texture);
 	// Given a set of verts and textures, render them with the actor matrix.
 	void renderSurfaceBuckets(const ActorRenderData& renderData, FTime currentTime);
 

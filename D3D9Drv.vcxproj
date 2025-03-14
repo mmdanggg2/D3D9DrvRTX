@@ -429,6 +429,7 @@
     <ClCompile Include="Src\D3D9DrvRTX.cpp" />
     <ClCompile Include="Src\D3D9Render.cpp" />
     <ClCompile Include="Src\D3D9RenderDevice.cpp" />
+    <ClCompile Include="Src\RTXLevelProperties.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Inc\c_gclip.h" />
@@ -437,6 +438,7 @@
     <ClInclude Include="Inc\D3D9DebugUtils.h" />
     <ClInclude Include="Inc\D3D9Render.h" />
     <ClInclude Include="Inc\D3D9RenderDevice.h" />
+    <ClInclude Include="Inc\RTXLevelProperties.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Inc\vectorUtils.h" />
   </ItemGroup>
@@ -448,6 +450,7 @@
     <None Include="Config\D3D9DrvRTX.int" />
     <None Include="Config\dxvk.conf" />
     <None Include="Config\rtx.conf" />
+    <None Include="Config\D3D9DrvRTX_level_properties_schema.json" />
     <None Include="README.md" />
     <None Include="scripts\BuildAll.py" />
     <None Include="scripts\ChangeLinks.bat" />

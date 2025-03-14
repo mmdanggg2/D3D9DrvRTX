@@ -1,3 +1,6 @@
 [submodule "sdks"]
 	path = sdks
 	url = https://github.com/mmdanggg2/UE1-sdks.git
+[submodule "external/json"]
+	path = external/json
+	url = https://github.com/nlohmann/json.git

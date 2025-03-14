@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "D3D9DrvRTX_level_properties_schema.json",
+  "$defs": {
+    "FVector": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number"
+      },
+      "prefixItems": [
+        { "type": "number", "title": "X" },
+        { "type": "number", "title": "Y" },
+        { "type": "number", "title": "Z" }
+      ]
+    }
+  },
+  "type": "object",
+  "patternProperties": {
+    "^[^$]+.*": {
+      "type": "object",
+      "description": "Properties used in the specified level",
+      "properties": {
+        "anchors": {
+          "type": "array",
+          "description": "A list of the anchors to create",
+          "items": {
+            "type": "object",
+            "description": "An anchor to render for replacment in Remix",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The name of the anchor, used as a seed to create a random mesh so 2 anchors with the same name will have the same hash."
+              },
+              "anim_type": {
+                "type": "string",
+                "enum": ["linear", "ping-pong", "static"],
+                "description": "Which kind of animation the anchor will have\nlinear: moves from start to end and loops back to start\nping-pong: moves from start to end and then reverses to move back to start\nstatic: does not move, will only rotate"
+              },
+              "start_loc": {
+                "$ref": "#/$defs/FVector",
+                "description": "The starting location of the anchor"
+              },
+              "start_rot": {
+                "$ref": "#/$defs/FVector",
+                "description": "The starting rotation of the anchor in degrees"
+              },
+              "rotation_rate": {
+                "$ref": "#/$defs/FVector",
+                "description": "The how much the anchor rotates in degrees per second"
+              }
+            },
+            "required": [
+              "name",
+              "anim_type",
+              "start_loc"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "anim_type": { 
+                      "anyOf": [
+                        { "const": "linear" },
+                        { "const": "ping-pong" }
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "end_loc": {
+                      "$ref": "#/$defs/FVector",
+                      "description": "The destination location for the anchor to move to"
+                    },
+                    "speed": {
+                      "type": "number",
+                      "description": "How fast the anchor will move from start to end in unreal units per second"
+                    }
+                  },
+                  "required": [
+                    "end_loc",
+                    "speed"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
