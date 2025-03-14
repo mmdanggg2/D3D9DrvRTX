@@ -3,6 +3,8 @@
 #include <bit>
 #include <bitset>
 #include <unordered_set>
+#include <locale>
+#include <codecvt>
 
 IMPLEMENT_CLASS(UD3D9Render);
 
@@ -17,15 +19,15 @@ void UD3D9Render::StaticConstructor() {
 	URender::StaticConstructor();
 	dout << "Static Constructing UD3D9Render!" << std::endl;
 #if UTGLR_HP_ENGINE
-	cachedLevelModel.facetsMem.Init(8192, TEXT("CacheLevelFacetMem"));
+	currentLevelData.facetsMem.Init(8192, TEXT("CacheLevelFacetMem"));
 #else
-	cachedLevelModel.facetsMem.Init(8192);
+	currentLevelData.facetsMem.Init(8192);
 #endif
-	cachedLevelModel.facetsMemMark = FMemMark(cachedLevelModel.facetsMem);
+	currentLevelData.facetsMemMark = FMemMark(currentLevelData.facetsMem);
 	unguard;
 }
 
-decltype(UD3D9Render::cachedLevelModel) UD3D9Render::cachedLevelModel;
+decltype(UD3D9Render::currentLevelData) UD3D9Render::currentLevelData;
 
 void UD3D9Render::getLevelModelFacets(FSceneNode* frame, ModelFacets& modelFacets) {
 	UModel* model = frame->Level->Model;
@@ -101,7 +103,7 @@ void UD3D9Render::SurfaceData::calculateSurfaceFacet(ULevel* level, const DWORD 
 	const FBspSurf* surf = &model->Surfs(this->iSurf);
 	FSurfaceFacet*& facet = this->facet;
 	// New surface, setup...
-	facet = New<FSurfaceFacet>(cachedLevelModel.facetsMem);
+	facet = New<FSurfaceFacet>(currentLevelData.facetsMem);
 	facet->Polys = NULL;
 	facet->Span = NULL;
 	facet->MapCoords = FCoords(
@@ -147,7 +149,7 @@ void UD3D9Render::SurfaceData::calculateSurfaceFacet(ULevel* level, const DWORD 
 	}
 #endif
 	if (panU != 0 || panV != 0) {
-		FVector* pan = New<FVector>(cachedLevelModel.facetsMem);
+		FVector* pan = New<FVector>(currentLevelData.facetsMem);
 		*pan = FVector(panU, panV, 0);
 		// Hide this away in the span coz we're not using it
 		facet->Span = (FSpanBuffer*)pan;
@@ -155,7 +157,7 @@ void UD3D9Render::SurfaceData::calculateSurfaceFacet(ULevel* level, const DWORD 
 
 	for (const INT& iNode : this->nodes) {
 		const FBspNode& node = model->Nodes(iNode);
-		FSavedPoly* poly = (FSavedPoly*)New<BYTE>(cachedLevelModel.facetsMem, sizeof(FSavedPoly) + node.NumVertices * sizeof(FTransform*));
+		FSavedPoly* poly = (FSavedPoly*)New<BYTE>(currentLevelData.facetsMem, sizeof(FSavedPoly) + node.NumVertices * sizeof(FTransform*));
 		poly->Next = facet->Polys;
 		facet->Polys = poly;
 #if !UTGLR_OLD_POLY_CLASSES
@@ -164,7 +166,7 @@ void UD3D9Render::SurfaceData::calculateSurfaceFacet(ULevel* level, const DWORD 
 		poly->NumPts = node.NumVertices;
 
 		// Allocate and store each point
-		FTransform* transArr = New<FTransform>(cachedLevelModel.facetsMem, poly->NumPts);
+		FTransform* transArr = New<FTransform>(currentLevelData.facetsMem, poly->NumPts);
 		for (int i = 0; i < poly->NumPts; i++) {
 			FVert& vert = model->Verts(node.iVertPool + i);
 			FTransform* trans = transArr + i;
@@ -204,6 +206,20 @@ static bool getRenderInterfaceActors(AActor* actor, FSceneNode* frame, std::vect
 		iface = nullptr;
 	}
 	return false;
+}
+
+void UD3D9Render::onLevelChange(FSceneNode* frame) {
+	currentLevelData.currentLevel = frame->Level;
+	currentLevelData.facetsMemMark.Pop();
+	currentLevelData.facets = ModelFacets();
+	getLevelModelFacets(frame, currentLevelData.facets);
+	currentLevelData.lastLevelTime = frame->Level->TimeSeconds;
+	currentLevelData.anchors.clear();
+
+	loadLevelJson(
+		std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(*frame->Level->URL.Map),
+		currentLevelData.anchors
+	);
 }
 
 void UD3D9Render::DrawWorld(FSceneNode* frame) {
@@ -302,13 +318,11 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	// Seems to also update mover bsp nodes for colision decal calculations
 	OccludeFrame(frame);
 
-	if (cachedLevelModel.currentLevel != frame->Level) {
-		cachedLevelModel.facetsMemMark.Pop();
-		cachedLevelModel.facets = ModelFacets();
-		getLevelModelFacets(frame, cachedLevelModel.facets);
-		cachedLevelModel.currentLevel = frame->Level;
+	if (currentLevelData.currentLevel != frame->Level) {
+		onLevelChange(frame);
 	}
-	ModelFacets& modelFacets = cachedLevelModel.facets;
+
+	ModelFacets& modelFacets = currentLevelData.facets;
 
 	std::unordered_map<UTexture*, FTextureInfo> lockedTextures;
 
@@ -333,6 +347,13 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	d3d9Dev->startWorldDraw(frame);
 
 	drawFrame(frame, d3d9Dev, modelFacets, objs, lockedTextures);
+
+	FLOAT deltaTime = frame->Level->TimeSeconds - currentLevelData.lastLevelTime;
+	currentLevelData.lastLevelTime = frame->Level->TimeSeconds;
+	for (std::unique_ptr<RTXAnchor>& anchor : currentLevelData.anchors) {
+		anchor->Tick(deltaTime);
+		d3d9Dev->renderRTXAnchor(*anchor, viewport->Actor->Level->DefaultTexture);
+	}
 
 	for (ASkyZoneInfo* zone : skyZones) {
 		d3d9Dev->renderSkyZoneAnchor(zone, &frame->Coords.Origin);
