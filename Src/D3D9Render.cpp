@@ -3,8 +3,6 @@
 #include <bit>
 #include <bitset>
 #include <unordered_set>
-#include <locale>
-#include <codecvt>
 
 IMPLEMENT_CLASS(UD3D9Render);
 
@@ -217,7 +215,7 @@ void UD3D9Render::onLevelChange(FSceneNode* frame) {
 	currentLevelData.anchors.clear();
 
 	loadLevelJson(
-		std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(*frame->Level->URL.Map),
+		*frame->Level->URL.Map,
 		currentLevelData.anchors
 	);
 }
