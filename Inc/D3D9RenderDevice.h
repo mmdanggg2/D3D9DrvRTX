@@ -214,6 +214,11 @@ struct FGLVertex {
 	FLOAT x;
 	FLOAT y;
 	FLOAT z;
+
+	FGLVertex() = default;
+	FGLVertex(FLOAT x, FLOAT y, FLOAT z) : x(x), y(y), z(z) {};
+	FGLVertex(const FVector& vec) : x(vec.X), y(vec.Y), z(vec.Z) {};
+	operator FVector() { return FVector(x, y, z); }
 };
 
 //Normals
@@ -221,6 +226,11 @@ struct FGLNormal {
 	FLOAT x;
 	FLOAT y;
 	FLOAT z;
+
+	FGLNormal() = default;
+	FGLNormal(FLOAT x, FLOAT y, FLOAT z) : x(x), y(y), z(z) {};
+	FGLNormal(const FVector& vec) : x(vec.X), y(vec.Y), z(vec.Z) {};
+	operator FVector() { return FVector(x, y, z); }
 };
 
 //Vertex and primary color
@@ -268,9 +278,6 @@ struct FRenderVert {
 	FGLNormal norm{};
 	FLOAT U{}, V{};
 	DWORD Color{0xFFFFFFFF};
-
-	FVector& Point() { return *reinterpret_cast<FVector*>(&pos); }
-	FVector& Normal() { return *reinterpret_cast<FVector*>(&norm); }
 };
 static_assert(std::is_trivially_copyable<FRenderVert>::value, "FRenderVert must be trivially copyable");
 
@@ -493,7 +500,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	std::vector<FRenderVert> m_csVertexArray;
 	IDirect3DVertexBuffer9 *m_d3dVertexColorBuffer;
 	FGLVertexColor *m_pVertexColorArray;
-	INT m_vertexTempBufferSize;
+	UINT m_vertexTempBufferSize;
 	IDirect3DVertexBuffer9* m_d3dTempVertexColorBuffer;
 	IDirect3DVertexBuffer9* m_currentVertexColorBuffer;
 
@@ -508,12 +515,12 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	//Tex coords
 	IDirect3DVertexBuffer9 *m_d3dTexCoordBuffer[MAX_TMUNITS];
 	FGLTexCoord *m_pTexCoordArray[MAX_TMUNITS];
-	INT m_texTempBufferSize[MAX_TMUNITS];
+	UINT m_texTempBufferSize[MAX_TMUNITS];
 	IDirect3DVertexBuffer9* m_d3dTempTexCoordBuffer[MAX_TMUNITS];
 	IDirect3DVertexBuffer9* m_currentTexCoordBuffer[MAX_TMUNITS];
 
 	//Vertex buffer state flags
-	INT m_curVertexBufferPos;
+	UINT m_curVertexBufferPos;
 	bool m_vertexColorBufferNeedsDiscard;
 	bool m_secondaryColorBufferNeedsDiscard;
 	bool m_texCoordBufferNeedsDiscard[MAX_TMUNITS];
@@ -761,8 +768,8 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	}
 
 	// Gets the current vert buffer position and increments it by numPoints
-	inline INT getVertBufferPos(INT numPoints) {
-		INT bufferPos = 0;
+	inline UINT getVertBufferPos(UINT numPoints) {
+		UINT bufferPos = 0;
 		if (numPoints <= VERTEX_BUFFER_SIZE) {
 			bufferPos = m_curVertexBufferPos;
 
@@ -772,7 +779,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		return bufferPos;
 	}
 
-	inline bool needsNewBuffer(DWORD polyFlags, int numVerts, FTextureInfo* info = nullptr) {
+	inline bool needsNewBuffer(DWORD polyFlags, UINT numVerts, FTextureInfo* info = nullptr) {
 		if (m_curPolyFlags != polyFlags) return true;
 		QWORD cacheId = info ? calcCacheID(*info, polyFlags) : TEX_CACHE_ID_NO_TEX;
 		if (TexInfo[0].CurrentCacheID != cacheId) return true;
@@ -781,10 +788,10 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	}
 
 	// Locks/Creates a vertex buffer appropriate for the given number of points
-	inline void LockVertexColorBuffer(INT numPoints) {
+	inline void LockVertexColorBuffer(UINT numPoints) {
 		DWORD lockFlags = D3DLOCK_NOSYSLOCK;
 		HRESULT hResult;
-		INT bufferPos;
+		UINT bufferPos;
 		IDirect3DVertexBuffer9* vertBuffer;
 
 		// Bigger than our main buffer, allocate new one of the appropriate size
@@ -839,7 +846,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		}
 	}
 
-	inline void LockSecondaryColorBuffer(INT numPoints) {
+	inline void LockSecondaryColorBuffer(UINT numPoints) {
 		appErrorf(TEXT("Can't be bothered, don't use LockSecondaryColorBuffer thx bye!"));
 		FGLSecondaryColor* pData = nullptr;
 		if (FAILED(m_d3dSecondaryColorBuffer->Lock(0, 0, (VOID**)&pData, D3DLOCK_NOSYSLOCK))) {
@@ -855,11 +862,11 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	}
 
 	// Locks/Creates a UV buffer appropriate for the given number of points
-	inline void FASTCALL LockTexCoordBuffer(DWORD texUnit, INT numPoints) {
+	inline void FASTCALL LockTexCoordBuffer(DWORD texUnit, UINT numPoints) {
 		DWORD lockFlags = D3DLOCK_NOSYSLOCK;
 		HRESULT hResult;
 		IDirect3DVertexBuffer9* texBuffer;
-		INT bufferPos;
+		UINT bufferPos;
 
 		if (numPoints > VERTEX_BUFFER_SIZE) {
 			check(m_vertexTempBufferSize == numPoints);
@@ -1263,8 +1270,8 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	void RenderPassesNoCheckSetup(void);
 
-	INT FASTCALL BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet, const FGLMapDot& csDot, bool append = false);
-	INT FASTCALL BufferTriangleSurfaceGeometry(const std::vector<FRenderVert>& vertices);
+	UINT FASTCALL BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet, const FGLMapDot& csDot, bool append = false);
+	UINT FASTCALL BufferTriangleSurfaceGeometry(const std::vector<FRenderVert>& vertices);
 
 	void FASTCALL BufferAdditionalClippedVerts(FTransTexture** Pts, INT NumPts);
 
