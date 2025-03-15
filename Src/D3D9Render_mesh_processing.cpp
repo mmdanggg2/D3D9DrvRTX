@@ -26,7 +26,7 @@ public:
 		}
 		bool newVal = false;
 		if (uniqueIdx == -1) {
-			uniqueIdx = uniqueValues.size();
+			uniqueIdx = static_cast<int>(uniqueValues.size());
 			uniqueValues.push_back(value);
 			newVal = true;
 		}
@@ -78,8 +78,8 @@ private:
 
 static inline void calcEnvMapping(FRenderVert& vert, const DirectX::XMMATRIX& screenSpaceMat, FSceneNode* frame) {
 	using namespace DirectX;
-	XMVECTOR ssPoint = XMVector3Transform(FVecToDXVec(vert.Point()), screenSpaceMat);
-	XMVECTOR ssNormal = XMVector3TransformNormal(FVecToDXVec(vert.Normal()), screenSpaceMat);
+	XMVECTOR ssPoint = XMVector3Transform(FVecToDXVec(vert.pos), screenSpaceMat);
+	XMVECTOR ssNormal = XMVector3TransformNormal(FVecToDXVec(vert.norm), screenSpaceMat);
 	ssNormal = XMVector3Normalize(ssNormal);
 
 	XMVECTOR normPoint = XMVector3Normalize(ssPoint);
@@ -409,13 +409,15 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 		pointsVec.reserve(vertMaxCount);
 		for (INT j = 0; j < 3; j++) {
 			FRenderVert& vert = pointsVec.emplace_back();
-			vert.Point() = samples[sampleIdx[j]];
-			vert.Normal() = normals[sampleIdx[j]];
+			FVector pos = samples[sampleIdx[j]];
+			const FVector& norm = normals[sampleIdx[j]];
+			if (fatten) {
+				pos += norm * fatness;
+			}
+			vert.pos = pos;
+			vert.norm = norm;
 			vert.U = triUV[j].U;
 			vert.V = triUV[j].V;
-			if (fatten) {
-				vert.Point() += vert.Normal() * fatness;
-			}
 
 			// Calculate the environment UV mapping
 			if (environMapped) {
@@ -570,13 +572,15 @@ void UD3D9RenderDevice::renderStaticMeshActor(FSceneNode* frame, AActor* actor, 
 		pointsVec.reserve(vertMaxCount);
 		for (INT j = 0; j < 3; j++) {
 			FRenderVert& vert = pointsVec.emplace_back();
-			vert.Point() = mesh->SMVerts(tri.iVertex[j]);
-			vert.Normal() = mesh->SMNormals(i);
+			FVector pos = mesh->SMVerts(tri.iVertex[j]);
+			const FVector& norm = mesh->SMNormals(i);
+			if (fatten) {
+				pos += norm * fatness;
+			}
+			vert.pos = pos;
+			vert.norm = norm;
 			vert.U = tri.Tex[j].U;
 			vert.V = tri.Tex[j].V;
-			if (fatten) {
-				vert.Point() += vert.Normal() * fatness;
-			}
 
 			// Calculate the environment UV mapping
 			if (environMapped) {
@@ -646,9 +650,6 @@ void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor,
 		return;
 	}
 
-	bool fatten = actor->Fatness != 128;
-	FLOAT fatness = (actor->Fatness / 16.0) - 8.0;
-
 	XMMATRIX screenSpaceMat = actorMatrix * FCoordToDXMat(frame->Uncoords);
 
 	FTerrainQuad* quad = &mesh->TerrainQuads(actor->LatentInt);
@@ -682,15 +683,12 @@ void UD3D9RenderDevice::renderTerrainMeshActor(FSceneNode* frame, AActor* actor,
 		for (INT j = 0; j < 3; j++) {
 			FTerrainVert& terrainVert = mesh->TerrainVerts(quad->Verts(tri.RenderVerts[j]));
 			FRenderVert& vert = pointsVec.emplace_back();
-			vert.Point() = terrainVert.Vert;
-			vert.Normal() = terrainVert.Normal;
+			vert.pos = terrainVert.Vert;
+			vert.norm = terrainVert.Normal;
 			vert.U = tri.UV[j].U / 256.0f;
 			vert.V = tri.UV[j].V / 256.0f;
 			DWORD alpha = tri.EdgeAlpha[j] * 255;
 			vert.Color = (alpha << 24) | 0x00FFFFFF;
-			if (fatten) {
-				vert.Point() += vert.Normal() * fatness;
-			}
 
 			// Calculate the environment UV mapping
 			if (environMapped) {
@@ -907,13 +905,15 @@ void UD3D9RenderDevice::renderSkeletalMeshActor(FSceneNode* frame, AActor* actor
 			for (INT j = 0; j < 3; j++) {
 				const INT idx = actor->bMirrored ? 2 - j : j;
 				FRenderVert& vert = pointsVec.emplace_back();
-				vert.Point() = deformed[tri.vIndex[idx]];
-				vert.Normal() = normals[tri.vIndex[idx]];
+				FVector pos = deformed[tri.vIndex[idx]];
+				const FVector& norm = normals[tri.vIndex[idx]];
+				if (fatten) {
+					pos += norm * fatness;
+				}
+				vert.pos = pos;
+				vert.norm = norm;
 				vert.U = tri.tex[idx].u;
 				vert.V = tri.tex[idx].v;
-				if (fatten) {
-					vert.Point() += vert.Normal() * fatness;
-				}
 
 				// Calculate the environment UV mapping
 				if (polyFlags & PF_Environment) {

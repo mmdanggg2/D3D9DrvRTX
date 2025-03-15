@@ -2038,7 +2038,7 @@ void UD3D9RenderDevice::drawLevelSurfaces(FSceneNode* frame, FSurfaceInfo& surfa
 
 	clockFast(ComplexCycles);
 
-	INT numVerts = 0;
+	UINT numVerts = 0;
 	for (FSurfaceFacet*& facet : facets) {
 		//Calculate UDot and VDot intermediates for complex surface
 		FGLMapDot csDot;
@@ -3560,7 +3560,7 @@ std::unordered_set<int> UD3D9RenderDevice::LightSlots::updateActors(const std::v
 		if (!actorSlots.count(actor)) {
 			// This is a new actor
 			if (availableSlots.empty()) {
-				static std::set<int> loggedLightOversizes;
+				static std::set<size_t> loggedLightOversizes;
 				if (loggedLightOversizes.insert(actors.size()).second) {
 					debugf(NAME_Warning, TEXT("No light slots left! Needed %d lights"), actors.size());
 					dout << "No light slots left! Needed " << actors.size() << " lights" << std::endl;
@@ -3680,19 +3680,19 @@ void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* l
 #endif
 
 	FRenderVert v1{};
-	v1.Point() = FVector(0, 0, 5) + hashToNormalVector(locHash);
+	v1.pos = FVector(0, 0, 5) + hashToNormalVector(locHash);
 	v1.U = 0.5 * texInfo.USize;
 	v1.V = 1.0 * texInfo.VSize;
 	FRenderVert v2{};
-	v2.Point() = FVector(5, 0, 0);
+	v2.pos = FVector(5, 0, 0);
 	v2.U = 0.5 * texInfo.USize;
 	v2.V = 0.25 * texInfo.VSize;
 	FRenderVert v3{};
-	v3.Point() = FVector(0, 5, 0) + hashToNormalVector(rotHash);
+	v3.pos = FVector(0, 5, 0) + hashToNormalVector(rotHash);
 	v3.U = 1.0 * texInfo.USize;
 	v3.V = 0.0 * texInfo.VSize;
 	FRenderVert v4{};
-	v4.Point() = FVector(0, -5, 0);
+	v4.pos = FVector(0, -5, 0);
 	v4.U = 0.0 * texInfo.USize;
 	v4.V = 0.0 * texInfo.VSize;
 
@@ -3730,14 +3730,14 @@ void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* l
 	unguard;
 }
 
-INT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FRenderVert>& vertices) {
+UINT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FRenderVert>& vertices) {
 	// I was promised to be given triangles
 	assert(vertices.size() % 3 == 0);
 
 	// Buffer "static" geometry.
 	m_csVertexArray = vertices;
 
-	return m_csVertexArray.size();
+	return static_cast<UINT>(m_csVertexArray.size());
 }
 
 void UD3D9RenderDevice::ClearZ(FSceneNode* Frame) {
@@ -3791,7 +3791,7 @@ void UD3D9RenderDevice::PopHit(INT Count, UBOOL bForce) {
 	if (selHit || bForce) {
 		DWORD nHitNameBytes;
 
-		nHitNameBytes = m_gclip.GetHitNameStackSize() * 4;
+		nHitNameBytes = static_cast<DWORD>(m_gclip.GetHitNameStackSize() * 4);
 		if (nHitNameBytes <= m_HitBufSize) {
 			m_gclip.GetHitNameStackValues((unsigned int *)m_HitData, nHitNameBytes / 4);
 			m_HitCount = nHitNameBytes;
@@ -5720,8 +5720,8 @@ void UD3D9RenderDevice::RenderPassesExec(void) {
 	//	assert(MultiDrawCountArray[PolyNum] == 3);
 	//	//m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, m_curVertexBufferPos + MultiDrawFirstArray[PolyNum], MultiDrawCountArray[PolyNum] - 2);
 	//}
-	size_t ptCount = m_csVertexArray.size();
-	INT bufferPos = getVertBufferPos(ptCount);
+	UINT ptCount = static_cast<UINT>(m_csVertexArray.size());
+	UINT bufferPos = getVertBufferPos(ptCount);
 	m_d3dDevice->DrawPrimitive(D3DPT_TRIANGLELIST, bufferPos, ptCount / 3);
 
 #ifdef UTGLR_DEBUG_WORLD_WIREFRAME
@@ -5769,7 +5769,7 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 	//Check for additional enabled texture units that should be disabled
 	DisableSubsequentTextures(m_rpPassCount);
 
-	size_t ptCount = m_csVertexArray.size();
+	UINT ptCount = static_cast<UINT>(m_csVertexArray.size());
 	//Make sure at least m_csPtCount entries are left in the vertex buffers
 	if ((m_curVertexBufferPos + ptCount) >= VERTEX_BUFFER_SIZE) {
 		FlushVertexBuffers();
@@ -5820,7 +5820,7 @@ void UD3D9RenderDevice::RenderPassesNoCheckSetup(void) {
 	return;
 }
 
-INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet, const FGLMapDot& csDot, bool append) {
+UINT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& Facet, const FGLMapDot& csDot, bool append) {
 	if (!append) {
 		m_csVertexArray.clear();
 	}
@@ -5837,14 +5837,14 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 	// Buffer "static" geometry.
 	for (FSavedPoly* Poly = Facet.Polys; Poly; Poly = Poly->Next) {
 		//Skip if not enough points
-		INT NumPts = Poly->NumPts;
+		UINT NumPts = Poly->NumPts;
 		if (NumPts <= 2) {
 			continue;
 		}
-		INT numPolys = NumPts - 2;
+		UINT numPolys = NumPts - 2;
 
 		FTransform** pPts = &Poly->Pts[0];
-		const FVector* hubPoint = &(*pPts++)->Point;
+		const FVector* const hubPoint = &(*pPts++)->Point;
 		const FVector* secondPoint = &(*pPts++)->Point;
 
 		const FGLTexCoord hubPtTex{
@@ -5858,21 +5858,21 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 
 		do {
 			FRenderVert& v1 = m_csVertexArray.emplace_back();
-			v1.Point() = *hubPoint;
-			v1.Normal() = {0.0f, 0.0f, 0.0f};
+			v1.pos = *hubPoint;
+			v1.norm = {0.0f, 0.0f, 0.0f};
 			v1.U = hubPtTex.u;
 			v1.V = hubPtTex.v;
 
 			FRenderVert& v2 = m_csVertexArray.emplace_back();
-			v2.Point() = *secondPoint;
-			v2.Normal() = {0.0f, 0.0f, 0.0f};
+			v2.pos = *secondPoint;
+			v2.norm = {0.0f, 0.0f, 0.0f};
 			v2.U = secondPtTex.u;
 			v2.V = secondPtTex.v;
 
 			const FVector* point = &(*pPts++)->Point;
 			FRenderVert& v3 = m_csVertexArray.emplace_back();
-			v3.Point() = *point;
-			v3.Normal() = {0.0f, 0.0f, 0.0f};
+			v3.pos = *point;
+			v3.norm = {0.0f, 0.0f, 0.0f};
 			v3.U = (Facet.MapCoords.XAxis | *point) - csDot.u;
 			v3.V = (Facet.MapCoords.YAxis | *point) - csDot.v;
 
@@ -5881,7 +5881,7 @@ INT UD3D9RenderDevice::BufferStaticComplexSurfaceGeometry(const FSurfaceFacet& F
 		} while (--numPolys != 0);
 	}
 
-	return m_csVertexArray.size();
+	return static_cast<UINT>(m_csVertexArray.size());
 }
 
 void UD3D9RenderDevice::EndBufferingNoCheck(void) {

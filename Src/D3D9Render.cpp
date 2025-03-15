@@ -461,13 +461,13 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 		for (const auto& decalsPair : decalMap) {
 			FTextureInfo* const& texInfo = decalsPair.tex;
 			for (std::vector<FTransTexture> decal : decalsPair.bucket) {
-				int numPts = decal.size();
+				size_t numPts = decal.size();
 				FTransTexture** pointsPtrs = new FTransTexture * [numPts];
-				for (int i = 0; i < numPts; i++) {
+				for (size_t i = 0; i < numPts; i++) {
 					pointsPtrs[i] = &decal[i];
 				}
 				d3d9Dev->setIdentityMatrix();
-				d3d9Dev->DrawGouraudPolygon(frame, *texInfo, pointsPtrs, numPts, decalsPair.flags, NULL);
+				d3d9Dev->DrawGouraudPolygon(frame, *texInfo, pointsPtrs, static_cast<INT>(numPts), decalsPair.flags, NULL);
 				delete[] pointsPtrs;
 			}
 		}
