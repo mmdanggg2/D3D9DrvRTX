@@ -94,6 +94,7 @@ version_path.mkdir(parents=True, exist_ok=args.overwrite)
 
 games_codes = [
 	"UT_469d",
+	"UT_469e",
 	"UT_436",
 	"Unreal_226",
 	"Unreal_227k_12",

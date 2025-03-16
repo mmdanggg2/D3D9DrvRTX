@@ -4,7 +4,7 @@
 This is a custom render device for the Unreal Engine, optimized for use with NVIDIA's RTX Remix. Built off of [Chris Dohnal's](https://www.cwdohnal.com/utglr/) D3D9Drv renderer and heavily modified to better support Remix.
 
 ## Currently Supported Games
-- Unreal Tournament ([OldUnreal v469d](https://github.com/OldUnreal/UnrealTournamentPatches/releases) and v436)
+- Unreal Tournament ([OldUnreal v469e, v469d](https://github.com/OldUnreal/UnrealTournamentPatches/releases) and v436)
 - Unreal ([OldUnreal v227k_12](https://github.com/OldUnreal/Unreal-testing/releases) and v226)
 - Deus Ex (v1112fm)
 - Nerf Arena Blast (v300)
