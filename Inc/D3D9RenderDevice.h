@@ -788,6 +788,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	// Locks/Creates a vertex buffer appropriate for the given number of points
 	inline void LockVertexColorBuffer(UINT numPoints) {
+		guard(UD3D9RenderDevice::LockVertexColorBuffer);
 		DWORD lockFlags = D3DLOCK_NOSYSLOCK;
 		HRESULT hResult;
 		UINT bufferPos;
@@ -838,6 +839,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		}
 
 		m_pVertexColorArray = (FGLVertexColor*)(pData + (bufferPos * sizeof(FGLVertexColor)));
+		unguard;
 	}
 	inline void UnlockVertexColorBuffer(void) {
 		if (FAILED(m_currentVertexColorBuffer->Unlock())) {
@@ -862,6 +864,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	// Locks/Creates a UV buffer appropriate for the given number of points
 	inline void FASTCALL LockTexCoordBuffer(DWORD texUnit, UINT numPoints) {
+		guard(UD3D9RenderDevice::LockTexCoordBuffer);
 		DWORD lockFlags = D3DLOCK_NOSYSLOCK;
 		HRESULT hResult;
 		IDirect3DVertexBuffer9* texBuffer;
@@ -912,6 +915,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		}
 
 		m_pTexCoordArray[texUnit] = (FGLTexCoord*)(pData + (bufferPos * sizeof(FGLTexCoord)));
+		unguard;
 	}
 	inline void FASTCALL UnlockTexCoordBuffer(DWORD texUnit) {
 		if (FAILED(m_currentTexCoordBuffer[texUnit]->Unlock())) {
