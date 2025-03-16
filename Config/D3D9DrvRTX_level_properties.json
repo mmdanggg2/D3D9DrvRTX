@@ -1,0 +1,37 @@
+{
+  "$schema": "D3D9DrvRTX_level_properties_schema.json",
+  "ExampleLevelName": {
+    "anchors": [
+      {
+        "name": "simple move",
+        "anim_type": "linear",
+        "start_loc": [ 0, 0, 0 ],
+        "end_loc": [ 50, 50, 50 ],
+        "speed": 10,
+        "rotation_rate": [ 0.5, 2, 5 ]
+      },
+      {
+        "name": "simple move",
+        "anim_type": "linear",
+        "start_loc": [ 30, 0, 0 ],
+        "end_loc": [ 50, 10, 10 ],
+        "speed": -10,
+        "start_rot": [ 0, 45, 0 ],
+        "rotation_rate": [ 0, 0, 2 ]
+      },
+      {
+        "name": "moving back and forth",
+        "anim_type": "ping-pong",
+        "start_loc": [ 0, 0, -60 ],
+        "end_loc": [ 50, 10, -60 ],
+        "speed": 10,
+        "start_rot": [ 0, 0, 45 ]
+      },
+      {
+        "name": "static anchor",
+        "anim_type": "static",
+        "start_loc": [ 0, 20, -60 ]
+      }
+    ]
+  }
+}
