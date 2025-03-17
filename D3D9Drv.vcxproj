@@ -448,6 +448,7 @@
   <ItemGroup>
     <None Include="Config\D3D9DrvRTX.ini" />
     <None Include="Config\D3D9DrvRTX.int" />
+    <None Include="Config\D3D9DrvRTX_level_properties.json" />
     <None Include="Config\dxvk.conf" />
     <None Include="Config\rtx.conf" />
     <None Include="Config\D3D9DrvRTX_level_properties_schema.json" />

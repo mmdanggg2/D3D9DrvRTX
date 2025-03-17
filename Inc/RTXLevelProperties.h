@@ -12,11 +12,12 @@ protected:
 	size_t hash;
 	FVector location;
 	FVector rotation;
+	FVector scale;
 	FVector angularVelocity;
 
 public:
-	RTXAnchor(std::string name, FVector location, FVector startRot, FVector rotationRate)
-		: name(name), location(location), rotation(startRot), angularVelocity(rotationRate) {
+	RTXAnchor(std::string name, FVector location, FVector startRot, FVector scale, FVector rotationRate)
+		: name(name), location(location), rotation(startRot), scale(scale), angularVelocity(rotationRate) {
 		hash = std::hash<std::string>()(name);
 	}
 
@@ -27,6 +28,9 @@ public:
 	}
 	const FVector& getRotation() const {
 		return rotation;
+	}
+	const FVector& getScale() const {
+		return scale;
 	}
 	size_t getHash() const {
 		return hash;
@@ -41,8 +45,8 @@ protected:
 	float speed;
 	float pathLocation = 0;
 public:
-	RTXAnchorLinear(std::string name, FVector startLoc, FVector startRot, FVector rotationRate, FVector endLoc, float speed)
-		: RTXAnchor(name, startLoc, startRot, rotationRate), pathStart(startLoc), pathDirection(endLoc - startLoc), speed(speed) {
+	RTXAnchorLinear(std::string name, FVector startLoc, FVector startRot, FVector scale, FVector rotationRate, FVector endLoc, float speed)
+		: RTXAnchor(name, startLoc, startRot, scale, rotationRate), pathStart(startLoc), pathDirection(endLoc - startLoc), speed(speed) {
 		pathLength = pathDirection.Size();
 		pathDirection.Normalize();
 	}
@@ -56,8 +60,8 @@ protected:
 	float pathLengthReal;
 
 public:
-	RTXAnchorPingPong(std::string name, FVector startLoc, FVector startRot, FVector rotationRate, FVector endLoc, float speed) 
-		: RTXAnchorLinear(name, startLoc, startRot, rotationRate, endLoc, speed), pathLengthReal(pathLength){
+	RTXAnchorPingPong(std::string name, FVector startLoc, FVector startRot, FVector scale, FVector rotationRate, FVector endLoc, float speed) 
+		: RTXAnchorLinear(name, startLoc, startRot, scale, rotationRate, endLoc, speed), pathLengthReal(pathLength){
 		pathLength = pathLength * 2;
 	}
 

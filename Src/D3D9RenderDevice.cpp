@@ -3724,6 +3724,8 @@ void UD3D9RenderDevice::renderRTXAnchor(const RTXAnchor& anchor, UTexture* textu
 
 	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(anchor.getLocation()));
 	XMMATRIX matRot = XMMatrixRotationRollPitchYawFromVector(FVecToDXVec(anchor.getRotation()));
+	XMMATRIX matScale = XMMatrixScalingFromVector(FVecToDXVec(anchor.getScale()));
+	actorMatrix *= matScale;
 	actorMatrix *= matRot;
 	actorMatrix *= matLoc;
 

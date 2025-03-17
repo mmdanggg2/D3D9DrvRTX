@@ -49,6 +49,11 @@
               "rotation_rate": {
                 "$ref": "#/$defs/FVector",
                 "description": "How much the anchor rotates in degrees per second"
+              },
+              "scale": {
+                "$ref": "#/$defs/FVector",
+                "default": [1, 1, 1],
+                "description": "What scale to apply to the anchor"
               }
             },
             "required": [

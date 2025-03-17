@@ -106,6 +106,9 @@
     <None Include="Config\D3D9DrvRTX_level_properties_schema.json">
       <Filter>Conf</Filter>
     </None>
+    <None Include="Config\D3D9DrvRTX_level_properties.json">
+      <Filter>Conf</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Src">

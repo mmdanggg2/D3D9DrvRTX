@@ -198,9 +198,11 @@ void loadLevelJson(const TCHAR* rawLevelName, std::vector<std::unique_ptr<RTXAnc
 			GET_ANCHOR_MEMBER_OPTIONAL(start_rot, startRot);
 			FVector rotationRate{};
 			GET_ANCHOR_MEMBER_OPTIONAL(rotation_rate, rotationRate);
+			FVector scale{1, 1, 1};
+			GET_ANCHOR_MEMBER_OPTIONAL(scale, scale);
 			if (animType == "static") {
 				if (anchorError) continue;
-				anchors.push_back(std::make_unique<RTXAnchor>(name, startLoc, startRot, rotationRate));
+				anchors.push_back(std::make_unique<RTXAnchor>(name, startLoc, startRot, scale, rotationRate));
 			} else if (animType == "linear" || animType == "ping-pong") {
 				FVector endLoc;
 				GET_ANCHOR_MEMBER(end_loc, endLoc);
@@ -208,9 +210,9 @@ void loadLevelJson(const TCHAR* rawLevelName, std::vector<std::unique_ptr<RTXAnc
 				GET_ANCHOR_MEMBER(speed, speed);
 				if (anchorError) continue;
 				if (animType == "ping-pong") {
-					anchors.push_back(std::make_unique<RTXAnchorPingPong>(name, startLoc, startRot, rotationRate, endLoc, speed));
+					anchors.push_back(std::make_unique<RTXAnchorPingPong>(name, startLoc, startRot, scale, rotationRate, endLoc, speed));
 				} else {
-					anchors.push_back(std::make_unique<RTXAnchorLinear>(name, startLoc, startRot, rotationRate, endLoc, speed));
+					anchors.push_back(std::make_unique<RTXAnchorLinear>(name, startLoc, startRot, scale, rotationRate, endLoc, speed));
 				}
 			}
 			else {
