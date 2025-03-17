@@ -133,14 +133,6 @@ static const D3DVERTEXELEMENT9 *g_standardNTextureStreamDefs[MAX_TMUNITS] = {
 	g_standardQuadTextureStreamDef
 };
 
-static const D3DVERTEXELEMENT9 g_twoColorSingleTextureStreamDef[] = {
-	{ 0, 0,  D3DDECLTYPE_FLOAT3,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION,	0 },
-	{ 0, 12, D3DDECLTYPE_D3DCOLOR,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR,		0 },
-	{ 1, 0,  D3DDECLTYPE_D3DCOLOR,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR,		1 },
-	{ 2, 0,  D3DDECLTYPE_FLOAT2,	D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD,	0 },
-	D3DDECL_END()
-};
-
 #ifdef BGRA_MAKE
 #undef BGRA_MAKE
 #endif
@@ -338,7 +330,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 
 	//Mark all vertex buffer objects as invalid
 	m_d3dVertexColorBuffer = NULL;
-	m_d3dSecondaryColorBuffer = NULL;
 	for (u = 0; u < MAX_TMUNITS; u++) {
 		m_d3dTexCoordBuffer[u] = NULL;
 	}
@@ -348,7 +339,6 @@ void UD3D9RenderDevice::StaticConstructor() {
 	for (u = 0; u < MAX_TMUNITS; u++) {
 		m_standardNTextureVertexDecl[u] = NULL;
 	}
-	m_twoColorSingleTextureVertexDecl = NULL;
 
 	//Reset TMUnits in case resource cleanup code is ever called before this is initialized
 	TMUnits = 0;
@@ -444,7 +434,6 @@ void UD3D9RenderDevice::ShutdownFrameRateLimitTimer(void) {
 static void FASTCALL Buffer3Verts(UD3D9RenderDevice *pRD, FTransTexture** Pts) {
 	FGLTexCoord *pTexCoordArray = &pRD->m_pTexCoordArray[0][pRD->m_bufferedVerts];
 	FGLVertexColor *pVertexColorArray = &pRD->m_pVertexColorArray[pRD->m_bufferedVerts];
-	FGLSecondaryColor *pSecondaryColorArray = &pRD->m_pSecondaryColorArray[pRD->m_bufferedVerts];
 	pRD->m_bufferedVerts += 3;
 	for (INT i = 0; i < 3; i++) {
 		const FTransTexture* P = *Pts++;
@@ -460,9 +449,6 @@ static void FASTCALL Buffer3Verts(UD3D9RenderDevice *pRD, FTransTexture** Pts) {
 			FLOAT f255_Times_One_Minus_FogW = 255.0f * (1.0f - P->Fog.W);
 
 			pVertexColorArray->color = FPlaneTo_BGRScaled_A255(&P->Light, f255_Times_One_Minus_FogW);
-
-			pSecondaryColorArray->specular = FPlaneTo_BGR_A0(&P->Fog);
-			pSecondaryColorArray++;
 		}
 		else if (pRD->m_requestedColorFlags & UD3D9RenderDevice::CF_COLOR_ARRAY) {
 			if (pRD->m_gpAlpha > 0)
@@ -523,7 +509,6 @@ static void FASTCALL Buffer3ColoredVerts(UD3D9RenderDevice *pRD, FTransTexture**
 static void FASTCALL Buffer3FoggedVerts(UD3D9RenderDevice *pRD, FTransTexture** Pts) {
 	FGLTexCoord *pTexCoordArray = &pRD->m_pTexCoordArray[0][pRD->m_bufferedVerts];
 	FGLVertexColor *pVertexColorArray = &pRD->m_pVertexColorArray[pRD->m_bufferedVerts];
-	FGLSecondaryColor *pSecondaryColorArray = &pRD->m_pSecondaryColorArray[pRD->m_bufferedVerts];
 	pRD->m_bufferedVerts += 3;
 	for (INT i = 0; i < 3; i++) {
 		const FTransTexture* P = *Pts++;
@@ -538,9 +523,6 @@ static void FASTCALL Buffer3FoggedVerts(UD3D9RenderDevice *pRD, FTransTexture** 
 		FLOAT f255_Times_One_Minus_FogW = 255.0f * (1.0f - P->Fog.W);
 		pVertexColorArray->color = FPlaneTo_BGRScaled_A255(&P->Light, f255_Times_One_Minus_FogW);
 		pVertexColorArray++;
-
-		pSecondaryColorArray->specular = FPlaneTo_BGR_A0(&P->Fog);
-		pSecondaryColorArray++;
 	}
 }
 
@@ -565,8 +547,6 @@ void UD3D9RenderDevice::BufferAdditionalClippedVerts(FTransTexture** Pts, INT Nu
 		if (m_requestedColorFlags & CF_FOG_MODE) {
 			FLOAT f255_Times_One_Minus_FogW = 255.0f * (1.0f - P->Fog.W);
 			pVertexColorArray->color = FPlaneTo_BGRScaled_A255(&P->Light, f255_Times_One_Minus_FogW);
-
-			m_pSecondaryColorArray[m_bufferedVerts].specular = FPlaneTo_BGR_A0(&P->Fog);
 		}
 		else if (m_requestedColorFlags & CF_COLOR_ARRAY) {
 #ifdef RUNE
@@ -591,8 +571,6 @@ void UD3D9RenderDevice::BufferAdditionalClippedVerts(FTransTexture** Pts, INT Nu
 		if (m_requestedColorFlags & CF_FOG_MODE) {
 			FLOAT f255_Times_One_Minus_FogW = 255.0f * (1.0f - P->Fog.W);
 			pVertexColorArray->color = FPlaneTo_BGRScaled_A255(&P->Light, f255_Times_One_Minus_FogW);
-
-			m_pSecondaryColorArray[m_bufferedVerts].specular = FPlaneTo_BGR_A0(&P->Fog);
 		}
 		else if (m_requestedColorFlags & CF_COLOR_ARRAY) {
 #ifdef RUNE
@@ -617,8 +595,6 @@ void UD3D9RenderDevice::BufferAdditionalClippedVerts(FTransTexture** Pts, INT Nu
 		if (m_requestedColorFlags & CF_FOG_MODE) {
 			FLOAT f255_Times_One_Minus_FogW = 255.0f * (1.0f - P->Fog.W);
 			pVertexColorArray->color = FPlaneTo_BGRScaled_A255(&P->Light, f255_Times_One_Minus_FogW);
-
-			m_pSecondaryColorArray[m_bufferedVerts].specular = FPlaneTo_BGR_A0(&P->Fog);
 		}
 		else if (m_requestedColorFlags & CF_COLOR_ARRAY) {
 #ifdef RUNE
@@ -1200,12 +1176,6 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 		}
 	}
 
-	//Stream definition with vertices, two colors, and one tex coord
-	hResult = m_d3dDevice->CreateVertexDeclaration(g_twoColorSingleTextureStreamDef, &m_twoColorSingleTextureVertexDecl);
-	if (FAILED(hResult)) {
-		appErrorf(TEXT("CreateVertexDeclaration 'TwoColor' failed: %ls"), *ExplainResult(hResult));
-	}
-
 	//For sprite quad
 	hResult = m_d3dDevice->CreateVertexDeclaration(g_colorTexStreamDef, &m_ColorTexVertexDecl);
 	if (FAILED(hResult)) {
@@ -1216,7 +1186,6 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	//Initialize vertex buffer state tracking information
 	m_curVertexBufferPos = 0;
 	m_vertexColorBufferNeedsDiscard = false;
-	m_secondaryColorBufferNeedsDiscard = false;
 	for (u = 0; u < MAX_TMUNITS; u++) {
 		m_texCoordBufferNeedsDiscard[u] = false;
 	}
@@ -1289,10 +1258,6 @@ void UD3D9RenderDevice::FreePermanentResources(void) {
 		m_d3dTempVertexColorBuffer->Release();
 		m_d3dTempVertexColorBuffer = NULL;
 	}
-	if (m_d3dSecondaryColorBuffer) {
-		m_d3dSecondaryColorBuffer->Release();
-		m_d3dSecondaryColorBuffer = NULL;
-	}
 	for (u = 0; u < TMUnits; u++) {
 		if (m_d3dTexCoordBuffer[u]) {
 			m_d3dTexCoordBuffer[u]->Release();
@@ -1324,11 +1289,6 @@ void UD3D9RenderDevice::FreePermanentResources(void) {
 			m_standardNTextureVertexDecl[u]->Release();
 			m_standardNTextureVertexDecl[u] = NULL;
 		}
-	}
-	//Stream definition with vertices, two colors, and one tex coord
-	if (m_twoColorSingleTextureVertexDecl) {
-		m_twoColorSingleTextureVertexDecl->Release();
-		m_twoColorSingleTextureVertexDecl = NULL;
 	}
 	if (m_ColorTexVertexDecl) {
 		m_ColorTexVertexDecl->Release();
@@ -2396,11 +2356,8 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 	}
 #endif
 
-	{
-		IDirect3DVertexDeclaration9 *vertexDecl = (drawFog) ? m_twoColorSingleTextureVertexDecl : m_standardNTextureVertexDecl[0];
-		//Set stream state
-		SetStreamState(vertexDecl);
-	}
+	//Set stream state
+	SetStreamState(m_standardNTextureVertexDecl[0]);
 
 	//Make sure at least NumPts entries are left in the vertex buffers
 	if ((m_curVertexBufferPos + NumPts) >= VERTEX_BUFFER_SIZE) {
@@ -2408,11 +2365,7 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 	}
 
 	//Lock vertexColor and texCoord0 buffers
-	//Lock secondary color buffer if fog
 	LockVertexColorBuffer(NumPts);
-	if (drawFog) {
-		LockSecondaryColorBuffer(NumPts);
-	}
 	LockTexCoordBuffer(0, NumPts);
 
 	INT Index = 0;
@@ -2434,7 +2387,6 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 		else if (drawFog) {
 			FLOAT f255_Times_One_Minus_FogW = 255.0f * (1.0f - P->Fog.W);
 			destVertexColor.color = FPlaneTo_BGRScaled_A255(&P->Light, f255_Times_One_Minus_FogW);
-			m_pSecondaryColorArray[Index].specular = FPlaneTo_BGR_A0(&P->Fog);
 		}
 		else {
 #ifdef RUNE
@@ -2448,11 +2400,7 @@ void UD3D9RenderDevice::DrawGouraudPolygonOld(FSceneNode* Frame, FTextureInfo& I
 	}
 
 	//Unlock vertexColor and texCoord0 buffers
-	//Unlock secondary color buffer if fog
 	UnlockVertexColorBuffer();
-	if (drawFog) {
-		UnlockSecondaryColorBuffer();
-	}
 	UnlockTexCoordBuffer(0);
 
 #ifdef UTGLR_DEBUG_ACTOR_WIREFRAME
@@ -2579,17 +2527,10 @@ void UD3D9RenderDevice::DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info
 		//Lock vertexColor and texCoord0 buffers
 		//Lock secondary color buffer if fog
 		LockVertexColorBuffer(NumPts);
-		if (m_requestedColorFlags & CF_FOG_MODE) {
-			LockSecondaryColorBuffer(NumPts);
-		}
 		LockTexCoordBuffer(0, NumPts);
 
-		{
-			IDirect3DVertexDeclaration9 *vertexDecl = (m_requestedColorFlags & CF_FOG_MODE) ? m_twoColorSingleTextureVertexDecl : m_standardNTextureVertexDecl[0];
-
-			//Set stream state
-			SetStreamState(vertexDecl);
-		}
+		//Set stream state
+		SetStreamState(m_standardNTextureVertexDecl[0]);
 
 		//Select a buffer verts proc
 		if (m_requestedColorFlags & CF_FOG_MODE) {
@@ -5961,9 +5902,6 @@ void UD3D9RenderDevice::EndGouraudPolygonBufferingNoCheck(void) {
 	//Unlock vertexColor and texCoord0 buffers
 	//Unlock secondary color buffer if fog
 	UnlockVertexColorBuffer();
-	if (m_requestedColorFlags & CF_FOG_MODE) {
-		UnlockSecondaryColorBuffer();
-	}
 	UnlockTexCoordBuffer(0);
 
 #ifdef UTGLR_DEBUG_ACTOR_WIREFRAME

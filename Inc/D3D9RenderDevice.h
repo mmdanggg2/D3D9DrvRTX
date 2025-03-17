@@ -491,7 +491,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	IDirect3DVertexDeclaration9 *m_oneColorVertexDecl;
 	IDirect3DVertexDeclaration9* m_ColorTexVertexDecl;
 	IDirect3DVertexDeclaration9 *m_standardNTextureVertexDecl[MAX_TMUNITS];
-	IDirect3DVertexDeclaration9 *m_twoColorSingleTextureVertexDecl;
 
 	//Current vertex declaration state tracking
 	IDirect3DVertexDeclaration9 *m_curVertexDecl;
@@ -507,10 +506,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	IDirect3DVertexBuffer9* m_d3dQuadBuffer;
 	DWORD m_QuadBufferColor;
 
-	//Secondary color
-	IDirect3DVertexBuffer9 *m_d3dSecondaryColorBuffer;
-	FGLSecondaryColor *m_pSecondaryColorArray;
-
 	//Tex coords
 	IDirect3DVertexBuffer9 *m_d3dTexCoordBuffer[MAX_TMUNITS];
 	FGLTexCoord *m_pTexCoordArray[MAX_TMUNITS];
@@ -521,7 +516,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	//Vertex buffer state flags
 	UINT m_curVertexBufferPos;
 	bool m_vertexColorBufferNeedsDiscard;
-	bool m_secondaryColorBufferNeedsDiscard;
 	bool m_texCoordBufferNeedsDiscard[MAX_TMUNITS];
 
 	void (FASTCALL* m_pBuffer3BasicVertsProc)(UD3D9RenderDevice*, FTransTexture**);
@@ -756,7 +750,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		//dout << L"Vertex buffers flushed" << std::endl;
 		m_curVertexBufferPos = 0;
 		m_vertexColorBufferNeedsDiscard = true;
-		m_secondaryColorBufferNeedsDiscard = true;
 		for (int u = 0; u < MAX_TMUNITS; u++) {
 			m_texCoordBufferNeedsDiscard[u] = true;
 		}
@@ -846,21 +839,6 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		HRESULT hResult = m_currentVertexColorBuffer->Unlock();
 		if (FAILED(hResult)) {
 			appErrorf(TEXT("Vertex buffer unlock failed: %ls"), *ExplainResult(hResult));
-		}
-	}
-
-	inline void LockSecondaryColorBuffer(UINT numPoints) {
-		appErrorf(TEXT("Can't be bothered, don't use LockSecondaryColorBuffer thx bye!"));
-		FGLSecondaryColor* pData = nullptr;
-		if (FAILED(m_d3dSecondaryColorBuffer->Lock(0, 0, (VOID**)&pData, D3DLOCK_NOSYSLOCK))) {
-			appErrorf(TEXT("Vertex buffer lock failed"));
-		}
-
-		m_pSecondaryColorArray = pData;
-	}
-	inline void UnlockSecondaryColorBuffer(void) {
-		if (FAILED(m_d3dSecondaryColorBuffer->Unlock())) {
-			appErrorf(TEXT("Vertex buffer unlock failed"));
 		}
 	}
 
