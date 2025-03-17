@@ -443,7 +443,7 @@ struct ActorRenderData {
 typedef std::vector<ActorRenderData> RenderList;
 
 constexpr const TCHAR* vertexBufferFailMessage = TEXT(
-	"CreateVertexBuffer failed (0x%08X)\n"
+	"CreateVertexBuffer '%s' failed: %ls\n"
 	"This was likely caused by an error in RTX Remix."
 );
 
@@ -804,7 +804,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 				//dout << L"Creating vert buffer of size " << numPoints << std::endl;
 				hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColor) * numPoints, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, D3DPOOL_DEFAULT, &m_d3dTempVertexColorBuffer, NULL);
 				if (FAILED(hResult)) {
-					appErrorf(vertexBufferFailMessage, hResult);
+					appErrorf(vertexBufferFailMessage, TEXT("Temp"), *ExplainResult(hResult));
 				}
 				m_vertexTempBufferSize = numPoints;
 			} else {
@@ -826,7 +826,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		if (vertBuffer != m_currentVertexColorBuffer) {
 			hResult = m_d3dDevice->SetStreamSource(0, vertBuffer, 0, sizeof(FGLVertexColor));
 			if (FAILED(hResult)) {
-				appErrorf(TEXT("SetStreamSource failed"));
+				appErrorf(TEXT("SetStreamSource failed: %ls"), *ExplainResult(hResult));
 			}
 			m_currentVertexColorBuffer = vertBuffer;
 		}
@@ -834,16 +834,18 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		BYTE* pData = nullptr;
 
 		//dout << L"Locking vert buffer of size " << numPoints << std::endl;
-		if (FAILED(vertBuffer->Lock(0, 0, (VOID**)&pData, lockFlags))) {
-			appErrorf(TEXT("Vertex buffer lock failed"));
+		hResult = vertBuffer->Lock(0, 0, (VOID**)&pData, lockFlags);
+		if (FAILED(hResult)) {
+			appErrorf(TEXT("Vertex buffer lock failed: %ls"), *ExplainResult(hResult));
 		}
 
 		m_pVertexColorArray = (FGLVertexColor*)(pData + (bufferPos * sizeof(FGLVertexColor)));
 		unguard;
 	}
 	inline void UnlockVertexColorBuffer(void) {
-		if (FAILED(m_currentVertexColorBuffer->Unlock())) {
-			appErrorf(TEXT("Vertex buffer unlock failed"));
+		HRESULT hResult = m_currentVertexColorBuffer->Unlock();
+		if (FAILED(hResult)) {
+			appErrorf(TEXT("Vertex buffer unlock failed: %ls"), *ExplainResult(hResult));
 		}
 	}
 
@@ -881,7 +883,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 				//dout << L"Creating tex buffer of size " << numPoints << std::endl;
 				hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLTexCoord) * numPoints, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, D3DPOOL_DEFAULT, &texCoordBuffer, NULL);
 				if (FAILED(hResult)) {
-					appErrorf(vertexBufferFailMessage, hResult);
+					appErrorf(vertexBufferFailMessage, TEXT("TempTex"), *ExplainResult(hResult));
 				}
 				m_texTempBufferSize[texUnit] = numPoints;
 			} else {
@@ -902,7 +904,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		if (m_currentTexCoordBuffer[texUnit] != texBuffer) {
 			hResult = m_d3dDevice->SetStreamSource(2 + texUnit, texBuffer, 0, sizeof(FGLTexCoord));
 			if (FAILED(hResult)) {
-				appErrorf(TEXT("SetStreamSource failed"));
+				appErrorf(TEXT("SetStreamSource failed: %ls"), *ExplainResult(hResult));
 			}
 			m_currentTexCoordBuffer[texUnit] = texBuffer;
 		}
@@ -910,16 +912,18 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 		BYTE* pData = nullptr;
 
 		//dout << L"Locking tex buffer of size " << numPoints << std::endl;
-		if (FAILED(texBuffer->Lock(0, 0, (VOID**)&pData, lockFlags))) {
-			appErrorf(TEXT("Vertex buffer lock failed"));
+		hResult = texBuffer->Lock(0, 0, (VOID**)&pData, lockFlags);
+		if (FAILED(hResult)) {
+			appErrorf(TEXT("Vertex buffer lock failed: %ls"), *ExplainResult(hResult));
 		}
 
 		m_pTexCoordArray[texUnit] = (FGLTexCoord*)(pData + (bufferPos * sizeof(FGLTexCoord)));
 		unguard;
 	}
 	inline void FASTCALL UnlockTexCoordBuffer(DWORD texUnit) {
-		if (FAILED(m_currentTexCoordBuffer[texUnit]->Unlock())) {
-			appErrorf(TEXT("Vertex buffer unlock failed"));
+		HRESULT hResult = m_currentTexCoordBuffer[texUnit]->Unlock();
+		if (FAILED(hResult)) {
+			appErrorf(TEXT("Vertex buffer unlock failed: %ls"), *ExplainResult(hResult));
 		}
 	}
 
@@ -960,6 +964,8 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	// UObject interface.
 	void StaticConstructor();
+
+	FString ExplainResult(HRESULT hResult);
 
 	// FExec interface
 	UBOOL Exec(const TCHAR* Cmd, FOutputDevice& Ar) override;

@@ -368,6 +368,47 @@ void UD3D9RenderDevice::StaticConstructor() {
 	unguard;
 }
 
+#define MAKE_CASE(ERR) case ERR: return TEXT(#ERR)
+
+FString UD3D9RenderDevice::ExplainResult(HRESULT hResult) {
+	switch (hResult)
+	{
+		MAKE_CASE(D3D_OK);
+		MAKE_CASE(D3DOK_NOAUTOGEN);
+		MAKE_CASE(D3DERR_WRONGTEXTUREFORMAT);
+		MAKE_CASE(D3DERR_UNSUPPORTEDCOLOROPERATION);
+		MAKE_CASE(D3DERR_UNSUPPORTEDCOLORARG);
+		MAKE_CASE(D3DERR_UNSUPPORTEDALPHAOPERATION);
+		MAKE_CASE(D3DERR_UNSUPPORTEDALPHAARG);
+		MAKE_CASE(D3DERR_TOOMANYOPERATIONS);
+		MAKE_CASE(D3DERR_CONFLICTINGTEXTUREFILTER);
+		MAKE_CASE(D3DERR_UNSUPPORTEDFACTORVALUE);
+		MAKE_CASE(D3DERR_CONFLICTINGRENDERSTATE);
+		MAKE_CASE(D3DERR_UNSUPPORTEDTEXTUREFILTER);
+		MAKE_CASE(D3DERR_CONFLICTINGTEXTUREPALETTE);
+		MAKE_CASE(D3DERR_DRIVERINTERNALERROR);
+		MAKE_CASE(D3DERR_NOTFOUND);
+		MAKE_CASE(D3DERR_MOREDATA);
+		MAKE_CASE(D3DERR_DEVICELOST);
+		MAKE_CASE(D3DERR_DEVICENOTRESET);
+		MAKE_CASE(D3DERR_NOTAVAILABLE);
+		MAKE_CASE(D3DERR_OUTOFVIDEOMEMORY);
+		MAKE_CASE(D3DERR_INVALIDDEVICE);
+		MAKE_CASE(D3DERR_INVALIDCALL);
+		MAKE_CASE(D3DERR_DRIVERINVALIDCALL);
+		MAKE_CASE(D3DERR_WASSTILLDRAWING);
+		MAKE_CASE(D3DERR_DEVICEREMOVED);
+		MAKE_CASE(D3DERR_DEVICEHUNG);
+		MAKE_CASE(D3DERR_UNSUPPORTEDOVERLAY);
+		MAKE_CASE(D3DERR_UNSUPPORTEDOVERLAYFORMAT);
+		MAKE_CASE(D3DERR_CANNOTPROTECTCONTENT);
+		MAKE_CASE(D3DERR_UNSUPPORTEDCRYPTO);
+		MAKE_CASE(D3DERR_PRESENT_STATISTICS_DISJOINT);
+		MAKE_CASE(E_OUTOFMEMORY);
+	}
+	return FString::Printf(TEXT("Error %d (0x%08X)"), hResult, hResult);
+}
+#undef MAKE_CASE
 
 void UD3D9RenderDevice::InitFrameRateLimitTimerSafe(void) {
 	//Only initialize once
@@ -660,7 +701,7 @@ UBOOL UD3D9RenderDevice::ResetDevice()
 	//Reset device
 	HRESULT hResult = m_d3dDevice->Reset(&m_d3dpp);
 	if (FAILED(hResult)) {
-		appErrorf(TEXT("Failed to create D3D device for new window size"));
+		appErrorf(TEXT("Failed to create D3D device for new window size: %ls"), *ExplainResult(hResult));
 	}
 
 	//Initialize permanent rendering state, including allocation of some resources
@@ -703,7 +744,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	HRESULT hResult;
 	bool saved_SetRes_isDeviceReset;
 
-	debugf(TEXT("Enter SetRes()"));
+	debugf(TEXT("Enter D3D9::SetRes(%d, %d, %d, %d)"), NewX, NewY, NewColorBytes, Fullscreen);
 
 	//Save parameters in case need to reset device
 	m_SetRes_NewX = NewX;
@@ -770,7 +811,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	//Get D3D caps
 	hResult = m_d3d9->GetDeviceCaps(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, &m_d3dCaps);
 	if (FAILED(hResult)) {
-		appErrorf(TEXT("GetDeviceCaps failed (0x%08X)"), hResult);
+		appErrorf(TEXT("GetDeviceCaps failed: %ls"), *ExplainResult(hResult));
 	}
 
 
@@ -780,7 +821,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 	D3DDISPLAYMODE d3ddm;
 	hResult = m_d3d9->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &d3ddm);
 	if (FAILED(hResult)) {
-		appErrorf(TEXT("Failed to get current display mode (0x%08X)"), hResult);
+		appErrorf(TEXT("Failed to get current display mode: %ls"), *ExplainResult(hResult));
 	}
 
 	//Check if SetRes device reset
@@ -853,7 +894,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		m_d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
 		hResult = m_d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, m_hWnd, behaviorFlags, &m_d3dpp, &m_d3dDevice);
 		if (FAILED(hResult)) {
-			appErrorf(TEXT("Failed to create D3D device (0x%08X)"), hResult);
+			appErrorf(TEXT("Failed to create D3D device: %ls"), *ExplainResult(hResult));
 		}
 	}
 
@@ -1122,20 +1163,14 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	//Vertex and primary color
 	hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColor) * VERTEX_BUFFER_SIZE, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dVertexColorBuffer, NULL);
 	if (FAILED(hResult)) {
-		appErrorf(vertexBufferFailMessage, hResult);
+		appErrorf(vertexBufferFailMessage, TEXT("VertexColor"), *ExplainResult(hResult));
 	}
-
-	//Secondary color
-	//hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLSecondaryColor) * VERTEX_ARRAY_SIZE, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dSecondaryColorBuffer, NULL);
-	//if (FAILED(hResult)) {
-	//	appErrorf(TEXT("CreateVertexBuffer failed"));
-	//}
 
 	//TexCoord
 	for (u = 0; u < TMUnits; u++) {
 		hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLTexCoord) * VERTEX_BUFFER_SIZE, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dTexCoordBuffer[u], NULL);
 		if (FAILED(hResult)) {
-			appErrorf(vertexBufferFailMessage, hResult);
+			appErrorf(vertexBufferFailMessage, TEXT("TexCoord"), *ExplainResult(hResult));
 		}
 		m_d3dTempTexCoordBuffer[u] = nullptr;
 		m_texTempBufferSize[u] = 0;
@@ -1144,7 +1179,7 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	//For sprite quad
 	hResult = m_d3dDevice->CreateVertexBuffer(sizeof(FGLVertexColorTex) * 4, D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, vertexBufferPool, &m_d3dQuadBuffer, NULL);
 	if (FAILED(hResult)) {
-		appErrorf(vertexBufferFailMessage, hResult);
+		appErrorf(vertexBufferFailMessage, TEXT("Quad"), *ExplainResult(hResult));
 	}
 
 	updateQuadBuffer(0xDEADBEEF);
@@ -1154,27 +1189,27 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	//Stream definition with vertices and color
 	hResult = m_d3dDevice->CreateVertexDeclaration(g_oneColorStreamDef, &m_oneColorVertexDecl);
 	if (FAILED(hResult)) {
-		appErrorf(TEXT("CreateVertexDeclaration failed"));
+		appErrorf(TEXT("CreateVertexDeclaration 'OneColor' failed: %ls"), *ExplainResult(hResult));
 	}
 
 	//Standard stream definitions with vertices, color, and a variable number of tex coords
 	for (u = 0; u < TMUnits; u++) {
 		hResult = m_d3dDevice->CreateVertexDeclaration(g_standardNTextureStreamDefs[u], &m_standardNTextureVertexDecl[u]);
 		if (FAILED(hResult)) {
-			appErrorf(TEXT("CreateVertexDeclaration failed"));
+			appErrorf(TEXT("CreateVertexDeclaration 'Standard %d' failed: %ls"), u, *ExplainResult(hResult));
 		}
 	}
 
 	//Stream definition with vertices, two colors, and one tex coord
 	hResult = m_d3dDevice->CreateVertexDeclaration(g_twoColorSingleTextureStreamDef, &m_twoColorSingleTextureVertexDecl);
 	if (FAILED(hResult)) {
-		appErrorf(TEXT("CreateVertexDeclaration failed"));
+		appErrorf(TEXT("CreateVertexDeclaration 'TwoColor' failed: %ls"), *ExplainResult(hResult));
 	}
 
 	//For sprite quad
 	hResult = m_d3dDevice->CreateVertexDeclaration(g_colorTexStreamDef, &m_ColorTexVertexDecl);
 	if (FAILED(hResult)) {
-		appErrorf(TEXT("CreateVertexDeclaration failed"));
+		appErrorf(TEXT("CreateVertexDeclaration 'Quad' failed: %ls"), *ExplainResult(hResult));
 	}
 
 
@@ -1190,7 +1225,7 @@ void UD3D9RenderDevice::InitPermanentResourcesAndRenderingState(void) {
 	//Set default stream definition
 	hResult = m_d3dDevice->SetVertexDeclaration(m_standardNTextureVertexDecl[0]);
 	if (FAILED(hResult)) {
-		appErrorf(TEXT("SetVertexDeclaration failed"));
+		appErrorf(TEXT("SetVertexDeclaration failed: %ls"), *ExplainResult(hResult));
 	}
 	m_curVertexDecl = m_standardNTextureVertexDecl[0];
 
@@ -1227,20 +1262,20 @@ void UD3D9RenderDevice::FreePermanentResources(void) {
 	//Vertex
 	hResult = m_d3dDevice->SetStreamSource(0, NULL, 0, 0);
 	if (FAILED(hResult)) {
-		appErrorf(TEXT("SetStreamSource failed"));
+		appErrorf(TEXT("SetStreamSource 0 failed: %ls"), *ExplainResult(hResult));
 	}
 
 	//Secondary Color
 	hResult = m_d3dDevice->SetStreamSource(1, NULL, 0, 0);
 	if (FAILED(hResult)) {
-		appErrorf(TEXT("SetStreamSource failed"));
+		appErrorf(TEXT("SetStreamSource 1 failed: %ls"), *ExplainResult(hResult));
 	}
 
 	//TexCoord
 	for (u = 0; u < TMUnits; u++) {
 		hResult = m_d3dDevice->SetStreamSource(2 + u, NULL, 0, 0);
 		if (FAILED(hResult)) {
-			appErrorf(TEXT("SetStreamSource failed"));
+			appErrorf(TEXT("SetStreamSource %d failed: %ls"), 2 + u, *ExplainResult(hResult));
 		}
 	}
 
@@ -1459,7 +1494,7 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 			}
 			//If not lost and not ready to be restored, error
 			else if (hResult != D3DERR_DEVICELOST) {
-				appErrorf(TEXT("Error checking for lost D3D device"));
+				appErrorf(TEXT("Error checking for lost D3D device: %ls"), *ExplainResult(hResult));
 			}
 			//Otherwise, device is lost and cannot be restored yet
 
@@ -1473,7 +1508,7 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 
 	//D3D begin scene
 	if (FAILED(m_d3dDevice->BeginScene())) {
-		appErrorf(TEXT("BeginScene failed"));
+		appErrorf(TEXT("BeginScene failed: %ls"), *ExplainResult(hResult));
 	}
 
 	m_d3dDevice->Clear(0, NULL, D3DCLEAR_TARGET, D3DCOLOR_ARGB(1, 0, 0, 0), 0, 0);
@@ -1708,12 +1743,12 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 	check(LockCount == 1);
 
 	//D3D end scene
-	if (FAILED(m_d3dDevice->EndScene())) {
-		appErrorf(TEXT("EndScene failed"));
+	HRESULT hResult = m_d3dDevice->EndScene();
+	if (FAILED(hResult)) {
+		appErrorf(TEXT("EndScene failed: %ls"), *ExplainResult(hResult));
 	}
 
 	if (Blit) {
-		HRESULT hResult;
 		bool swapBuffersStatus;
 
 		//Present
@@ -2776,10 +2811,10 @@ void UD3D9RenderDevice::DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X,
 
 void UD3D9RenderDevice::Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
-{
-	static int si;
-	dout << L"utd3d9r: Draw3DLine = " << si++ << std::endl;
-}
+	{
+		static int si;
+		dout << L"utd3d9r: Draw3DLine = " << si++ << std::endl;
+	}
 #endif
 	guard(UD3D9RenderDevice::Draw3DLine);
 
@@ -2883,10 +2918,10 @@ void UD3D9RenderDevice::Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 
 void UD3D9RenderDevice::Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
-{
-	static int si;
-	dout << L"utd3d9r: Draw2DLine = " << si++ << std::endl;
-}
+	{
+		static int si;
+		dout << L"utd3d9r: Draw2DLine = " << si++ << std::endl;
+	}
 #endif
 	guard(UD3D9RenderDevice::Draw2DLine);
 
@@ -2956,8 +2991,8 @@ void UD3D9RenderDevice::Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 	DWORD lineColor = FPlaneTo_BGRClamped_A255(&Color);
 
 	//Buffer the line
-	FGLVertexColor *pVertexColorArray = &m_pVertexColorArray[m_bufferedVerts];
-	FGLTexCoord *pTexCoordArray = &m_pTexCoordArray[0][m_bufferedVerts];
+	FGLVertexColor* pVertexColorArray = &m_pVertexColorArray[m_bufferedVerts];
+	FGLTexCoord* pTexCoordArray = &m_pTexCoordArray[0][m_bufferedVerts];
 
 	pVertexColorArray[0].x = X1Pos;
 	pVertexColorArray[0].y = Y1Pos;
@@ -2982,10 +3017,10 @@ void UD3D9RenderDevice::Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFl
 
 void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FLOAT X1, FLOAT Y1, FLOAT X2, FLOAT Y2, FLOAT Z) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
-{
-	static int si;
-	dout << L"utd3d9r: Draw2DPoint = " << si++ << std::endl;
-}
+	{
+		static int si;
+		dout << L"utd3d9r: Draw2DPoint = " << si++ << std::endl;
+	}
 #endif
 	guard(UD3D9RenderDevice::Draw2DPoint);
 
@@ -2995,7 +3030,7 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 	if (GIsEditor) {
 		Z = 1.0f;
 	}
- 
+
 	//Get point coordinates back in 3D
 	FLOAT X1Pos = m_RFX2 * (X1 - Frame->FX2 - 0.5f);
 	FLOAT Y1Pos = m_RFY2 * (Y1 - Frame->FY2 - 0.5f);
@@ -3078,8 +3113,8 @@ void UD3D9RenderDevice::Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineF
 	DWORD pointColor = FPlaneTo_BGRClamped_A255(&Color);
 
 	//Buffer the point
-	FGLVertexColor *pVertexColorArray = &m_pVertexColorArray[m_bufferedVerts];
-	FGLTexCoord *pTexCoordArray = &m_pTexCoordArray[0][m_bufferedVerts];
+	FGLVertexColor* pVertexColorArray = &m_pVertexColorArray[m_bufferedVerts];
+	FGLTexCoord* pTexCoordArray = &m_pTexCoordArray[0][m_bufferedVerts];
 
 	pVertexColorArray[0].x = X1Pos;
 	pVertexColorArray[0].y = Y1Pos;
@@ -3193,8 +3228,9 @@ void UD3D9RenderDevice::updateQuadBuffer(DWORD color) {
 	//dout << L"Updating quad buffer to color " << std::hex << color << std::endl;
 
 	FGLVertexColorTex* buffer = nullptr;
-	if (FAILED(m_d3dQuadBuffer->Lock(0, 0, (void**)&buffer, D3DLOCK_NOSYSLOCK | D3DLOCK_DISCARD))) {
-		appErrorf(TEXT("Vertex buffer lock failed"));
+	HRESULT hResult = m_d3dQuadBuffer->Lock(0, 0, (void**)&buffer, D3DLOCK_NOSYSLOCK | D3DLOCK_DISCARD);
+	if (FAILED(hResult)) {
+		appErrorf(TEXT("Vertex buffer lock failed: %ls"), *ExplainResult(hResult));
 	}
 
 	buffer[0].x = 0.0f;
@@ -3225,8 +3261,9 @@ void UD3D9RenderDevice::updateQuadBuffer(DWORD color) {
 	buffer[3].u = 0.0f;
 	buffer[3].v = 1.0f;
 
-	if (FAILED(m_d3dQuadBuffer->Unlock())) {
-		appErrorf(TEXT("Vertex buffer unlock failed"));
+	hResult = m_d3dQuadBuffer->Unlock();
+	if (FAILED(hResult)) {
+		appErrorf(TEXT("Vertex buffer unlock failed: %ls"), *ExplainResult(hResult));
 	}
 	m_QuadBufferColor = color;
 }
@@ -3287,7 +3324,7 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 	if (m_currentVertexColorBuffer != m_d3dQuadBuffer) {
 		HRESULT hResult = m_d3dDevice->SetStreamSource(0, m_d3dQuadBuffer, 0, sizeof(FGLVertexColorTex));
 		if (FAILED(hResult)) {
-			appErrorf(TEXT("SetStreamSource failed"));
+			appErrorf(TEXT("SetStreamSource failed: %ls"), *ExplainResult(hResult));
 		}
 		m_currentVertexColorBuffer = m_d3dQuadBuffer;
 	}
@@ -3742,10 +3779,10 @@ UINT UD3D9RenderDevice::BufferTriangleSurfaceGeometry(const std::vector<FRenderV
 
 void UD3D9RenderDevice::ClearZ(FSceneNode* Frame) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
-{
-	static int si;
-	dout << L"utd3d9r: ClearZ = " << si++ << std::endl;
-}
+	{
+		static int si;
+		dout << L"utd3d9r: ClearZ = " << si++ << std::endl;
+	}
 #endif
 	guard(UD3D9RenderDevice::ClearZ);
 
@@ -3979,10 +4016,10 @@ void UD3D9RenderDevice::ReadPixels(FColor* Pixels) {
 
 void UD3D9RenderDevice::EndFlash() {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
-{
-	static int si;
-	dout << L"utd3d9r: EndFlash = " << si++ << std::endl;
-}
+	{
+		static int si;
+		dout << L"utd3d9r: EndFlash = " << si++ << std::endl;
+	}
 #endif
 	guard(UD3D9RenderDevice::EndFlash);
 
@@ -4101,12 +4138,13 @@ void UD3D9RenderDevice::InitNoTextureSafe(void) {
 	//Create the texture
 	hResult = m_d3dDevice->CreateTexture(4, 4, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &m_pNoTexObj, NULL);
 	if (FAILED(hResult)) {
-		appErrorf(TEXT("CreateTexture (basic RGBA8) failed"));
+		appErrorf(TEXT("CreateTexture (basic RGBA8) failed: %ls"), *ExplainResult(hResult));
 	}
 
 	//Lock texture level 0
-	if (FAILED(m_pNoTexObj->LockRect(0, &lockRect, NULL, D3DLOCK_NOSYSLOCK))) {
-		appErrorf(TEXT("Texture lock failed"));
+	hResult = m_pNoTexObj->LockRect(0, &lockRect, NULL, D3DLOCK_NOSYSLOCK);
+	if (FAILED(hResult)) {
+		appErrorf(TEXT("Texture lock failed: %ls"), *ExplainResult(hResult));
 	}
 
 	//Write texture
@@ -4119,8 +4157,9 @@ void UD3D9RenderDevice::InitNoTextureSafe(void) {
 	}
 
 	//Unlock texture level 0
-	if (FAILED(m_pNoTexObj->UnlockRect(0))) {
-		appErrorf(TEXT("Texture unlock failed"));
+	hResult = m_pNoTexObj->UnlockRect(0);
+	if (FAILED(hResult)) {
+		appErrorf(TEXT("Texture unlock failed: %ls"), *ExplainResult(hResult));
 	}
 
 	return;
@@ -4329,7 +4368,7 @@ bool UD3D9RenderDevice::BindTexture(DWORD texNum, FTexInfo& Tex, FTextureInfo& I
 				1U << pBind->UBits, 1U << pBind->VBits, (Info.NumMips == 1) ? 1 : (pBind->MaxLevel + 1),
 				0, pBind->texFormat, D3DPOOL_MANAGED, &pBind->pTexObj, NULL);
 			if (FAILED(hResult)) {
-				appErrorf(TEXT("CreateTexture failed"));
+				appErrorf(TEXT("CreateTexture failed: %ls"), *ExplainResult(hResult));
 			}
 		}
 	}
@@ -4451,7 +4490,7 @@ bool UD3D9RenderDevice::BindTexture(DWORD texNum, FTexInfo& Tex, FTextureInfo& I
 					1U << pBind->UBits, 1U << pBind->VBits, (Info.NumMips == 1) ? 1 : (pBind->MaxLevel + 1),
 					0, pBind->texFormat, D3DPOOL_MANAGED, &pBind->pTexObj, NULL);
 				if (FAILED(hResult)) {
-					appErrorf(TEXT("CreateTexture failed"));
+					appErrorf(TEXT("CreateTexture failed: %ls"), *ExplainResult(hResult));
 				}
 			}
 		}
@@ -4621,8 +4660,9 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 			}
 			else {
 				//Lock texture level
-				if (FAILED(pBind->pTexObj->LockRect(Level, &m_texConvertCtx.lockRect, NULL, D3DLOCK_NOSYSLOCK))) {
-					appErrorf(TEXT("Texture lock failed"));
+				HRESULT hResult = pBind->pTexObj->LockRect(Level, &m_texConvertCtx.lockRect, NULL, D3DLOCK_NOSYSLOCK);
+				if (FAILED(hResult)) {
+					appErrorf(TEXT("Texture lock failed: %ls"), *ExplainResult(hResult));
 				}
 
 				//Texture data copy and potential conversion if necessary
@@ -4738,8 +4778,9 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 				m_texConvertCtx.texHeightPow2 = (texHeight & 0x1) | (texHeight >> 1);
 
 				//Unlock texture level
-				if (FAILED(pBind->pTexObj->UnlockRect(Level))) {
-					appErrorf(TEXT("Texture unlock failed"));
+				hResult = pBind->pTexObj->UnlockRect(Level);
+				if (FAILED(hResult)) {
+					appErrorf(TEXT("Texture unlock failed: %ls"), *ExplainResult(hResult));
 				}
 			}
 		}
@@ -5689,7 +5730,7 @@ void UD3D9RenderDevice::SetVertexDeclNoCheck(IDirect3DVertexDeclaration9 *vertex
 	//Set vertex declaration
 	hResult = m_d3dDevice->SetVertexDeclaration(vertexDecl);
 	if (FAILED(hResult)) {
-		appErrorf(TEXT("SetVertexDeclaration failed"));
+		appErrorf(TEXT("SetVertexDeclaration failed: %ls"), *ExplainResult(hResult));
 	}
 
 	//Save new current vertex declaration
@@ -5714,7 +5755,6 @@ void UD3D9RenderDevice::RenderPassesExec(void) {
 
 	m_rpTMUnits = 1;
 	m_rpForceSingle = true;
-
 
 	//for (INT PolyNum = 0; PolyNum < m_csPolyCount; PolyNum++) {
 	//	assert(MultiDrawCountArray[PolyNum] == 3);
