@@ -874,6 +874,15 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		}
 	}
 
+	// Initialize RTX Remix API
+	if (!remixInterfaceInitialized){
+		remixapi_ErrorCode remixErr = remixapi::bridge_initRemixApi(&remixInterface);
+		if (remixErr == REMIXAPI_ERROR_CODE_SUCCESS) {
+			remixInterfaceInitialized = true;
+		} else {
+			debugf(NAME_Init, TEXT("Failed to initialize RTX Remix API! Error: %d"), remixErr);
+		}
+	}
 
 	//Reset previous SwapBuffers status to okay
 	m_prevSwapBuffersStatus = true;
@@ -6171,6 +6180,8 @@ INT UD3D9RenderDevice::LockCount = 0;
 
 HMODULE UD3D9RenderDevice::hModuleD3d9 = NULL;
 LPDIRECT3DCREATE9 UD3D9RenderDevice::pDirect3DCreate9 = NULL;
+remixapi_Interface UD3D9RenderDevice::remixInterface {0};
+bool UD3D9RenderDevice::remixInterfaceInitialized = false;
 
 #if UTGLR_DEFINE_HACK_FLAGS
 DWORD GUglyHackFlags;

@@ -22,6 +22,8 @@
 #include "D3D9DebugUtils.h"
 #include "RTXLevelProperties.h"
 
+#include "remixapi/bridge_remix_api.h"
+
 #include <math.h>
 #include <stdio.h>
 
@@ -469,6 +471,9 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 
 	static HMODULE hModuleD3d9;
 	static LPDIRECT3DCREATE9 pDirect3DCreate9;
+
+	static remixapi_Interface remixInterface;
+	static bool remixInterfaceInitialized;
 
 #ifdef WIN32
 	// Permanent variables.
