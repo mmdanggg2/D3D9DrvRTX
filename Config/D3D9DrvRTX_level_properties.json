@@ -3,6 +3,7 @@
   "ExampleLevelName": {
     "anchors": [
       {
+        "$comment": "Moves from 0,0,0 to 50,50,50 at a speed of 10uu/s and snaps back 0 to loop forever. Also rotates constantly with the given euler XYZ values",
         "name": "simple move",
         "anim_type": "linear",
         "start_loc": [ 0, 0, 0 ],
@@ -11,6 +12,7 @@
         "rotation_rate": [ 0.5, 2, 5 ]
       },
       {
+        "$comment": "This shares the same name as the first and so will have the same mesh hash in Remix. It is scaled, and also has a defined starting rotation.",
         "name": "simple move",
         "anim_type": "linear",
         "start_loc": [ 30, 0, 0 ],
@@ -18,9 +20,10 @@
         "speed": -10,
         "start_rot": [ 0, 45, 0 ],
         "rotation_rate": [ 0, 0, 2 ],
-        "scale": [ 1, 1.5, 1]
+        "scale": [ 1, 1.5, 1 ]
       },
       {
+        "$comment": "Uses the ping-pong movement and so after reaching end_loc will instead begin travelling back to start_loc instead of snapping back",
         "name": "moving back and forth",
         "anim_type": "ping-pong",
         "start_loc": [ 0, 0, -60 ],
@@ -29,6 +32,7 @@
         "start_rot": [ 0, 0, 45 ]
       },
       {
+        "$comment": "This anchor will have a static location (can still rotate) so end_loc and speed need not be defined",
         "name": "static anchor",
         "anim_type": "static",
         "start_loc": [ 0, 20, -60 ],
