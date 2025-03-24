@@ -49,7 +49,7 @@ private:
 	static struct {
 		ULevel* currentLevel;
 		FTime lastLevelTime;
-		std::vector<std::unique_ptr<RTXAnchor>> anchors;
+		RTXAnchors anchors;
 		ModelFacets facets;
 		FMemStack facetsMem;
 		FMemMark facetsMemMark;

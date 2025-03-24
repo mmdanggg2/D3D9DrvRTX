@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 
 class RTXAnchor {
 protected:
@@ -68,4 +69,7 @@ public:
 	void Tick(float deltaTime) override;
 };
 
-void loadLevelJson(const TCHAR* levelName, std::vector<std::unique_ptr<RTXAnchor>>& anchors);
+typedef std::vector<std::unique_ptr<RTXAnchor>> RTXAnchors;
+typedef std::unordered_map<std::string, std::string> RTXConfigVars;
+
+void loadLevelJson(const TCHAR* levelName, RTXAnchors& anchors, RTXConfigVars& remixConfigVaraibles);

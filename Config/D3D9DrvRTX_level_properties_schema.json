@@ -17,6 +17,7 @@
     }
   },
   "type": "object",
+  "description": "A map of level names and the properties to apply when loading that level",
   "patternProperties": {
     "^[^$]+.*": {
       "type": "object",
@@ -91,6 +92,16 @@
                 }
               }
             ]
+          }
+        },
+        "config_vars": {
+          "type": "object",
+          "description": "The RTX Remix config variables to apply when loading this level, the values should be in the same format as in rtx.conf",
+          "patternProperties": {
+            "^[^$]+.*": {
+              "type": "string",
+              "description": "An RTX Remix config key/value pair"
+            }
           }
         }
       }

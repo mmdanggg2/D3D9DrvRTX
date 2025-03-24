@@ -214,10 +214,22 @@ void UD3D9Render::onLevelChange(FSceneNode* frame) {
 	currentLevelData.lastLevelTime = frame->Level->TimeSeconds;
 	currentLevelData.anchors.clear();
 
+	RTXConfigVars remixConfigVars;
+
 	loadLevelJson(
 		*frame->Level->URL.Map,
-		currentLevelData.anchors
+		currentLevelData.anchors,
+		remixConfigVars
 	);
+
+	if (UD3D9RenderDevice::remixInterfaceInitialized) {
+		for (const auto& [key, value] : remixConfigVars) {
+			remixapi_ErrorCode remixErr = UD3D9RenderDevice::remixInterface.SetConfigVariable(key.c_str(), value.c_str());
+			if (remixErr != REMIXAPI_ERROR_CODE_SUCCESS) {
+				debugf(NAME_Warning, TEXT("Failed to set RTX Remix config variable [%s = %s]! Error: %d"), appFromAnsi(key.c_str()), appFromAnsi(value.c_str()), remixErr);
+			}
+		}
+	}
 }
 
 void UD3D9Render::DrawWorld(FSceneNode* frame) {

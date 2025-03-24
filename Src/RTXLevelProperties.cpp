@@ -142,7 +142,76 @@ std::string normalize_level_name(const std::string& input) {
 	return toLower(result);
 }
 
-void loadLevelJson(const TCHAR* rawLevelName, std::vector<std::unique_ptr<RTXAnchor>>& anchors) {
+void loadAnchorsArray(json& anchorsArr, const std::string& levelName, RTXAnchors& anchors) {
+	for (json anchorObj : anchorsArr) {
+		if (!anchorObj.is_object()) {
+			debugf(TEXT("Error RTXAnchor '%s' in level '%s' is not an object!"), s2ws(anchorObj.dump()).c_str(), s2ws(levelName).c_str());
+			continue;
+		}
+
+#define GET_ANCHOR_MEMBER(KEY, VAR) \
+		try {\
+			anchorObj.at(#KEY).get_to(VAR);\
+		}\
+		catch (const json::exception& e) {\
+			debugf(TEXT("Error on RTXAnchor '%s' in level '%s', failed to parse '"#KEY"': %s"), s2ws(anchorObj.dump()).c_str(), s2ws(levelName).c_str(), s2ws(e.what()).c_str());\
+			anchorError = true;\
+		}
+
+#define GET_ANCHOR_MEMBER_OPTIONAL(KEY, VAR) \
+		if (anchorObj.contains(#KEY)) {\
+			GET_ANCHOR_MEMBER(KEY, VAR);\
+		}
+
+		bool anchorError = false;
+		std::string name;
+		GET_ANCHOR_MEMBER(name, name);
+		std::string animType{ "linear" };
+		GET_ANCHOR_MEMBER_OPTIONAL(anim_type, animType);
+		FVector startLoc;
+		GET_ANCHOR_MEMBER(start_loc, startLoc);
+		FVector startRot{};
+		GET_ANCHOR_MEMBER_OPTIONAL(start_rot, startRot);
+		FVector rotationRate{};
+		GET_ANCHOR_MEMBER_OPTIONAL(rotation_rate, rotationRate);
+		FVector scale{ 1, 1, 1 };
+		GET_ANCHOR_MEMBER_OPTIONAL(scale, scale);
+		if (animType == "static") {
+			if (anchorError) continue;
+			anchors.push_back(std::make_unique<RTXAnchor>(name, startLoc, startRot, scale, rotationRate));
+		}
+		else if (animType == "linear" || animType == "ping-pong") {
+			FVector endLoc;
+			GET_ANCHOR_MEMBER(end_loc, endLoc);
+			float speed = 0.0f;
+			GET_ANCHOR_MEMBER(speed, speed);
+			if (anchorError) continue;
+			if (animType == "ping-pong") {
+				anchors.push_back(std::make_unique<RTXAnchorPingPong>(name, startLoc, startRot, scale, rotationRate, endLoc, speed));
+			}
+			else {
+				anchors.push_back(std::make_unique<RTXAnchorLinear>(name, startLoc, startRot, scale, rotationRate, endLoc, speed));
+			}
+		}
+		else {
+			debugf(TEXT("Unknown anim_type on RTXAnchor '%s' in level '%s': %s"), s2ws(anchorObj.dump()).c_str(), s2ws(levelName).c_str(), s2ws(animType).c_str());
+		}
+#undef GET_ANCHOR_MEMBER_OPTIONAL
+#undef GET_ANCHOR_MEMBER
+	}
+}
+
+void loadConfigVars(json& configVars, const std::string& levelName, RTXConfigVars& remixConfigVariables) {
+	for (const auto& [key, value] : configVars.items()) {
+		if (!value.is_string()) {
+			debugf(NAME_Warning, TEXT("RTX config var '%s' in level '%s' is not a string!"), s2ws(key).c_str(), s2ws(levelName).c_str());
+			continue;
+		}
+		remixConfigVariables[key] = value;
+	}
+}
+
+void loadLevelJson(const TCHAR* rawLevelName, RTXAnchors& anchors, RTXConfigVars& remixConfigVariables) {
 	std::wstring fileName = L"D3D9DrvRTX_level_properties.json";
 	std::ifstream file = std::ifstream(fileName);
 	if (!file.is_open()) {
@@ -153,7 +222,7 @@ void loadLevelJson(const TCHAR* rawLevelName, std::vector<std::unique_ptr<RTXAnc
 	try {
 		json configJson = json::parse(file);
 		json levelObj;
-		for (auto& [key, val] : configJson.items()) {
+		for (const auto& [key, val] : configJson.items()) {
 			if (toLower(key) == levelName) {
 				levelObj = val;
 				break;
@@ -163,63 +232,13 @@ void loadLevelJson(const TCHAR* rawLevelName, std::vector<std::unique_ptr<RTXAnc
 			debugf(TEXT("Level '%s' was not found in RTX level properties."), s2ws(levelName).c_str());
 			return;
 		}
-		json anchorsArr = levelObj["anchors"];
-		if (!anchorsArr.is_array()) {
-			return;
+		json& anchorsArr = levelObj["anchors"];
+		if (anchorsArr.is_array()) {
+			loadAnchorsArray(anchorsArr, levelName, anchors);
 		}
-		for (json anchorObj : anchorsArr) {
-			if (!anchorObj.is_object()) {
-				debugf(TEXT("Error RTXAnchor '%s' in level '%s' is not an object!"), s2ws(anchorObj.dump()).c_str(), s2ws(levelName).c_str());
-				continue;
-			}
-
-#define GET_ANCHOR_MEMBER(KEY, VAR) \
-			try {\
-				anchorObj.at(#KEY).get_to(VAR);\
-			}\
-			catch (const json::exception& e) {\
-				debugf(TEXT("Error on RTXAnchor '%s' in level '%s', failed to parse '"#KEY"': %s"), s2ws(anchorObj.dump()).c_str(), s2ws(levelName).c_str(), s2ws(e.what()).c_str());\
-				anchorError = true;\
-			}
-
-#define GET_ANCHOR_MEMBER_OPTIONAL(KEY, VAR) \
-			if (anchorObj.contains(#KEY)) {\
-				GET_ANCHOR_MEMBER(KEY, VAR);\
-			}
-
-			bool anchorError = false;
-			std::string name;
-			GET_ANCHOR_MEMBER(name, name);
-			std::string animType{"linear"};
-			GET_ANCHOR_MEMBER_OPTIONAL(anim_type, animType);
-			FVector startLoc;
-			GET_ANCHOR_MEMBER(start_loc, startLoc);
-			FVector startRot{};
-			GET_ANCHOR_MEMBER_OPTIONAL(start_rot, startRot);
-			FVector rotationRate{};
-			GET_ANCHOR_MEMBER_OPTIONAL(rotation_rate, rotationRate);
-			FVector scale{1, 1, 1};
-			GET_ANCHOR_MEMBER_OPTIONAL(scale, scale);
-			if (animType == "static") {
-				if (anchorError) continue;
-				anchors.push_back(std::make_unique<RTXAnchor>(name, startLoc, startRot, scale, rotationRate));
-			} else if (animType == "linear" || animType == "ping-pong") {
-				FVector endLoc;
-				GET_ANCHOR_MEMBER(end_loc, endLoc);
-				float speed = 0.0f;
-				GET_ANCHOR_MEMBER(speed, speed);
-				if (anchorError) continue;
-				if (animType == "ping-pong") {
-					anchors.push_back(std::make_unique<RTXAnchorPingPong>(name, startLoc, startRot, scale, rotationRate, endLoc, speed));
-				} else {
-					anchors.push_back(std::make_unique<RTXAnchorLinear>(name, startLoc, startRot, scale, rotationRate, endLoc, speed));
-				}
-			}
-			else {
-				debugf(TEXT("Unknown anim_type on RTXAnchor '%s' in level '%s': %s"), s2ws(anchorObj.dump()).c_str(), s2ws(levelName).c_str(), s2ws(animType).c_str());
-			}
-#undef GET_ANCHOR_MEMBER_OPTIONAL
-#undef GET_ANCHOR_MEMBER
+		json& configVars = levelObj["config_vars"];
+		if (configVars.is_object()) {
+			loadConfigVars(configVars, levelName, remixConfigVariables);
 		}
 	}
 	catch (const json::exception& e) {

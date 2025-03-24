@@ -38,6 +38,10 @@
         "start_loc": [ 0, 20, -60 ],
         "scale": [ 1, 1, 2 ]
       }
-    ]
+    ],
+    "config_vars": {
+      "rtx.volumetrics.transmittanceColor": "0.1, 0.5, 0.5",
+      "rtx.skyReprojectToMainCameraSpace": "True"
+    }
   }
 }
