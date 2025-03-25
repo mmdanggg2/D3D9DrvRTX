@@ -14,84 +14,82 @@
         { "type": "number", "title": "Y" },
         { "type": "number", "title": "Z" }
       ]
-    }
-  },
-  "type": "object",
-  "description": "A map of level names and the properties to apply when loading that level",
-  "patternProperties": {
-    "^[^$]+.*": {
+    },
+    "Anchor": {
       "type": "object",
-      "description": "Properties used in the specified level",
+      "description": "An anchor to render for replacment in Remix",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the anchor, used as a seed to create a random mesh so 2 anchors with the same name will have the same hash."
+        },
+        "anim_type": {
+          "type": "string",
+          "enum": ["linear", "ping-pong", "static"],
+          "description": "Which kind of animation the anchor will have\nlinear: moves from start to end and loops back to start\nping-pong: moves from start to end and then reverses to move back to start\nstatic: does not move, will only rotate"
+        },
+        "start_loc": {
+          "$ref": "#/$defs/FVector",
+          "description": "The starting location of the anchor"
+        },
+        "start_rot": {
+          "$ref": "#/$defs/FVector",
+          "description": "The starting rotation of the anchor in degrees"
+        },
+        "rotation_rate": {
+          "$ref": "#/$defs/FVector",
+          "description": "How much the anchor rotates in degrees per second"
+        },
+        "scale": {
+          "$ref": "#/$defs/FVector",
+          "default": [1, 1, 1],
+          "description": "What scale to apply to the anchor"
+        }
+      },
+      "required": [
+        "name",
+        "anim_type",
+        "start_loc"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "anim_type": { 
+                "anyOf": [
+                  { "const": "linear" },
+                  { "const": "ping-pong" }
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "end_loc": {
+                "$ref": "#/$defs/FVector",
+                "description": "The destination location for the anchor to move to"
+              },
+              "speed": {
+                "type": "number",
+                "description": "How fast the anchor will move from start to end in unreal units per second"
+              }
+            },
+            "required": [
+              "end_loc",
+              "speed"
+            ]
+          }
+        }
+      ]
+    },
+    "LevelProperties": {
+      "type": "object",
       "properties": {
         "anchors": {
           "type": "array",
           "description": "A list of the anchors to create",
           "items": {
-            "type": "object",
-            "description": "An anchor to render for replacment in Remix",
-            "properties": {
-              "name": {
-                "type": "string",
-                "description": "The name of the anchor, used as a seed to create a random mesh so 2 anchors with the same name will have the same hash."
-              },
-              "anim_type": {
-                "type": "string",
-                "enum": ["linear", "ping-pong", "static"],
-                "description": "Which kind of animation the anchor will have\nlinear: moves from start to end and loops back to start\nping-pong: moves from start to end and then reverses to move back to start\nstatic: does not move, will only rotate"
-              },
-              "start_loc": {
-                "$ref": "#/$defs/FVector",
-                "description": "The starting location of the anchor"
-              },
-              "start_rot": {
-                "$ref": "#/$defs/FVector",
-                "description": "The starting rotation of the anchor in degrees"
-              },
-              "rotation_rate": {
-                "$ref": "#/$defs/FVector",
-                "description": "How much the anchor rotates in degrees per second"
-              },
-              "scale": {
-                "$ref": "#/$defs/FVector",
-                "default": [1, 1, 1],
-                "description": "What scale to apply to the anchor"
-              }
-            },
-            "required": [
-              "name",
-              "anim_type",
-              "start_loc"
-            ],
-            "allOf": [
-              {
-                "if": {
-                  "properties": {
-                    "anim_type": { 
-                      "anyOf": [
-                        { "const": "linear" },
-                        { "const": "ping-pong" }
-                      ]
-                    }
-                  }
-                },
-                "then": {
-                  "properties": {
-                    "end_loc": {
-                      "$ref": "#/$defs/FVector",
-                      "description": "The destination location for the anchor to move to"
-                    },
-                    "speed": {
-                      "type": "number",
-                      "description": "How fast the anchor will move from start to end in unreal units per second"
-                    }
-                  },
-                  "required": [
-                    "end_loc",
-                    "speed"
-                  ]
-                }
-              }
-            ]
+            "$ref": "#/$defs/Anchor"
           }
         },
         "config_vars": {
@@ -105,6 +103,20 @@
           }
         }
       }
+    }
+  },
+  "type": "object",
+  "description": "A map of level names and the properties to apply when loading that level",
+  "properties": {
+    "_default_level": {
+      "$ref": "#/$defs/LevelProperties",
+      "description": "Properties used if the current level was not found in the level_properties file"
+    }
+  },
+  "patternProperties": {
+    "^[^$]+.*": {
+      "$ref": "#/$defs/LevelProperties",
+      "description": "Properties used in the specified level"
     }
   }
 }

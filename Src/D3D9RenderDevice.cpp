@@ -879,6 +879,7 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		remixapi_ErrorCode remixErr = remixapi::bridge_initRemixApi(&remixInterface);
 		if (remixErr == REMIXAPI_ERROR_CODE_SUCCESS) {
 			remixInterfaceInitialized = true;
+			debugf(NAME_Init, TEXT("RTX Remix API initialized!"));
 		} else {
 			debugf(NAME_Init, TEXT("Failed to initialize RTX Remix API! Error: %d"), remixErr);
 		}

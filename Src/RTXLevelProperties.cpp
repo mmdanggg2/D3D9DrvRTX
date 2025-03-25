@@ -228,8 +228,16 @@ void loadLevelJson(const TCHAR* rawLevelName, RTXAnchors& anchors, RTXConfigVars
 				break;
 			}
 		}
+		if (levelObj.is_null()) {
+			debugf(TEXT("Level '%s' was not found in RTX level properties, attempting to use '_default_level'"), s2ws(levelName).c_str());
+			levelObj = configJson["_default_level"];
+			if (levelObj.is_null()) {
+				debugf(TEXT("No '_default_level' properties were found in RTX level properties."));
+				return;
+			}
+		}
 		if (!levelObj.is_object()) {
-			debugf(TEXT("Level '%s' was not found in RTX level properties."), s2ws(levelName).c_str());
+			debugf(TEXT("Level '%s' properties value is not a json object!"), s2ws(levelName).c_str());
 			return;
 		}
 		json& anchorsArr = levelObj["anchors"];

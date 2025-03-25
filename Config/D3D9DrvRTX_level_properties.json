@@ -43,5 +43,12 @@
       "rtx.volumetrics.transmittanceColor": "0.1, 0.5, 0.5",
       "rtx.skyReprojectToMainCameraSpace": "True"
     }
+  },
+  "_default_level": {
+    "$comment": "These properties for '_default_level' are used if the current level name hasn't had it's properties defined",
+    "config_vars": {
+      "rtx.volumetrics.transmittanceColor": "0.98, 0.98, 0.98",
+      "rtx.skyReprojectToMainCameraSpace": "False"
+    }
   }
 }
