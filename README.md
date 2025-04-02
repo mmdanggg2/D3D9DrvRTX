@@ -59,11 +59,11 @@ The RTX specific options are listed here:
 - `EnableSkyBoxRendering`: Enables rendering of the skybox zone (if one is found) before the main view.
 - `EnableSkyBoxAnchors`: Enables the special mesh at the camera's position, generated for anchoring the skybox in remix.
 - `EnableHashTextures`: Enables specially generated textures with a stable hash in place of procedurally generated ones.
-
-	### Hash textures (Help, some textures are pink mush!)
+	
+	### Hash textures
 	UE1 makes use of textures that are generated procedurally at runtime, which means that the hash for them that Remix sees is not always the same, this makes replacing them difficult. To get around this issue, when `EnableHashTextures` is on, we generate a unique static texture that is used in place of the procedural one.
 	
-	Textures can be individually excluded from this option by adding their name into the `D3D9DrvRTX_hash_tex_blacklist.txt` file.
+	Textures can be individually excluded from this option by adding their name into the `hash_tex_blacklist` array in the `D3D9DrvRTX_config.json` file.
 	To help in detemining which textures are affected, when a texture is replaced this way, a message is logged in the game's log (eg. `UnrealTournament.log`) that will give you the full name of the texture.
 
 	### Light formula

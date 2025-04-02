@@ -1,4 +1,5 @@
 #include "D3D9Render.h"
+#include "D3D9DrvRTX.h"
 
 #include <bit>
 #include <bitset>
@@ -226,7 +227,7 @@ void UD3D9Render::onLevelChange(FSceneNode* frame) {
 		for (const auto& [key, value] : remixConfigVars) {
 			remixapi_ErrorCode remixErr = UD3D9RenderDevice::remixInterface.SetConfigVariable(key.c_str(), value.c_str());
 			if (remixErr != REMIXAPI_ERROR_CODE_SUCCESS) {
-				debugf(NAME_Warning, TEXT("Failed to set RTX Remix config variable [%s = %s]! Error: %d"), appFromAnsi(key.c_str()), appFromAnsi(value.c_str()), remixErr);
+				debugf(NAME_D3D9DrvRTX, TEXT("Failed to set RTX Remix config variable [%s = %s]! Error: %d"), appFromAnsi(key.c_str()), appFromAnsi(value.c_str()), remixErr);
 			}
 		}
 	}

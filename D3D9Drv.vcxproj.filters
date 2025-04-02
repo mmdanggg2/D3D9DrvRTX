@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="Src\c_gclip.cpp">
@@ -47,6 +47,9 @@
       <Filter>Inc</Filter>
     </ClInclude>
     <ClInclude Include="Inc\RTXLevelProperties.h">
+      <Filter>Inc</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\D3D9DrvRTX.h">
       <Filter>Inc</Filter>
     </ClInclude>
   </ItemGroup>
@@ -103,10 +106,10 @@
     <None Include="scripts\UT_469d.bat">
       <Filter>Scripts</Filter>
     </None>
-    <None Include="Config\D3D9DrvRTX_level_properties_schema.json">
+    <None Include="Config\D3D9DrvRTX_config_schema.json">
       <Filter>Conf</Filter>
     </None>
-    <None Include="Config\D3D9DrvRTX_level_properties.json">
+    <None Include="Config\D3D9DrvRTX_config_example.json">
       <Filter>Conf</Filter>
     </None>
   </ItemGroup>
@@ -123,11 +126,6 @@
     <Filter Include="Scripts">
       <UniqueIdentifier>{6c4cdd26-e4fb-4cd5-9166-999c4d6eea02}</UniqueIdentifier>
     </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="Config\D3D9DrvRTX_hash_tex_blacklist.txt">
-      <Filter>Conf</Filter>
-    </Text>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="NatvisFile.natvis" />

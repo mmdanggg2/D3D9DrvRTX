@@ -106,17 +106,28 @@
     }
   },
   "type": "object",
-  "description": "A map of level names and the properties to apply when loading that level",
+  "description": "D3D9DrvRTX config root",
   "properties": {
-    "_default_level": {
+    "level_properties": {
+      "type": "object",
+      "description": "A map of level names and the properties to apply when loading that level\nLevel name matching is case insensitive",
+      "patternProperties": {
+        "^[^$]+.*": {
+          "$ref": "#/$defs/LevelProperties",
+          "description": "Properties used in the specified level"
+        }
+      }
+    },
+    "level_properties_default": {
       "$ref": "#/$defs/LevelProperties",
-      "description": "Properties used if the current level was not found in the level_properties file"
-    }
-  },
-  "patternProperties": {
-    "^[^$]+.*": {
-      "$ref": "#/$defs/LevelProperties",
-      "description": "Properties used in the specified level"
+      "description": "Properties used if the current level was not found in the level_properties object"
+    },
+    "hash_tex_blacklist": {
+      "type": "array",
+      "description": "A list of texture names to exclude from being replaced when using the EnableHashTextures option",
+      "items": {
+        "type": "string"
+      }
     }
   }
 }

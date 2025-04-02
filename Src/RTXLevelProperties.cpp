@@ -1,6 +1,7 @@
 #include "windows.h"
 
 #include "RTXLevelProperties.h"
+#include "D3D9DrvRTX.h"
 #include "D3D9DebugUtils.h"
 #include "nlohmann/json.hpp"
 
@@ -145,7 +146,7 @@ std::string normalize_level_name(const std::string& input) {
 void loadAnchorsArray(json& anchorsArr, const std::string& levelName, RTXAnchors& anchors) {
 	for (json anchorObj : anchorsArr) {
 		if (!anchorObj.is_object()) {
-			debugf(TEXT("Error RTXAnchor '%s' in level '%s' is not an object!"), s2ws(anchorObj.dump()).c_str(), s2ws(levelName).c_str());
+			debugf(NAME_D3D9DrvRTX, TEXT("Error RTXAnchor '%s' in level '%s' is not an object!"), s2ws(anchorObj.dump()).c_str(), s2ws(levelName).c_str());
 			continue;
 		}
 
@@ -154,7 +155,7 @@ void loadAnchorsArray(json& anchorsArr, const std::string& levelName, RTXAnchors
 			anchorObj.at(#KEY).get_to(VAR);\
 		}\
 		catch (const json::exception& e) {\
-			debugf(TEXT("Error on RTXAnchor '%s' in level '%s', failed to parse '"#KEY"': %s"), s2ws(anchorObj.dump()).c_str(), s2ws(levelName).c_str(), s2ws(e.what()).c_str());\
+			debugf(NAME_D3D9DrvRTX, TEXT("Error on RTXAnchor '%s' in level '%s', failed to parse '"#KEY"': %s"), s2ws(anchorObj.dump()).c_str(), s2ws(levelName).c_str(), s2ws(e.what()).c_str());\
 			anchorError = true;\
 		}
 
@@ -194,7 +195,7 @@ void loadAnchorsArray(json& anchorsArr, const std::string& levelName, RTXAnchors
 			}
 		}
 		else {
-			debugf(TEXT("Unknown anim_type on RTXAnchor '%s' in level '%s': %s"), s2ws(anchorObj.dump()).c_str(), s2ws(levelName).c_str(), s2ws(animType).c_str());
+			debugf(NAME_D3D9DrvRTX, TEXT("Unknown anim_type on RTXAnchor '%s' in level '%s': %s"), s2ws(anchorObj.dump()).c_str(), s2ws(levelName).c_str(), s2ws(animType).c_str());
 		}
 #undef GET_ANCHOR_MEMBER_OPTIONAL
 #undef GET_ANCHOR_MEMBER
@@ -204,40 +205,65 @@ void loadAnchorsArray(json& anchorsArr, const std::string& levelName, RTXAnchors
 void loadConfigVars(json& configVars, const std::string& levelName, RTXConfigVars& remixConfigVariables) {
 	for (const auto& [key, value] : configVars.items()) {
 		if (!value.is_string()) {
-			debugf(NAME_Warning, TEXT("RTX config var '%s' in level '%s' is not a string!"), s2ws(key).c_str(), s2ws(levelName).c_str());
+			debugf(NAME_D3D9DrvRTX, TEXT("RTX config var '%s' in level '%s' is not a string!"), s2ws(key).c_str(), s2ws(levelName).c_str());
 			continue;
 		}
 		remixConfigVariables[key] = value;
 	}
 }
 
-void loadLevelJson(const TCHAR* rawLevelName, RTXAnchors& anchors, RTXConfigVars& remixConfigVariables) {
-	std::wstring fileName = L"D3D9DrvRTX_level_properties.json";
-	std::ifstream file = std::ifstream(fileName);
+const std::string config_filename = "D3D9DrvRTX_config.json";
+
+json loadConfigFile() {
+	std::ifstream file = std::ifstream(config_filename);
 	if (!file.is_open()) {
-		debugf(TEXT("Could not open RTX level properties file '%s'!"), fileName.c_str());
+		debugf(NAME_D3D9DrvRTX, TEXT("Could not open RTX config file '%s'!"), s2ws(config_filename).c_str());
+		return json();
+	}
+	try {
+		json config = json::parse(file);
+
+		if (!config.is_object()) {
+			debugf(NAME_D3D9DrvRTX, TEXT("RTX config json root was not a json object, is was type '%s'!"), s2ws(config.type_name()).c_str());
+			return json();
+		}
+		return config;
+	}
+	catch (const json::exception& e) {
+		debugf(NAME_D3D9DrvRTX, TEXT("Error parsing RTX config json: %s"), s2ws(e.what()).c_str());
+		return json();
+	}
+}
+
+void loadLevelJson(const TCHAR* rawLevelName, RTXAnchors& anchors, RTXConfigVars& remixConfigVariables) {
+	std::string levelName = normalize_level_name(ws2s(rawLevelName));
+	json configJson = loadConfigFile();
+	if (configJson.is_null()) {
 		return;
 	}
-	std::string levelName = normalize_level_name(ws2s(rawLevelName));
 	try {
-		json configJson = json::parse(file);
+		json& levelProperties = configJson["level_properties"];
+		if (!levelProperties.is_object()) {
+			debugf(NAME_D3D9DrvRTX, TEXT("No level_properties defined in config json."));
+			return;
+		}
 		json levelObj;
-		for (const auto& [key, val] : configJson.items()) {
+		for (const auto& [key, val] : levelProperties.items()) {
 			if (toLower(key) == levelName) {
 				levelObj = val;
 				break;
 			}
 		}
 		if (levelObj.is_null()) {
-			debugf(TEXT("Level '%s' was not found in RTX level properties, attempting to use '_default_level'"), s2ws(levelName).c_str());
-			levelObj = configJson["_default_level"];
+			debugf(NAME_D3D9DrvRTX, TEXT("Level '%s' was not found in level_properties, attempting to use 'level_properties_default'"), s2ws(levelName).c_str());
+			levelObj = configJson["level_properties_default"];
 			if (levelObj.is_null()) {
-				debugf(TEXT("No '_default_level' properties were found in RTX level properties."));
+				debugf(NAME_D3D9DrvRTX, TEXT("No 'level_properties_default' was found."));
 				return;
 			}
 		}
 		if (!levelObj.is_object()) {
-			debugf(TEXT("Level '%s' properties value is not a json object!"), s2ws(levelName).c_str());
+			debugf(NAME_D3D9DrvRTX, TEXT("Level '%s' properties value is not a json object!"), s2ws(levelName).c_str());
 			return;
 		}
 		json& anchorsArr = levelObj["anchors"];
@@ -250,6 +276,33 @@ void loadLevelJson(const TCHAR* rawLevelName, RTXAnchors& anchors, RTXConfigVars
 		}
 	}
 	catch (const json::exception& e) {
-		debugf(TEXT("Error loading rtx level properties for level '%s': %s"), s2ws(levelName).c_str(), s2ws(e.what()).c_str());
+		debugf(NAME_D3D9DrvRTX, TEXT("Error loading level properties for level '%s': %s"), s2ws(levelName).c_str(), s2ws(e.what()).c_str());
 	}
+}
+
+std::unordered_set<std::wstring> getHashTexBlacklist() {
+	json configJson = loadConfigFile();
+	std::unordered_set<std::wstring> blacklist{};
+	if (configJson.is_null()) {
+		return blacklist;
+	}
+	try {
+		json& blacklistArray= configJson["hash_tex_blacklist"];
+		if (blacklistArray.is_null()) {
+			debugf(NAME_D3D9DrvRTX, TEXT("hash_tex_blacklist was not found in json config."));
+			return blacklist;
+		}
+		if (!blacklistArray.is_array()) {
+			debugf(NAME_D3D9DrvRTX, TEXT("hash_tex_blacklist json config was not an array type!"));
+			return blacklist;
+		}
+		for (const std::string& item : blacklistArray) {
+			dout << item.c_str() << std::endl;
+			blacklist.insert(s2ws(item));
+		}
+	}
+	catch (const json::exception& e) {
+		debugf(NAME_D3D9DrvRTX, TEXT("Error loading hash texture blacklist: %s"), s2ws(e.what()).c_str());
+	}
+	return blacklist;
 }

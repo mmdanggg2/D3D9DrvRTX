@@ -436,6 +436,7 @@
     <ClInclude Include="Inc\c_rbtree.h" />
     <ClInclude Include="Inc\D3D9Config.h" />
     <ClInclude Include="Inc\D3D9DebugUtils.h" />
+    <ClInclude Include="Inc\D3D9DrvRTX.h" />
     <ClInclude Include="Inc\D3D9Render.h" />
     <ClInclude Include="Inc\D3D9RenderDevice.h" />
     <ClInclude Include="Inc\RTXLevelProperties.h" />
@@ -448,10 +449,10 @@
   <ItemGroup>
     <None Include="Config\D3D9DrvRTX.ini" />
     <None Include="Config\D3D9DrvRTX.int" />
-    <None Include="Config\D3D9DrvRTX_level_properties.json" />
+    <None Include="Config\D3D9DrvRTX_config_example.json" />
     <None Include="Config\dxvk.conf" />
     <None Include="Config\rtx.conf" />
-    <None Include="Config\D3D9DrvRTX_level_properties_schema.json" />
+    <None Include="Config\D3D9DrvRTX_config_schema.json" />
     <None Include="README.md" />
     <None Include="scripts\BuildAll.py" />
     <None Include="scripts\ChangeLinks.bat" />
@@ -465,9 +466,6 @@
     <None Include="scripts\Unreal_226.bat" />
     <None Include="scripts\UT_436.bat" />
     <None Include="scripts\UT_469d.bat" />
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="Config\D3D9DrvRTX_hash_tex_blacklist.txt" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="NatvisFile.natvis" />

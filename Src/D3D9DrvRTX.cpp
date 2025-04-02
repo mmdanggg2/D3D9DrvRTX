@@ -10,13 +10,16 @@
 // For TCHAR def
 #include "Windows.h"
 
-#include "Core.h"
+#include "D3D9DrvRTX.h"
 
 /*-----------------------------------------------------------------------------
 	Unreal package implementation.
 -----------------------------------------------------------------------------*/
 
 IMPLEMENT_PACKAGE(D3D9DrvRTX);
+
+FName FNAME_D3D9DrvRTX(TEXT("D3D9DrvRTX"), FNAME_Intrinsic);
+EName NAME_D3D9DrvRTX = (EName)FNAME_D3D9DrvRTX.GetIndex();
 
 /*-----------------------------------------------------------------------------
 	The End.

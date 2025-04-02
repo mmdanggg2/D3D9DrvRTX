@@ -50,6 +50,8 @@ TODO:
 
 #include "D3D9RenderDevice.h"
 #include "vectorUtils.h"
+#include "RTXLevelProperties.h"
+#include "D3D9DrvRTX.h"
 
 #ifdef WIN32
 #include <mmsystem.h>
@@ -879,9 +881,9 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 		remixapi_ErrorCode remixErr = remixapi::bridge_initRemixApi(&remixInterface);
 		if (remixErr == REMIXAPI_ERROR_CODE_SUCCESS) {
 			remixInterfaceInitialized = true;
-			debugf(NAME_Init, TEXT("RTX Remix API initialized!"));
+			debugf(NAME_D3D9DrvRTX, TEXT("RTX Remix API initialized!"));
 		} else {
-			debugf(NAME_Init, TEXT("Failed to initialize RTX Remix API! Error: %d"), remixErr);
+			debugf(NAME_D3D9DrvRTX, TEXT("Failed to initialize RTX Remix API! Error: %d"), remixErr);
 		}
 	}
 
@@ -1367,21 +1369,7 @@ UBOOL UD3D9RenderDevice::Init(UViewport* InViewport, INT NewX, INT NewY, INT New
 	// Default to a state for drawing ui
 	endWorldDraw(nullptr);
 
-	std::wstring fileName = L"D3D9DrvRTX_hash_tex_blacklist.txt";
-	std::wifstream file(fileName);
-
-	if (file.is_open()) {
-		std::wstring line;
-		while (std::getline(file, line)) {
-			if (!line.empty()) {
-				dout << line.c_str() << std::endl;
-				hashTexBlacklist.insert(line);
-			}
-		}
-		file.close();
-	} else {
-		debugf(TEXT("Unable to open hash texture blacklist '%s'!"), fileName.c_str());
-	}
+	hashTexBlacklist = getHashTexBlacklist();
 
 	return 1;
 	unguard;
@@ -3550,7 +3538,7 @@ std::unordered_set<int> UD3D9RenderDevice::LightSlots::updateActors(const std::v
 			if (availableSlots.empty()) {
 				static std::set<size_t> loggedLightOversizes;
 				if (loggedLightOversizes.insert(actors.size()).second) {
-					debugf(NAME_Warning, TEXT("No light slots left! Needed %d lights"), actors.size());
+					debugf(NAME_D3D9DrvRTX, TEXT("No light slots left! Needed %d lights"), actors.size());
 					dout << "No light slots left! Needed " << actors.size() << " lights" << std::endl;
 				}
 				break;
@@ -4339,7 +4327,7 @@ bool UD3D9RenderDevice::shouldGenHashTexture(const FTextureInfo& tex) {
 
 void UD3D9RenderDevice::fillHashTexture(FTexConvertCtx convertContext, FTextureInfo& tex) {
 	const TCHAR* name = tex.Texture->GetPathName();
-	debugf(NAME_Dev, TEXT("Generating magic hash texture for '%s'"), name);
+	debugf(NAME_D3D9DrvRTX, TEXT("Generating magic hash texture for '%s'"), name);
 	const unsigned int nameLen = FString(name).Len();
 	uint8_t* pTex = (uint8_t*) convertContext.lockRect.pBits;
 	unsigned int nameIdx = 0;

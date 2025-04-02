@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 
 class RTXAnchor {
 protected:
@@ -72,4 +73,5 @@ public:
 typedef std::vector<std::unique_ptr<RTXAnchor>> RTXAnchors;
 typedef std::unordered_map<std::string, std::string> RTXConfigVars;
 
+std::unordered_set<std::wstring> getHashTexBlacklist();
 void loadLevelJson(const TCHAR* levelName, RTXAnchors& anchors, RTXConfigVars& remixConfigVaraibles);
