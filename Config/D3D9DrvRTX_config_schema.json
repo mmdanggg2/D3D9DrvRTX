@@ -34,10 +34,12 @@
         },
         "start_rot": {
           "$ref": "#/$defs/FVector",
+          "default": [0, 0, 0],
           "description": "The starting rotation of the anchor in degrees"
         },
         "rotation_rate": {
           "$ref": "#/$defs/FVector",
+          "default": [0, 0, 0],
           "description": "How much the anchor rotates in degrees per second"
         },
         "scale": {
