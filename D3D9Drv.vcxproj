@@ -447,6 +447,7 @@
     <ResourceCompile Include="D3D9DrvRTX.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Config\bridge.conf" />
     <None Include="Config\D3D9DrvRTX.ini" />
     <None Include="Config\D3D9DrvRTX.int" />
     <None Include="Config\D3D9DrvRTX_config_example.json" />

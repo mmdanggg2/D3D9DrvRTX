@@ -61,7 +61,7 @@ def build(version: str | None = None, x64: bool = False):
 
 def zip_build(build_name: str, version_path: Path, x64: bool = False):
 	# Set the files to include in the ZIP file
-	files_to_zip = [
+	files_to_zip: 'list[Path | tuple[Path, str]]' = [
 		VS_PROJECT_PATH / "install" / ("System64" if x64 else "System") / "D3D9DrvRTX.dll",
 		VS_PROJECT_PATH / "Config" / "D3D9DrvRTX.ini",
 		VS_PROJECT_PATH / "Config" / "D3D9DrvRTX.int",
@@ -71,13 +71,20 @@ def zip_build(build_name: str, version_path: Path, x64: bool = False):
 		VS_PROJECT_PATH / "Config" / "rtx.conf",
 		VS_PROJECT_PATH / "README.md",
 	]
+	if not x64:
+		files_to_zip.append((VS_PROJECT_PATH / "Config" / "bridge.conf", ".trex/bridge.conf"))
 	
 	# Create the ZIP file
 	zip_file_path = version_path / f"{build_name}.zip"
-	with zipfile.ZipFile(zip_file_path, "w") as zip_file:
-		for file_path in files_to_zip:
-			zip_file.write(file_path, arcname=file_path.name, compress_type=zipfile.ZIP_DEFLATED)
-
+	with zipfile.ZipFile(zip_file_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zip_file:
+		for file in files_to_zip:
+			if isinstance(file, tuple):
+				file_path, arc_path = file
+			else:
+				file_path, arc_path = (file, file.name)
+			
+			zip_file.write(file_path, arcname=arc_path)
+	
 	print(f"Zipped at: {zip_file_path}")
 
 parser = argparse.ArgumentParser()
