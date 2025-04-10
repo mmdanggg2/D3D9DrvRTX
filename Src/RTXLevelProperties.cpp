@@ -5,6 +5,9 @@
 #include "D3D9DebugUtils.h"
 #include "nlohmann/json.hpp"
 
+#define XXH_INLINE_ALL
+#include "xxhash.h"
+
 #include <cmath>
 #include <fstream>
 
@@ -12,6 +15,11 @@ using json = nlohmann::json;
 
 double floored_mod(double a, double b) {
 	return a - b * std::floor(a / b);
+}
+
+RTXAnchor::RTXAnchor(std::string name, FVector location, FVector startRot, FVector scale, FVector rotationRate)
+	: name(name), location(location), rotation(startRot), scale(scale), angularVelocity(rotationRate) {
+	hash = XXH32(name.c_str(), name.size(), 0);
 }
 
 void RTXAnchor::Tick(float deltaTime) {

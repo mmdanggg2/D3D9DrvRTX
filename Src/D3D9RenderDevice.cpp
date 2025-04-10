@@ -53,6 +53,9 @@ TODO:
 #include "RTXLevelProperties.h"
 #include "D3D9DrvRTX.h"
 
+#define XXH_INLINE_ALL
+#include "xxhash.h"
+
 #ifdef WIN32
 #include <mmsystem.h>
 #endif
@@ -3601,136 +3604,43 @@ void UD3D9RenderDevice::renderLights(FSceneNode* frame, std::vector<AActor*> lig
 }
 
 // Helper function to convert a hash to a float in the range [-1, 1]
-static inline float hashToFloat(size_t hash, size_t max_value) {
-	return (static_cast<float>(hash % (2 * max_value)) / static_cast<float>(max_value)) - 1.0f;
+static inline float hashToFloat(uint32_t hash, uint32_t max_value) {
+	return (static_cast<float>(hash) / static_cast<float>(max_value) * 2.0f) - 1.0f;
 }
 
-static FVector hashToNormalVector(size_t hash) {
-	size_t max_value = std::numeric_limits<size_t>::max();
+// Takes a 32-bit hash value and converts it into a random vector witin a unit cube
+static FVector hashToRandomVector(uint32_t hash) {
+	FVector vec;
+	vec.X = hashToFloat(hash & 0x7FF, 0x7FF); // Use the lower 11 bits
+	vec.Y = hashToFloat((hash >> 11) & 0x7FF, 0x7FF); // Use the next 11 bits
+	vec.Z = hashToFloat((hash >> 22) & 0x3FF, 0x3FF); // Use the remaining 10 bits
 
-	FVector norm;
-	norm.X = hashToFloat(hash & 0xFFF, max_value); // Use the lower 12 bits
-	norm.Y = hashToFloat((hash >> 12) & 0xFFF, max_value); // Use the next 12 bits
-	norm.Z = hashToFloat((hash >> 24) & 0xFF, max_value); // Use the remaining 8 bits
-
-	norm.Normalize();
-
-	return norm;
+	return vec;
 }
 
-void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* location) {
-#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
-	{
-		static int si;
-		dout << L"utd3d9r: renderSkyZoneAnchor = " << si++ << std::endl;
-	}
-#endif
-	guard(UD3D9RenderDevice::renderSkyZoneAnchor);
-	using namespace DirectX;
+// https://stackoverflow.com/a/57595105/5233018
+template <typename T, typename... Rest>
+void xxh32_combine(std::uint32_t& seed, const T& v, const Rest&... rest) {
+	uint32_t value_hash = XXH32(&v, sizeof(T), 0);
+	seed ^= value_hash + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	(xxh32_combine(seed, rest), ...);
+}
 
-	if (!EnableSkyBoxAnchors) {
-		return;
-	}
+static uint32_t xxh32_FVector(const FVector& t) {
+	uint32_t hash = 0;
+	xxh32_combine(hash, t.X, t.Y, t.Z);
+	return hash;
+}
 
+static uint32_t xxh32_FRotator(const FRotator& t) {
+	uint32_t hash = 0;
+	xxh32_combine(hash, t.Roll, t.Pitch, t.Yaw);
+	return hash;
+}
+
+void UD3D9RenderDevice::renderAnchor(const D3DMATRIX* matrix, UTexture* texture, const uint32_t hash1, const uint32_t hash2) {
 	EndBuffering();
-
-	XMMATRIX actorMatrix = XMMatrixIdentity();
-
-	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(location ? *location : zone->Location));
-	XMMATRIX matRot = XMMatrixInverse(nullptr, FRotToDXRotMat(zone->Rotation));
-	actorMatrix *= matRot;
-	actorMatrix *= matLoc;
-
-	D3DMATRIX d3dMatrix = ToD3DMATRIX(actorMatrix);
-	m_d3dDevice->SetTransform(D3DTS_WORLD, &d3dMatrix);
-
-	size_t locHash = std::hash<FVector>()(zone->Location);
-	size_t rotHash = std::hash<FRotator>()(zone->RotationRate);
-
-	UTexture* tex = zone->Level->DefaultTexture;
-	FTextureInfo texInfo;
-#if UNREAL_GOLD_OLDUNREAL
-	texInfo = *tex->GetTexture(-1, this);
-#else
-	tex->Lock(texInfo, 0.0, -1, this);
-#endif
-
-	FRenderVert v1{};
-	v1.pos = FVector(0, 0, 5) + hashToNormalVector(locHash);
-	v1.U = 0.5 * texInfo.USize;
-	v1.V = 1.0 * texInfo.VSize;
-	FRenderVert v2{};
-	v2.pos = FVector(5, 0, 0);
-	v2.U = 0.5 * texInfo.USize;
-	v2.V = 0.25 * texInfo.VSize;
-	FRenderVert v3{};
-	v3.pos = FVector(0, 5, 0) + hashToNormalVector(rotHash);
-	v3.U = 1.0 * texInfo.USize;
-	v3.V = 0.0 * texInfo.VSize;
-	FRenderVert v4{};
-	v4.pos = FVector(0, -5, 0);
-	v4.U = 0.0 * texInfo.USize;
-	v4.V = 0.0 * texInfo.VSize;
-
-	std::vector<FRenderVert> verts;
-	verts.push_back(v1);
-	verts.push_back(v2);
-	verts.push_back(v3);
-
-	verts.push_back(v1);
-	verts.push_back(v4);
-	verts.push_back(v2);
-
-	verts.push_back(v2);
-	verts.push_back(v4);
-	verts.push_back(v3);
-
-	DWORD polyFlags = PF_Occlude;
-
-	BufferTriangleSurfaceGeometry(verts);
-
-	//Initialize render passes state information
-	m_rpPassCount = 0;
-	m_rpTMUnits = TMUnits;
-	m_rpForceSingle = false;
-	m_rpMasked = ((polyFlags & PF_Masked) == 0) ? false : true;
-
-	AddRenderPass(&texInfo, polyFlags & ~PF_FlatShaded, 0.0f);
-
-	RenderPasses();
-
-#if !UNREAL_GOLD_OLDUNREAL
-	tex->Unlock(texInfo);
-#endif
-
-	unguard;
-}
-
-void UD3D9RenderDevice::renderRTXAnchor(const RTXAnchor& anchor, UTexture* texture) {
-#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
-	{
-		static int si;
-		dout << L"utd3d9r: renderSkyZoneAnchor = " << si++ << std::endl;
-	}
-#endif
-	guard(UD3D9RenderDevice::renderSkyZoneAnchor);
-	using namespace DirectX;
-
-	EndBuffering();
-
-	XMMATRIX actorMatrix = XMMatrixIdentity();
-
-	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(anchor.getLocation()));
-	XMMATRIX matRot = XMMatrixRotationRollPitchYawFromVector(FVecToDXVec(anchor.getRotation()));
-	XMMATRIX matScale = XMMatrixScalingFromVector(FVecToDXVec(anchor.getScale()));
-	actorMatrix *= matScale;
-	actorMatrix *= matRot;
-	actorMatrix *= matLoc;
-
-	D3DMATRIX d3dMatrix = ToD3DMATRIX(actorMatrix);
-	m_d3dDevice->SetTransform(D3DTS_WORLD, &d3dMatrix);
-
-	FVector hash_vector = hashToNormalVector(anchor.getHash());
+	m_d3dDevice->SetTransform(D3DTS_WORLD, matrix);
 
 	FTextureInfo texInfo;
 #if UNREAL_GOLD_OLDUNREAL
@@ -3740,21 +3650,25 @@ void UD3D9RenderDevice::renderRTXAnchor(const RTXAnchor& anchor, UTexture* textu
 #endif
 
 	FRenderVert v1{};
-	v1.pos = FVector(0, 0, 5) + hash_vector;
+	v1.pos = FVector(0, 0, 5);
 	v1.U = 0.5 * texInfo.USize;
-	v1.V = 1.0 * texInfo.VSize;
+	v1.V = 0.5 * texInfo.VSize;
 	FRenderVert v2{};
-	v2.pos = FVector(5, 0, 0);
-	v2.U = 0.5 * texInfo.USize;
-	v2.V = 0.25 * texInfo.VSize;
+	v2.pos = FVector(5, 0, 0) + hashToRandomVector(hash1);
+	v2.U = 1.0 * texInfo.USize;
+	v2.V = 1.0 * texInfo.VSize;
 	FRenderVert v3{};
-	v3.pos = FVector(0, 5, 0) - hash_vector;
-	v3.U = 1.0 * texInfo.USize;
-	v3.V = 0.0 * texInfo.VSize;
+	v3.pos = FVector(0, 5, 0);
+	v3.U = 0.0 * texInfo.USize;
+	v3.V = 1.0 * texInfo.VSize;
 	FRenderVert v4{};
-	v4.pos = FVector(0, -5, 0);
+	v4.pos = FVector(-5, 0, 0) + hashToRandomVector(hash2);
 	v4.U = 0.0 * texInfo.USize;
 	v4.V = 0.0 * texInfo.VSize;
+	FRenderVert v5{};
+	v5.pos = FVector(0, -5, 0);
+	v5.U = 1.0 * texInfo.USize;
+	v5.V = 0.0 * texInfo.VSize;
 
 	std::vector<FRenderVert> verts;
 	verts.push_back(v1);
@@ -3762,12 +3676,16 @@ void UD3D9RenderDevice::renderRTXAnchor(const RTXAnchor& anchor, UTexture* textu
 	verts.push_back(v3);
 
 	verts.push_back(v1);
-	verts.push_back(v4);
-	verts.push_back(v2);
-
-	verts.push_back(v2);
-	verts.push_back(v4);
 	verts.push_back(v3);
+	verts.push_back(v4);
+
+	verts.push_back(v1);
+	verts.push_back(v4);
+	verts.push_back(v5);
+
+	verts.push_back(v1);
+	verts.push_back(v5);
+	verts.push_back(v2);
 
 	DWORD polyFlags = PF_Occlude;
 
@@ -3786,6 +3704,65 @@ void UD3D9RenderDevice::renderRTXAnchor(const RTXAnchor& anchor, UTexture* textu
 #if !UNREAL_GOLD_OLDUNREAL
 	texture->Unlock(texInfo);
 #endif
+}
+
+void UD3D9RenderDevice::renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* location) {
+#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: renderSkyZoneAnchor = " << si++ << std::endl;
+	}
+#endif
+	guard(UD3D9RenderDevice::renderSkyZoneAnchor);
+	using namespace DirectX;
+
+	if (!EnableSkyBoxAnchors) {
+		return;
+	}
+
+	XMMATRIX actorMatrix = XMMatrixIdentity();
+
+	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(location ? *location : zone->Location));
+	XMMATRIX matRot = XMMatrixInverse(nullptr, FRotToDXRotMat(zone->Rotation));
+	actorMatrix *= matRot;
+	actorMatrix *= matLoc;
+
+	D3DMATRIX d3dMatrix = ToD3DMATRIX(actorMatrix);
+
+	uint32_t locHash = xxh32_FVector(zone->Location);
+	uint32_t rotHash = xxh32_FRotator(zone->RotationRate);
+
+	UTexture* tex = zone->Level->DefaultTexture;
+
+	renderAnchor(&d3dMatrix, tex, locHash, rotHash);
+
+	unguard;
+}
+
+void UD3D9RenderDevice::renderRTXAnchor(const RTXAnchor& anchor, UTexture* texture) {
+#ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
+	{
+		static int si;
+		dout << L"utd3d9r: renderRTXAnchor = " << si++ << std::endl;
+	}
+#endif
+	guard(UD3D9RenderDevice::renderSkyZoneAnchor);
+	using namespace DirectX;
+
+	XMMATRIX actorMatrix = XMMatrixIdentity();
+
+	XMMATRIX matLoc = XMMatrixTranslationFromVector(FVecToDXVec(anchor.getLocation()));
+	XMMATRIX matRot = XMMatrixRotationRollPitchYawFromVector(FVecToDXVec(anchor.getRotation()));
+	XMMATRIX matScale = XMMatrixScalingFromVector(FVecToDXVec(anchor.getScale()));
+	actorMatrix *= matScale;
+	actorMatrix *= matRot;
+	actorMatrix *= matLoc;
+
+	D3DMATRIX d3dMatrix = ToD3DMATRIX(actorMatrix);
+
+	uint32_t hash = anchor.getHash();
+
+	renderAnchor(&d3dMatrix, texture, hash, ~hash);
 
 	unguard;
 }

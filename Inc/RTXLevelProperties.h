@@ -11,17 +11,14 @@
 class RTXAnchor {
 protected:
 	std::string name;
-	size_t hash;
+	uint32_t hash;
 	FVector location;
 	FVector rotation;
 	FVector scale;
 	FVector angularVelocity;
 
 public:
-	RTXAnchor(std::string name, FVector location, FVector startRot, FVector scale, FVector rotationRate)
-		: name(name), location(location), rotation(startRot), scale(scale), angularVelocity(rotationRate) {
-		hash = std::hash<std::string>()(name);
-	}
+	RTXAnchor(std::string name, FVector location, FVector startRot, FVector scale, FVector rotationRate);
 
 	virtual void Tick(float deltaTime);
 
@@ -34,7 +31,7 @@ public:
 	const FVector& getScale() const {
 		return scale;
 	}
-	size_t getHash() const {
+	uint32_t getHash() const {
 		return hash;
 	}
 };

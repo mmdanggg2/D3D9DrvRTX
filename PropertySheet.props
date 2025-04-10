@@ -16,7 +16,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>Inc;$(UNREAL_SDK_DIR)\Core\Inc;$(UNREAL_SDK_DIR)\Render\Inc;$(UNREAL_SDK_DIR)\Engine\Inc;external\json\include;external\RemixAPI\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>Inc;$(UNREAL_SDK_DIR)\Core\Inc;$(UNREAL_SDK_DIR)\Render\Inc;$(UNREAL_SDK_DIR)\Engine\Inc;external\json\include;external\RemixAPI\include;external\xxHash;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup>

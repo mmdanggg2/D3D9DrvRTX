@@ -333,59 +333,6 @@ static inline DWORD getBasePolyFlags(AActor* actor) {
 	return basePolyFlags;
 }
 
-// https://stackoverflow.com/a/57595105/5233018
-template <typename T, typename... Rest>
-void hash_combine(std::size_t& seed, const T& v, const Rest&... rest) {
-	seed ^= std::hash<T>{}(v)+0x9e3779b9 + (seed << 6) + (seed >> 2);
-	(hash_combine(seed, rest), ...);
-}
-
-template<>
-struct std::hash<FVector> {
-	std::size_t operator()(const FVector& t) const {
-		std::size_t hash = 0;
-		hash_combine(hash, t.X, t.Y, t.Z);
-		return hash;
-	}
-};
-
-template<>
-struct std::hash<FRotator> {
-	std::size_t operator()(const FRotator& t) const {
-		std::size_t hash = 0;
-		hash_combine(hash, t.Roll, t.Pitch, t.Yaw);
-		return hash;
-	}
-};
-
-template<>
-struct std::hash<FTextureInfo> {
-	std::size_t operator()(const FTextureInfo& t) const {
-		std::size_t hash = 0;
-		hash_combine(
-			hash,
-			t.Texture,
-			t.LOD,
-			t.Mips[0],
-			t.NumMips,
-			t.Pan,
-			t.CacheID,
-			t.PaletteCacheID,
-			t.UClamp,
-			t.USize,
-			t.UScale,
-			t.VClamp,
-			t.VSize,
-			t.VScale
-		);
-		return hash;
-	}
-};
-
-bool inline operator==(const FTextureInfo& lhs, const FTextureInfo& rhs) {
-	return std::hash<FTextureInfo>()(lhs) == std::hash<FTextureInfo>()(rhs);
-}
-
 bool inline operator<(const FPlane& lhs, const FPlane& rhs) {
 	if (lhs.X != rhs.X) return lhs.X < rhs.X;
 	if (lhs.Y != rhs.Y) return lhs.Y < rhs.Y;
@@ -1297,6 +1244,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	// Updates and sends the given lights to dx
 	void renderLights(FSceneNode* frame, std::vector<AActor*> lightActors);
 	// Renders a magic shape for anchoring stuff to the sky box
+	void renderAnchor(const D3DMATRIX* matrix, UTexture* texture, const uint32_t hash1, const uint32_t hash2);
 	void renderSkyZoneAnchor(ASkyZoneInfo* zone, const FVector* location);
 	void renderRTXAnchor(const RTXAnchor& anchor, UTexture* texture);
 	// Given a set of verts and textures, render them with the actor matrix.
