@@ -4758,6 +4758,19 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 						(this->*pBind->pConvertBGRA7777)(Mip, Level);
 						unguard;
 					}
+#elif BROTHER_BEAR
+					switch (Info.Format) {
+					case TEXF_RGBA8:
+						guard(ConvertBGRA8); // Seems to be BGR not RGB ??
+						(this->*pBind->pConvertBGRA8)(Mip, Level);
+						unguard;
+						break;
+
+					default:
+						guard(ConvertBGRA7777);
+						(this->*pBind->pConvertBGRA7777)(Mip, Level);
+						unguard;
+					}
 #else
 					guard(ConvertBGRA7777);
 					(this->*pBind->pConvertBGRA7777)(Mip, Level);
@@ -4963,6 +4976,8 @@ void UD3D9RenderDevice::CacheTextureInfo(FCachedTexture *pBind, const FTextureIn
 	}
 #if UNREAL_TOURNAMENT_OLDUNREAL || UNREAL_GOLD_OLDUNREAL
 	else if (FIsPalettizedFormat(Info.Format)) {
+#elif BROTHER_BEAR
+	else if (Info.Format == TEXF_P8 && Info.Palette) {
 #else
 	else if (Info.Palette) {
 #endif
