@@ -12,6 +12,7 @@ This is a custom render device for the Unreal Engine, optimized for use with NVI
 - Rune (v107)
 - Harry Potter Philosopher's Stone
 - Harry Potter Chamber of Secrets
+- Brother Bear
 
 ## Requirements
 - One of the supported games

@@ -565,6 +565,14 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 		DrawParticleSystem(frame, &sprite);
 	}
 	else
+#if BROTHER_BEAR
+	if (actor->DrawType == DT_Emitter) {
+		d3d9Dev->setCompatMatrix(frame);
+		FDynamicSprite sprite(actor);
+		DrawActorSprite(frame, &sprite);
+	}
+	else
+#endif
 #endif
 #if UNREAL_GOLD_OLDUNREAL
 	if (actor->RealBasedActors) {
@@ -743,7 +751,7 @@ void UD3D9Render::ClipDecal(FSceneNode* frame, const FDecal* decal, const FBspSu
 
 void UD3D9Render::drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, RenderList& renderList, SpecialCoord& specialCoord) {
 #if !RUNE
-#if HARRY_POTTER_2
+#if HARRY_POTTER_2 || BROTHER_BEAR
 	if (specialCoord.exists) {
 		FCoords wsCoords = specialCoord.worldCoord;
 		wsCoords.YAxis = -wsCoords.YAxis;

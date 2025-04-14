@@ -56,6 +56,10 @@
 	#define UTGLR_VALID_BUILD_CONFIG 1
 	#define UTGLR_HP_ENGINE 1
 	#define UTGLR_HAS_DARK_LIGHT 1
+#elif defined(BROTHER_BEAR)
+	#define UTGLR_VALID_BUILD_CONFIG 1
+	#define UTGLR_HP_ENGINE 1
+	#define UTGLR_HAS_DARK_LIGHT 1
 #else
 	#define UTGLR_VALID_BUILD_CONFIG 0
 #endif

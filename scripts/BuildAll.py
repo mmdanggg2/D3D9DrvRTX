@@ -111,6 +111,7 @@ games_codes = [
 	"Rune",
 	"HP1",
 	"HP2",
+	"Brother_Bear",
 ]
 
 for game_code in games_codes:

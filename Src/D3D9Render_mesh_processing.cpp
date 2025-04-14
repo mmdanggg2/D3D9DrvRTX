@@ -126,9 +126,12 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 		FARPROC fnPtr = GetProcAddress(GetModuleHandle(L"Engine.dll"), "?MeshAdjust@USkeletalMesh@@ABE?AVFVector@@PBVAActor@@@Z");
 		typedef FVector(USkeletalMesh::* fnTyp)(const AActor*)const;
 		fnTyp* fn = reinterpret_cast<fnTyp*>(&fnPtr);
-		adjustLoc = (skMesh->* * fn)(actor);
+		adjustLoc = (skMesh->* (*fn))(actor);
 #if HARRY_POTTER_2
 		adjustLoc.Z += actor->SavedPrePivotZ;
+#endif
+#if BROTHER_BEAR
+		adjustLoc += FVector(actor->SavedPrePivotX, actor->SavedPrePivotY, actor->SavedPrePivotZ);
 #endif
 	}
 #else
@@ -162,11 +165,17 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 #if UTGLR_HP_ENGINE
 	bool origAlignBot = actor->bAlignBottom;
 	actor->bAlignBottom = false;
-#if HARRY_POTTER_2
+#if HARRY_POTTER_2 || BROTHER_BEAR
 	FLOAT origSavedPrePivotZ = actor->SavedPrePivotZ;
 	bool origAlignBotAlways = actor->bAlignBottomAlways;
 	actor->SavedPrePivotZ = 0.0f;
 	actor->bAlignBottomAlways = false;
+#endif
+#if BROTHER_BEAR
+	FLOAT origSavedPrePivotX = actor->SavedPrePivotX;
+	FLOAT origSavedPrePivotY = actor->SavedPrePivotY;
+	actor->SavedPrePivotX = 0.0f;
+	actor->SavedPrePivotY = 0.0f;
 #endif
 #endif
 
@@ -230,9 +239,13 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 	actor->DrawScale = origScale;
 #if UTGLR_HP_ENGINE
 	actor->bAlignBottom = origAlignBot;
-#if HARRY_POTTER_2
+#if HARRY_POTTER_2 || BROTHER_BEAR
 	actor->SavedPrePivotZ = origSavedPrePivotZ;
 	actor->bAlignBottomAlways = origAlignBotAlways;
+#endif
+#if BROTHER_BEAR
+	actor->SavedPrePivotX = origSavedPrePivotX;
+	actor->SavedPrePivotY = origSavedPrePivotY;
 #endif
 #endif
 

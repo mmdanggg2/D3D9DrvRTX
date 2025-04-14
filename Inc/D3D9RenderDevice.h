@@ -946,6 +946,10 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	INT MaxVertices() override { return 0xFFFF; }
 	void DrawTriangles(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, USHORT* Indices, INT NumIdx, DWORD PolyFlags, FSpanBuffer* Span) override;
 #endif
+#if BROTHER_BEAR
+	void UpdateGamma() {};
+	void RestoreGamma() {};
+#endif
 
 	// Implementation.
 	void InitFrameRateLimitTimerSafe(void);
