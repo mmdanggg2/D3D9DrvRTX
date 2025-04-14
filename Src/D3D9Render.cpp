@@ -235,6 +235,8 @@ void UD3D9Render::onLevelChange(FSceneNode* frame) {
 
 void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	guard(UD3D9Render::DrawWorld);
+	//bool result = exportPackage(TEXT("Engine"));
+	//appErrorf(TEXT("EXIT %d"), result);
 	if (!GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
 #ifndef NDEBUG
 		dout << "Not using D3D9DrvRTX Device! " << GRenderDevice->GetName() << std::endl;

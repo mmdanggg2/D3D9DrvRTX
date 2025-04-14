@@ -39,6 +39,24 @@ std::basic_string<TCHAR> HexString(DWORD data, DWORD numBits) {
 	return strHexNum.str();
 }
 
+bool exportPackage(const FString& exportPackageName) {
+	// You should put what class headers you do have in /Package/Inc/*.h or classes will not have the #include statements
+	// Load in the Editor package, specifically ClassExporterH which ExportToFile will find and use to export .h files
+	UObject::StaticLoadClass(UExporter::StaticClass(), NULL, TEXT("Editor.ClassExporterH"), NULL, LOAD_NoFail, NULL);
+	// Grab the package to export
+	UObject* exportPackage = UObject::LoadPackage(NULL, *exportPackageName, LOAD_NoFail);
+	for (TObjectIterator<UClass> classIter = TObjectIterator<UClass>(); classIter; ++classIter) {
+		UClass* cls = *classIter;
+		UObject* outer = cls->GetOuter();
+		if (outer != exportPackage) continue;  // Ignore if not the package we want
+		// Seems to be unavailable // if (!cls->ScriptText) continue;  // Ignore classes with no uc script.
+		if (!(cls->GetFlags() & RF_Native) || (cls->ClassFlags & CLASS_NoExport)) continue;  // Ignore if not native
+		cls->SetFlags(RF_TagExp);  // Set this as an object to export
+	}
+	FString exportPath = FString(TEXT("../")) + exportPackageName + TEXT("/Inc/") + exportPackageName + TEXT("Classes.h");
+	return UExporter::ExportToFile(UObject::StaticClass(), NULL, *exportPath, false, false);
+}
+
 const TCHAR* dereferenceFName(const FName& name) {
 	__try {
 		if (const_cast<FName&>(name).IsValid()) {

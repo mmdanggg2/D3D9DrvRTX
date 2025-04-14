@@ -23,3 +23,5 @@ public:
 extern ods_stream dout;
 
 std::basic_string<TCHAR> HexString(DWORD data, DWORD numBits = 4);
+
+bool exportPackage(const class FString& exportPackageName);
