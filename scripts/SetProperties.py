@@ -1,6 +1,7 @@
 from pathlib import Path
 import re
 import argparse
+import shutil
 
 parse = argparse.ArgumentParser()
 parse.add_argument("--debug-exe")
@@ -26,4 +27,8 @@ props = replace_tag("TreatWChar_tAsBuiltInType", "true" if args.wchar else "fals
 prop_path.write_text(props)
 
 sln_path = VS_PROJECT_PATH / "D3D9Drv.sln"
+# Poke the sln file, makes vs reload the config
 sln_path.touch(exist_ok=True)
+
+# Clear build so it doesn't try to use the old one
+shutil.rmtree(VS_PROJECT_PATH / "Build", ignore_errors=True)
