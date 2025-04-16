@@ -17,8 +17,20 @@ double floored_mod(double a, double b) {
 	return a - b * std::floor(a / b);
 }
 
-RTXAnchor::RTXAnchor(std::string name, FVector location, FVector startRot, FVector scale, FVector rotationRate)
-	: name(name), location(location), rotation(startRot), scale(scale), angularVelocity(rotationRate) {
+RTXAnchor::RTXAnchor(
+	std::string name,
+	FVector location,
+	FVector startRot,
+	FVector scale,
+	FVector rotationRate,
+	bool pausable
+) : name(name),
+	location(location),
+	rotation(startRot),
+	scale(scale),
+	angularVelocity(rotationRate),
+	pausable(pausable)
+{
 	hash = XXH32(name.c_str(), name.size(), 0);
 }
 
@@ -175,31 +187,34 @@ void loadAnchorsArray(json& anchorsArr, const std::string& levelName, RTXAnchors
 		bool anchorError = false;
 		std::string name;
 		GET_ANCHOR_MEMBER(name, name);
-		std::string animType{ "linear" };
-		GET_ANCHOR_MEMBER_OPTIONAL(anim_type, animType);
 		FVector startLoc;
 		GET_ANCHOR_MEMBER(start_loc, startLoc);
 		FVector startRot{};
 		GET_ANCHOR_MEMBER_OPTIONAL(start_rot, startRot);
 		FVector rotationRate{};
 		GET_ANCHOR_MEMBER_OPTIONAL(rotation_rate, rotationRate);
+		bool pausable{ true };
+		GET_ANCHOR_MEMBER_OPTIONAL(pausable, pausable);
 		FVector scale{ 1, 1, 1 };
 		GET_ANCHOR_MEMBER_OPTIONAL(scale, scale);
+		std::string animType{ "linear" };
+		GET_ANCHOR_MEMBER_OPTIONAL(anim_type, animType);
+
 		if (animType == "static") {
 			if (anchorError) continue;
-			anchors.push_back(std::make_unique<RTXAnchor>(name, startLoc, startRot, scale, rotationRate));
+			anchors.push_back(std::make_unique<RTXAnchor>(name, startLoc, startRot, scale, rotationRate, pausable));
 		}
 		else if (animType == "linear" || animType == "ping-pong") {
 			FVector endLoc;
 			GET_ANCHOR_MEMBER(end_loc, endLoc);
-			float speed = 0.0f;
+			float speed{ 0.0f };
 			GET_ANCHOR_MEMBER(speed, speed);
 			if (anchorError) continue;
 			if (animType == "ping-pong") {
-				anchors.push_back(std::make_unique<RTXAnchorPingPong>(name, startLoc, startRot, scale, rotationRate, endLoc, speed));
+				anchors.push_back(std::make_unique<RTXAnchorPingPong>(name, startLoc, startRot, scale, rotationRate, pausable, endLoc, speed));
 			}
 			else {
-				anchors.push_back(std::make_unique<RTXAnchorLinear>(name, startLoc, startRot, scale, rotationRate, endLoc, speed));
+				anchors.push_back(std::make_unique<RTXAnchorLinear>(name, startLoc, startRot, scale, rotationRate, pausable, endLoc, speed));
 			}
 		}
 		else {

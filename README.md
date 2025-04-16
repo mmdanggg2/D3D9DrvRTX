@@ -100,10 +100,11 @@ If the current level isn't found, the properties will fall back to the top-level
 		- `end_loc` (array[x, y, z]): The destination location for the anchor to move to
 		- `speed` (number): How fast the anchor will move from start to end in unreal units per second
 	
-	Optionally you can specify `start_rot`, `rotation_rate` or `scale`
+	Optionally you can specify `start_rot`, `rotation_rate`, `scale` or `pausable`
 	- `start_rot` (array[x, y, z]): The starting rotation of the anchor in degrees
 	- `rotation_rate` (array[x, y, z]): How much the anchor rotates in degrees per second
 	- `scale` (array[x, y, z]): What scale to apply to the anchor
+	- `pausable` (boolean): If set to false, the anchor will continue to animate when the game is paused
 	
 
 - ### RTX Configuration Variables

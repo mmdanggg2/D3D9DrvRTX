@@ -42,6 +42,11 @@
           "default": [0, 0, 0],
           "description": "How much the anchor rotates in degrees per second"
         },
+        "pausable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Determines if this anchor will become paused/frozen when the game is paused"
+        },
         "scale": {
           "$ref": "#/$defs/FVector",
           "default": [1, 1, 1],

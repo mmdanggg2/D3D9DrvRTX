@@ -16,9 +16,17 @@ protected:
 	FVector rotation;
 	FVector scale;
 	FVector angularVelocity;
+	bool pausable;
 
 public:
-	RTXAnchor(std::string name, FVector location, FVector startRot, FVector scale, FVector rotationRate);
+	RTXAnchor(
+		std::string name,
+		FVector location,
+		FVector startRot,
+		FVector scale,
+		FVector rotationRate,
+		bool pausable
+	);
 
 	virtual void Tick(float deltaTime);
 
@@ -34,6 +42,9 @@ public:
 	uint32_t getHash() const {
 		return hash;
 	}
+	bool isPausable() const {
+		return pausable;
+	}
 };
 
 class RTXAnchorLinear : public RTXAnchor {
@@ -44,8 +55,23 @@ protected:
 	float speed;
 	float pathLocation = 0;
 public:
-	RTXAnchorLinear(std::string name, FVector startLoc, FVector startRot, FVector scale, FVector rotationRate, FVector endLoc, float speed)
-		: RTXAnchor(name, startLoc, startRot, scale, rotationRate), pathStart(startLoc), pathDirection(endLoc - startLoc), speed(speed) {
+	RTXAnchorLinear(
+		std::string name,
+		FVector startLoc,
+		FVector startRot,
+		FVector scale,
+		FVector rotationRate,
+		bool pausable,
+		FVector endLoc,
+		float speed
+	) : RTXAnchor(
+		name,
+		startLoc,
+		startRot,
+		scale,
+		rotationRate,
+		pausable
+	), pathStart(startLoc), pathDirection(endLoc - startLoc), speed(speed) {
 		pathLength = pathDirection.Size();
 		pathDirection.Normalize();
 	}
@@ -59,8 +85,25 @@ protected:
 	float pathLengthReal;
 
 public:
-	RTXAnchorPingPong(std::string name, FVector startLoc, FVector startRot, FVector scale, FVector rotationRate, FVector endLoc, float speed) 
-		: RTXAnchorLinear(name, startLoc, startRot, scale, rotationRate, endLoc, speed), pathLengthReal(pathLength){
+	RTXAnchorPingPong(
+		std::string name,
+		FVector startLoc,
+		FVector startRot,
+		FVector scale,
+		FVector rotationRate,
+		bool pausable,
+		FVector endLoc,
+		float speed
+	) : RTXAnchorLinear(
+		name,
+		startLoc,
+		startRot,
+		scale,
+		rotationRate,
+		pausable,
+		endLoc,
+		speed
+	), pathLengthReal(pathLength){
 		pathLength = pathLength * 2;
 	}
 

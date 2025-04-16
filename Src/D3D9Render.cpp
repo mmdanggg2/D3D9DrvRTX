@@ -364,7 +364,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	FLOAT deltaTime = frame->Level->TimeSeconds - currentLevelData.lastLevelTime;
 	currentLevelData.lastLevelTime = frame->Level->TimeSeconds;
 	for (std::unique_ptr<RTXAnchor>& anchor : currentLevelData.anchors) {
-		anchor->Tick(deltaTime);
+		if (!anchor->isPausable() || frame->Level->GetLevelInfo()->Pauser == TEXT("")) {
+			anchor->Tick(deltaTime);
+		}
 		d3d9Dev->renderRTXAnchor(*anchor, viewport->Actor->Level->DefaultTexture);
 	}
 
