@@ -463,7 +463,7 @@
     <None Include="scripts\LibGen.py" />
     <None Include="scripts\Nerf.bat" />
     <None Include="scripts\Rune.bat" />
-    <None Include="scripts\SetDebug.py" />
+    <None Include="scripts\SetProperties.py" />
     <None Include="scripts\Unreal_226.bat" />
     <None Include="scripts\UT_436.bat" />
     <None Include="scripts\UT_469d.bat" />

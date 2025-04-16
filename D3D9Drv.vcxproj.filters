@@ -94,7 +94,7 @@
     <None Include="scripts\Rune.bat">
       <Filter>Scripts</Filter>
     </None>
-    <None Include="scripts\SetDebug.py">
+    <None Include="scripts\SetProperties.py">
       <Filter>Scripts</Filter>
     </None>
     <None Include="scripts\Unreal_226.bat">
