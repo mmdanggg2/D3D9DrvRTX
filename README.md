@@ -25,7 +25,7 @@ This is a custom render device for the Unreal Engine, optimized for use with NVI
 3. Extract the files into the `System` folder. (the RTX Remix `d3d9.dll` and `.trex` should be here too)
 4. Configure the game to use the `Direct3D 9 RTX Optimised` render device in the menus.
 	
-	Or update the game's .ini configuration file (eg. `UnrealTournament.ini`)  by changing these lines under the `[Engine.Engine]` section:
+	Alternatively, or if there is not menu option, you can update the game's .ini configuration file (eg. `UnrealTournament.ini`) by changing these lines under the `[Engine.Engine]` section:
 	
 	```ini
 	[Engine.Engine]
@@ -34,10 +34,10 @@ This is a custom render device for the Unreal Engine, optimized for use with NVI
 	Render=D3D9DrvRTX.D3D9Render
 	```
 
-## Harry Potter 1/2 installation
-For the Harry Potter games, the .ini files are located in the documents folder and they must be manually edited as described above because there is no render device selection menu.
-- `%USERPROFILE%\Documents\Harry Potter\HP.ini` for Philosophers Stone
-- `%USERPROFILE%\Documents\Harry Potter II\Game.ini` for Chamber of Secrets
+	For some games, the .ini files are located in other directories
+	- Harry Potter Philosopher's Stone - `%USERPROFILE%\Documents\Harry Potter\HP.ini`
+	- Harry Potter Chamber of Secrets - `%USERPROFILE%\Documents\Harry Potter II\Game.ini`
+	- [Brother Bear](https://www.pcgamingwiki.com/wiki/Brother_Bear#Game_data) - `%ProgramData%\Disney Interactive\Brother Bear\System\Game.ini`
 
 ## Unreal 227k_12 64 bit installation
 Unreal v227k_12 comes with a 64 bit version of the game that is within `System64`. Installation of D3D9DrvRTX is much the same except you need to extract the files from the `Unreal_227k_12-x64` zip into the `System64` directory.
@@ -111,7 +111,7 @@ If the current level isn't found, the properties will fall back to the top-level
 	
 	For these to work, you require the Remix API to be enabled on the Remix bridge. To enable this, set `exposeRemixApi = True` in the `.trex/bridge.conf` file. On x64 builds this is not necessary as there is no bridge and the API is always available.
 	
-	⚠️ Note that on remix-1.0.0, this will cause it to crash so you need to use a later version where this is fixed.
+	⚠️ Note that on remix-1.0.0, this will cause it to crash so you need to use a later version [where this is fixed](https://github.com/NVIDIAGameWorks/rtx-remix/issues/736).
 
 
 # Developer setup
