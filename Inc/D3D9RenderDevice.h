@@ -314,6 +314,16 @@ static inline UTexture* getTextureWithoutNext(UTexture* texture, FTime time, FLO
 	return renderTexture;
 }
 
+static inline UTexture* getTextureFromInfo(const FTextureInfo& texInfo) {
+#if KLINGON_HONOR_GUARD
+	INT texIndex = texInfo.CacheID >> 32;
+	UObject* cacheItem = UObject::GetIndexedObject(texIndex);
+	return Cast<UTexture>(cacheItem);
+#else
+	return texInfo.Texture;
+#endif
+}
+
 static inline DWORD getBasePolyFlags(AActor* actor) {
 	DWORD basePolyFlags = 0;
 	if (actor->Style == STY_Masked) {
@@ -894,7 +904,12 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	static const TCHAR* StaticConfigName() { return TEXT("D3D9DrvRTX"); }
 
 	// UObject interface.
+#if UTGLR_ALT_STATIC_CONSTRUCTOR
+	static void StaticConstructor(UClass* clazz);
+	void StaticConstructorReal();
+#else
 	void StaticConstructor();
+#endif
 
 	FString ExplainResult(HRESULT hResult);
 
@@ -915,7 +930,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void DrawComplexSurface(FSceneNode* Frame, FSurfaceInfo& Surface, FSurfaceFacet& Facet) override;
 	void DrawGouraudPolygon(FSceneNode* Frame, FTextureInfo& Info, FTransTexture** Pts, INT NumPts, DWORD PolyFlags, FSpanBuffer* Span) override;
 	void DrawTile(FSceneNode* Frame, FTextureInfo& Info, FLOAT X, FLOAT Y, FLOAT XL, FLOAT YL, FLOAT U, FLOAT V, FLOAT UL, FLOAT VL, FSpanBuffer* Span, FLOAT Z, FPlane Color, FPlane Fog, DWORD PolyFlags) override;
-	void Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2) override;
+	void Draw3DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2);
 	void Draw2DLine(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FVector P1, FVector P2) override;
 	void Draw2DPoint(FSceneNode* Frame, FPlane Color, DWORD LineFlags, FLOAT X1, FLOAT Y1, FLOAT X2, FLOAT Y2, FLOAT Z) override;
 	void ClearZ(FSceneNode* Frame) override;
@@ -929,8 +944,10 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 #endif
 	void EndFlash() override;
 
+#if !KLINGON_HONOR_GUARD
 	void SetSceneNode(FSceneNode* Frame) override;
 	void PrecacheTexture(FTextureInfo& Info, DWORD PolyFlags) override;
+#endif
 
 #if UNREAL_TOURNAMENT_OLDUNREAL
 	UBOOL SupportsTextureFormat(ETextureFormat Format) override;
@@ -986,7 +1003,7 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	inline QWORD calcCacheID(const FTextureInfo& info, DWORD polyFlags) {
 		QWORD cacheID = info.CacheID;
 		if ((cacheID & 0xFF) == CID_RenderTexture && (polyFlags & PF_Masked)) {
-			cacheID |= 1;
+			cacheID ^= 1;
 		}
 		return cacheID;
 	}

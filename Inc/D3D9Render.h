@@ -19,7 +19,11 @@ class UD3D9Render : public URender {
 
 	// UObject interface.
 	UD3D9Render();
+#if UTGLR_ALT_STATIC_CONSTRUCTOR
+	static void StaticConstructor(UClass* clazz);
+#else
 	void StaticConstructor();
+#endif
 	
 	// URenderBase interface
 	void DrawWorld(FSceneNode* Frame) override;
@@ -92,5 +96,8 @@ static_assert(sizeof(URender) == Rune_size);
 #elif UTGLR_HP_ENGINE
 constexpr int HP1_size = 280;
 static_assert(sizeof(URender) == HP1_size);
+#elif KLINGON_HONOR_GUARD
+constexpr int KHG_size = 184;
+static_assert(sizeof(URender) == KHG_size);
 #endif
 static_assert(sizeof(UD3D9Render) == sizeof(URender));

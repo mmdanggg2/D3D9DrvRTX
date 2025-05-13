@@ -184,6 +184,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 	FVector* samples;
 	bool isLod;
 
+#if !UTGLR_NO_LODMESH
 	if (mesh->IsA(ULodMesh::StaticClass())) {
 		isLod = true;
 		ULodMesh* meshLod = (ULodMesh*)mesh;
@@ -225,7 +226,9 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 			specialCoord->exists = true;
 		}
 	}
-	else {
+	else
+#endif  // UTGLR_NO_LODMESH
+	{
 		isLod = false;
 		numVerts = mesh->FrameVerts;
 		samples = New<FVector>(GMem, numVerts);
@@ -265,12 +268,14 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 #endif
 		for (INT i = 0; i < numVerts; i++) {
 			FVector& sample = samples[i];
+#if !KLINGON_HONOR_GUARD
 			if (actor->bRandomFrame) {
 				tex = actor->MultiSkins[appCeil((&sample - samples) / 3.f) % 8];
 				if (tex) {
 					tex = getTextureWithoutNext(tex, currentTime, actor->LifeFraction());
 				}
 			}
+#endif
 			if (tex) {
 
 				// Transform the local-space point into world-space
@@ -281,11 +286,13 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 				FTextureInfo texInfo;
 #if UNREAL_GOLD_OLDUNREAL
 				texInfo = *tex->GetTexture(-1, this);
+#elif KLINGON_HONOR_GUARD
+				tex->GetInfo(texInfo, currentTime);
 #else
 				tex->Lock(texInfo, currentTime, -1, this);
 #endif
 				renderSpriteGeo(frame, point, actor->DrawScale, texInfo, baseFlags, color);
-#if !UNREAL_GOLD_OLDUNREAL
+#if !UTGLR_NO_TEXTURE_UNLOCK
 				tex->Unlock(texInfo);
 #endif
 			}
@@ -335,6 +342,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 	// Already zeroed on new
 	for (int i = 0; i < numTris; i++) {
 		int sampleIdx[3];
+#if !UTGLR_NO_LODMESH
 		if (isLod) {
 			ULodMesh* meshLod = (ULodMesh*)mesh;
 			FMeshFace& face = meshLod->Faces(i);
@@ -343,7 +351,9 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 				sampleIdx[j] = wedge.iVertex;
 			}
 		}
-		else {
+		else
+#endif  // UTGLR_NO_LODMESH
+		{
 			FMeshTri& tri = mesh->Tris(i);
 			for (int j = 0; j < 3; j++) {
 				sampleIdx[j] = tri.iVertex[j];
@@ -380,6 +390,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 		DWORD polyFlags;
 		INT texIdx;
 		FMeshUV triUV[3];
+#if !UTGLR_NO_LODMESH
 		if (isLod) {
 			ULodMesh* meshLod = (ULodMesh*)mesh;
 			FMeshFace& face = meshLod->Faces(i);
@@ -392,7 +403,9 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 			texIdx = mat.TextureIndex;
 			polyFlags = mat.PolyFlags;
 		}
-		else {
+		else
+#endif  // UTGLR_NO_LODMESH
+		{
 			FMeshTri& tri = mesh->Tris(i);
 			for (int j = 0; j < 3; j++) {
 				sampleIdx[j] = tri.iVertex[j];

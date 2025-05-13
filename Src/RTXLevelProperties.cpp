@@ -258,7 +258,7 @@ json loadConfigFile() {
 	}
 }
 
-void loadLevelJson(const TCHAR* rawLevelName, RTXAnchors& anchors, RTXConfigVars& remixConfigVariables) {
+void loadLevelJson(const UNICHAR* rawLevelName, RTXAnchors& anchors, RTXConfigVars& remixConfigVariables) {
 	std::string levelName = normalize_level_name(ws2s(rawLevelName));
 	json configJson = loadConfigFile();
 	if (configJson.is_null()) {

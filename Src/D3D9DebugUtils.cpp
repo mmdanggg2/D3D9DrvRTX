@@ -8,12 +8,12 @@ ods_buf::~ods_buf() {
 int ods_buf::sync() {
 #ifdef WIN32
 	//Output the string
-	OutputDebugStringW(str().c_str());
+	OutputDebugString(str().c_str());
 #else
 	//Add non-win32 debug output code here
 #endif
 
-		//Clear the buffer
+	//Clear the buffer
 	str(std::basic_string<TCHAR>());
 
 	return 0;
@@ -39,6 +39,7 @@ std::basic_string<TCHAR> HexString(DWORD data, DWORD numBits) {
 	return strHexNum.str();
 }
 
+#if UTGLR_ENABLE_CLASS_EXPORT
 bool exportPackage(const FString& exportPackageName) {
 	// You should put what class headers you do have in /Package/Inc/*.h or classes will not have the #include statements
 	// Load in the Editor package, specifically ClassExporterH which ExportToFile will find and use to export .h files
@@ -56,6 +57,7 @@ bool exportPackage(const FString& exportPackageName) {
 	FString exportPath = FString(TEXT("../")) + exportPackageName + TEXT("/Inc/") + exportPackageName + TEXT("Classes.h");
 	return UExporter::ExportToFile(UObject::StaticClass(), NULL, *exportPath, false, false);
 }
+#endif
 
 const TCHAR* dereferenceFName(const FName& name) {
 	__try {

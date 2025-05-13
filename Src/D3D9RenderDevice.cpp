@@ -228,7 +228,15 @@ static void SC_AddFloatConfigParam(const TCHAR* pName, FLOAT& param, ECppPropert
 	new(UD3D9RenderDevice::StaticClass(), pName, RF_Public)UFloatProperty(EC_CppProperty, InOffset, TEXT("Options"), CPF_Config);
 }
 
+#if UTGLR_ALT_STATIC_CONSTRUCTOR
+void UD3D9RenderDevice::StaticConstructor(UClass* clazz) {
+	reinterpret_cast<UD3D9RenderDevice*>(clazz->GetDefaultObject())->StaticConstructorReal();
+}
+
+void UD3D9RenderDevice::StaticConstructorReal() {
+#else
 void UD3D9RenderDevice::StaticConstructor() {
+#endif
 	unsigned int u;
 
 	guard(UD3D9RenderDevice::StaticConstructor);
@@ -257,6 +265,8 @@ void UD3D9RenderDevice::StaticConstructor() {
 			GConfig->SetString(TEXT("Engine.Engine"), TEXT("Render"), TEXT("D3D9DrvRTX.D3D9Render"));
 #if UNREAL_GOLD_OLDUNREAL
 			appRequestExit(0, TEXT("Exiting after Render config change"));
+#elif KLINGON_HONOR_GUARD
+			appRequestExit();
 #else
 			appRequestExit(0);
 #endif
@@ -298,7 +308,7 @@ void UD3D9RenderDevice::StaticConstructor() {
 	SC_AddBoolConfigParam(3, TEXT("NonSolidTranslucentHack"), CPP_PROPERTY_LOCAL(NonSolidTranslucentHack), 1);
 	SC_AddBoolConfigParam(2, TEXT("EnableSkyBoxRendering"), CPP_PROPERTY_LOCAL(EnableSkyBoxRendering), 1);
 	SC_AddBoolConfigParam(1, TEXT("EnableSkyBoxAnchors"), CPP_PROPERTY_LOCAL(EnableSkyBoxAnchors), 0);
-	SC_AddBoolConfigParam(0, TEXT("EnableHashTextures"), CPP_PROPERTY_LOCAL(EnableHashTextures), 1);
+	SC_AddBoolConfigParam(0, TEXT("EnableHashTextures"), CPP_PROPERTY_LOCAL(EnableHashTextures), 0);
 	SC_AddFloatConfigParam(TEXT("LightMultiplier"), CPP_PROPERTY_LOCAL(LightMultiplier), 4000.0f);
 	SC_AddFloatConfigParam(TEXT("LightRadiusDivisor"), CPP_PROPERTY_LOCAL(LightRadiusDivisor), 70.0f);
 	SC_AddFloatConfigParam(TEXT("LightRadiusExponent"), CPP_PROPERTY_LOCAL(LightRadiusExponent), 0.55f);
@@ -309,7 +319,7 @@ void UD3D9RenderDevice::StaticConstructor() {
 	if (!ColorStruct)
 		ColorStruct = new(UObject::StaticClass(), TEXT("Color")) UStruct(NULL);
 	ColorStruct->PropertiesSize = sizeof(FColor);
-	new(GetClass(), TEXT("SurfaceSelectionColor"), RF_Public)UStructProperty(CPP_PROPERTY(SurfaceSelectionColor), TEXT("Options"), CPF_Config, ColorStruct);
+	new(UD3D9RenderDevice::StaticClass(), TEXT("SurfaceSelectionColor"), RF_Public)UStructProperty(CPP_PROPERTY(SurfaceSelectionColor), TEXT("Options"), CPF_Config, ColorStruct);
 
 #undef CPP_PROPERTY_LOCAL
 
@@ -356,7 +366,7 @@ void UD3D9RenderDevice::StaticConstructor() {
 
 	HighDetailActors = true;
 
-#if !UNREAL_GOLD
+#if !UTGLR_NO_DESC_FLAGS
 	DescFlags |= RDDESCF_Certified;
 #endif
 
@@ -1354,7 +1364,6 @@ UBOOL UD3D9RenderDevice::Init(UViewport* InViewport, INT NewX, INT NewY, INT New
 
 	Viewport = InViewport;
 
-
 	//Remember main window handle and get its DC
 	m_hWnd = (HWND)InViewport->GetWindow();
 	check(m_hWnd);
@@ -1398,7 +1407,7 @@ UBOOL UD3D9RenderDevice::Exec(const TCHAR* Cmd, FOutputDevice& Ar) {
 		for (const FPlane& mode : Relevant) {
 			Str += FString::Printf(TEXT("%ix%i "), (INT)mode.X, (INT)mode.Y);
 		}
-		Ar.Log(*Str.LeftChop(1));
+		Ar.Log(*Str);
 		return 1;
 	}
 	else if (ParseCommand(&Cmd, TEXT("GetColorDepths")))
@@ -1584,6 +1593,7 @@ void UD3D9RenderDevice::Lock(FPlane InFlashScale, FPlane InFlashFog, FPlane Scre
 	unguard;
 }
 
+#if !KLINGON_HONOR_GUARD
 void UD3D9RenderDevice::SetSceneNode(FSceneNode* Frame) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
 {
@@ -1682,6 +1692,7 @@ void UD3D9RenderDevice::SetSceneNode(FSceneNode* Frame) {
 
 	unguard;
 }
+#endif
 
 void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 #ifdef UTGLR_DEBUG_SHOW_CALL_COUNTS
@@ -1768,7 +1779,11 @@ void UD3D9RenderDevice::Unlock(UBOOL Blit) {
 		rcpFrameRateLimit = 1.0f / FrameRateLimit;
 		if (timeDiff < rcpFrameRateLimit) {
 			float sleepTime = rcpFrameRateLimit - timeDiff;
+#if KLINGON_HONOR_GUARD
+			Sleep(sleepTime);
+#else
 			appSleep(sleepTime);
+#endif
 
 			m_prevFrameTimestamp = appSeconds();
 		}
@@ -3152,11 +3167,13 @@ void UD3D9RenderDevice::renderSprite(FSceneNode* frame, AActor* actor) {
 	FTextureInfo texInfo;
 #if UNREAL_GOLD_OLDUNREAL
 	texInfo = *renderTexture->GetTexture(-1, this);
+#elif KLINGON_HONOR_GUARD
+	renderTexture->GetInfo(texInfo, currTime);
 #else
 	renderTexture->Lock(texInfo, currTime, -1, this);
 #endif
 	renderSpriteGeo(frame, actor->Location + actor->PrePivot, drawScale, texInfo, getBasePolyFlags(actor), color);
-#if !UNREAL_GOLD_OLDUNREAL
+#if !UTGLR_NO_TEXTURE_UNLOCK
 	renderTexture->Unlock(texInfo);
 #endif
 	unguard;
@@ -3244,7 +3261,7 @@ void UD3D9RenderDevice::renderSpriteGeo(FSceneNode* frame, const FVector& locati
 	if (color.Y > 1.0) color.Y = 1.0;
 	if (color.Z > 1.0) color.Z = 1.0;
 
-	DWORD flags = basePolyFlags | PF_TwoSided | (texInfo.Texture->PolyFlags & PF_Masked);
+	DWORD flags = basePolyFlags | PF_TwoSided | (getTextureFromInfo(texInfo)->PolyFlags & PF_Masked);
 
 	// Modulated seems to need white vert colours
 	DWORD d3dColor = flags & PF_Modulated ? 0xFFFFFFFF : D3DCOLOR_COLORVALUE(color.X, color.Y, color.Z, 1.0f);
@@ -3308,13 +3325,17 @@ void UD3D9RenderDevice::renderSurfaceBuckets(const ActorRenderData& renderData, 
 		texInfoPtr = tex->GetTexture(-1, this);
 #else
 		FTextureInfo texInfo{};
+#if KLINGON_HONOR_GUARD
+		tex->GetInfo(texInfo, currentTime);
+#else
 		tex->Lock(texInfo, currentTime, -1, this);
+#endif
 		texInfoPtr = &texInfo;
 #endif
 
 		AddRenderPass(texInfoPtr, polyFlags & ~PF_FlatShaded, 0.0f);
 
-#if !UNREAL_GOLD_OLDUNREAL
+#if !UTGLR_NO_TEXTURE_UNLOCK
 		tex->Unlock(texInfo);
 #endif
 
@@ -3453,14 +3474,16 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 			texInfo = &textureInfos[tex];
 #if UNREAL_GOLD_OLDUNREAL
 			*texInfo = *tex->GetTexture(-1, this);
+#elif KLINGON_HONOR_GUARD
+			tex->GetInfo(*texInfo, viewport->CurrentTime);
 #else
-			tex->Lock(*texInfo, frame->Viewport->CurrentTime, -1, this);
+			tex->Lock(*texInfo, viewport->CurrentTime, -1, this);
 #endif
 		} else {
 			texInfo = &textureInfos[tex];
 		}
 
-		flags |= texInfo->Texture->PolyFlags;
+		flags |= tex->PolyFlags;
 		flags &= ~PF_FlatShaded;// Ignore this for poly matching, meaningless for rendering
 		polys[SurfKey(texInfo, flags)].push_back(poly);
 	}
@@ -3510,7 +3533,7 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 		RenderPasses();
 	}
 
-#if !UNREAL_GOLD_OLDUNREAL
+#if !UTGLR_NO_TEXTURE_UNLOCK
 	for (std::pair<UTexture* const, FTextureInfo>& entry : textureInfos) {
 		entry.first->Unlock(entry.second);
 	}
@@ -3645,6 +3668,8 @@ void UD3D9RenderDevice::renderAnchor(const D3DMATRIX* matrix, UTexture* texture,
 	FTextureInfo texInfo;
 #if UNREAL_GOLD_OLDUNREAL
 	texInfo = *texture->GetTexture(-1, this);
+#elif KLINGON_HONOR_GUARD
+	texture->GetInfo(texInfo, 0.0);
 #else
 	texture->Lock(texInfo, 0.0, -1, this);
 #endif
@@ -3701,7 +3726,7 @@ void UD3D9RenderDevice::renderAnchor(const D3DMATRIX* matrix, UTexture* texture,
 
 	RenderPasses();
 
-#if !UNREAL_GOLD_OLDUNREAL
+#if !UTGLR_NO_TEXTURE_UNLOCK
 	texture->Unlock(texInfo);
 #endif
 }
@@ -4100,11 +4125,13 @@ void UD3D9RenderDevice::EndFlash() {
 	unguard;
 }
 
+#if !KLINGON_HONOR_GUARD
 void UD3D9RenderDevice::PrecacheTexture(FTextureInfo& Info, DWORD PolyFlags) {
 	guard(UD3D9RenderDevice::PrecacheTexture);
 	SetTextureNoPanBias(0, Info, PolyFlags);
 	unguard;
 }
+#endif
 
 #if UNREAL_TOURNAMENT_OLDUNREAL
 UBOOL UD3D9RenderDevice::SupportsTextureFormat(ETextureFormat Format)
@@ -4291,19 +4318,19 @@ void UD3D9RenderDevice::SetNoTextureNoCheck(INT Multi) {
 	unguard;
 }
 
-bool UD3D9RenderDevice::shouldGenHashTexture(const FTextureInfo& tex) {
+bool UD3D9RenderDevice::shouldGenHashTexture(const FTextureInfo& texInfo) {
 	if (!EnableHashTextures) {
 		return false;
 	}
-	if (tex.bRealtime) {
-		std::wstring name(tex.Texture->GetPathName());
+	if (texInfo.bRealtime) {
+		std::wstring name(appToUnicode(getTextureFromInfo(texInfo)->GetPathName()));
 		return !hashTexBlacklist.count(name);
 	}
 	return false;
 }
 
-void UD3D9RenderDevice::fillHashTexture(FTexConvertCtx convertContext, FTextureInfo& tex) {
-	const TCHAR* name = tex.Texture->GetPathName();
+void UD3D9RenderDevice::fillHashTexture(FTexConvertCtx convertContext, FTextureInfo& texInfo) {
+	const TCHAR* name = getTextureFromInfo(texInfo)->GetPathName();
 	debugf(NAME_D3D9DrvRTX, TEXT("Generating magic hash texture for '%s'"), name);
 	const unsigned int nameLen = FString(name).Len();
 	uint8_t* pTex = (uint8_t*) convertContext.lockRect.pBits;
@@ -4582,9 +4609,11 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 		FColor paletteIndex0;
 
 		// Cleanup texture flags.
+#if !KLINGON_HONOR_GUARD
 		if (SupportsLazyTextures) {
 			Info.Load();
 		}
+#endif
 		Info.bRealtimeChanged = 0;
 
 		//Set palette index 0 to black for masked paletted textures
@@ -4807,9 +4836,11 @@ void UD3D9RenderDevice::SetTextureNoCheck(DWORD texNum, FTexInfo& Tex, FTextureI
 		}
 
 		// Cleanup.
+#if !KLINGON_HONOR_GUARD
 		if (SupportsLazyTextures) {
 			Info.Unload();
 		}
+#endif
 	}
 
 	//Set texture filter parameters
@@ -5118,7 +5149,9 @@ void UD3D9RenderDevice::ConvertP8_RGBA8888(const FMipmapBase *Mip, const FColor 
 			if (bZero || UOff >= Mip->USize)
 				pTex[j] = 0;
 			else {
-				DWORD dwColor = GET_COLOR_DWORD(Palette[Base[UOff]]);
+				BYTE& pIndex = Base[UOff];
+				DWORD dwColor = GET_COLOR_DWORD(Palette[pIndex]);
+				if (pIndex != 0) dwColor |= 0xFF000000; // Set alpha to 1
 				pTex[j] = (dwColor & 0xFF00FF00) | ((dwColor >> 16) & 0xFF) | ((dwColor << 16) & 0xFF0000);
 			}
 		} while ((j += ij_inc) < j_stop);
@@ -5150,7 +5183,9 @@ void UD3D9RenderDevice::ConvertP8_RGBA8888_NoStep(const FMipmapBase *Mip, const 
 			if (bZero || UOff >= Mip->USize)
 				pTex[j] = 0;
 			else {
-				DWORD dwColor = GET_COLOR_DWORD(Palette[Base[UOff]]);
+				BYTE& pIndex = Base[UOff];
+				DWORD dwColor = GET_COLOR_DWORD(Palette[pIndex]);
+				if (pIndex != 0) dwColor |= 0xFF000000; // Set alpha to 1
 				pTex[j] = (dwColor & 0xFF00FF00) | ((dwColor >> 16) & 0xFF) | ((dwColor << 16) & 0xFF0000);
 			}	
 		} while ((j += 1) < j_stop);

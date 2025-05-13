@@ -13,9 +13,15 @@ UD3D9Render::UD3D9Render() : URender() {
 	unguard;
 }
 
+#if UTGLR_ALT_STATIC_CONSTRUCTOR
+void UD3D9Render::StaticConstructor(UClass* clazz) {
+	guard(UD3D9Render::StaticConstructor);
+	URender::StaticConstructor(clazz);
+#else
 void UD3D9Render::StaticConstructor() {
 	guard(UD3D9Render::StaticConstructor);
 	URender::StaticConstructor();
+#endif
 	dout << "Static Constructing UD3D9Render!" << std::endl;
 #if UTGLR_HP_ENGINE
 	currentLevelData.facetsMem.Init(8192, TEXT("CacheLevelFacetMem"));
@@ -175,6 +181,7 @@ void UD3D9Render::SurfaceData::calculateSurfaceFacet(ULevel* level, const DWORD 
 	}
 }
 
+#if !UTGLR_NO_RENDERITERATOR
 static bool getRenderInterfaceActors(AActor* actor, FSceneNode* frame, std::vector<AActor*>& actorsFound) {
 	UClass*& iterClass = actor->RenderIteratorClass;
 	URenderIterator*& iface = actor->RenderInterface;
@@ -206,6 +213,7 @@ static bool getRenderInterfaceActors(AActor* actor, FSceneNode* frame, std::vect
 	}
 	return false;
 }
+#endif  // UTGLR_NO_RENDERITERATOR
 
 void UD3D9Render::onLevelChange(FSceneNode* frame) {
 	currentLevelData.currentLevel = frame->Level;
@@ -218,7 +226,7 @@ void UD3D9Render::onLevelChange(FSceneNode* frame) {
 	RTXConfigVars remixConfigVars;
 
 	loadLevelJson(
-		*frame->Level->URL.Map,
+		appToUnicode(*frame->Level->URL.Map),
 		currentLevelData.anchors,
 		remixConfigVars
 	);
@@ -235,35 +243,36 @@ void UD3D9Render::onLevelChange(FSceneNode* frame) {
 
 void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	guard(UD3D9Render::DrawWorld);
-	//bool result = exportPackage(TEXT("Engine"));
-	//appErrorf(TEXT("EXIT %d"), result);
-	if (!GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
+#if UTGLR_ENABLE_CLASS_EXPORT
+	bool result = exportPackage(TEXT("Engine"));
+	appErrorf(TEXT("EXIT %d"), result);
+#endif
+	const UViewport* viewport = frame->Viewport;
+	UD3D9RenderDevice* d3d9Dev = Cast<UD3D9RenderDevice>(viewport->RenDev);
+	if (!d3d9Dev) {
 #ifndef NDEBUG
-		dout << "Not using D3D9DrvRTX Device! " << GRenderDevice->GetName() << std::endl;
+		dout << "Not using D3D9DrvRTX Device! " << viewport->RenDev->GetName() << std::endl;
 #endif
 		Super::DrawWorld(frame);
 		return;
 	}
 #if UNREAL_TOURNAMENT && !UNREAL_TOURNAMENT_OLDUNREAL
-	else if (FString(GRenderDevice->GetName()).InStr(TEXT("RenderDeviceProxy")) == 0) {
+	else if (FString(viewport->RenDev->GetName()).InStr(TEXT("RenderDeviceProxy")) == 0) {
 		appErrorf(TEXT("D3D9DrvRTX for UT v436 is not compatible with v469.\nInstall D3D9DrvRTX for v469 instead!"));
 	}
 #endif
 
-	UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
-
 	FMemMark memMark(GMem);
-	//FMemMark sceneMark(GSceneMem);
-	//FMemMark dynMark(GDynMem);
 	FMemMark vectorMark(VectorMem);
 
 	//dout << "Starting frame" << std::endl;
 
+#if !KLINGON_HONOR_GUARD
 	if (Engine->Audio && !GIsEditor) {
 		Engine->Audio->RenderAudioGeometry(frame);
 	}
+#endif
 
-	const UViewport* viewport = frame->Viewport;
 	AActor* playerActor = NULL;
 	if (!viewport->Actor->bBehindView) {
 		playerActor = viewport->Actor->ViewTarget ? viewport->Actor->ViewTarget : viewport->Actor;
@@ -292,7 +301,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		isVisible &= GIsEditor ? !actor->bHiddenEd : !actor->bHidden;
 		bool isOwned = actor->IsOwnedBy(frame->Viewport->Actor);
 		isVisible &= !actor->bOnlyOwnerSee || (isOwned && !frame->Viewport->Actor->bBehindView);
+#if !KLINGON_HONOR_GUARD
 		isVisible &= !isOwned || !actor->bOwnerNoSee || (isOwned && frame->Viewport->Actor->bBehindView);
+#endif
 		if (isVisible) {
 			if (actor->IsA(AMover::StaticClass())) {
 				objs.movers.push_back((ABrush*)actor);
@@ -313,9 +324,11 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 				continue;
 			}
 #endif
+#if !UTGLR_NO_RENDERITERATOR
 			if (getRenderInterfaceActors(actor, frame, objs.actors)) {
 				continue;
 			}
+#endif  // UTGLR_NO_RENDERITERATOR
 			if (actor->DrawType == DT_Brush) {
 				continue;
 			}
@@ -329,7 +342,22 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	*currFrameMaxZ = -1.0f;
 #endif
 	// Seems to also update mover bsp nodes for colision decal calculations
+#if UTGLR_MAX_Y_RESOLUTION
+	{
+		FSceneNode resizedFrame(*frame);
+		if (resizedFrame.Y > UTGLR_MAX_Y_RESOLUTION) {
+			FLOAT ratio = resizedFrame.FX / resizedFrame.FY;
+			resizedFrame.Y = UTGLR_MAX_Y_RESOLUTION;
+			resizedFrame.X = ratio * resizedFrame.Y;
+			resizedFrame.ComputeRenderSize();
+		}
+		OccludeFrame(&resizedFrame);
+		std::copy(std::begin(resizedFrame.Draw), std::end(resizedFrame.Draw), frame->Draw);
+		frame->Sprite = resizedFrame.Sprite;
+	}
+#else
 	OccludeFrame(frame);
+#endif
 
 	if (currentLevelData.currentLevel != frame->Level) {
 		onLevelChange(frame);
@@ -364,7 +392,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	FLOAT deltaTime = frame->Level->TimeSeconds - currentLevelData.lastLevelTime;
 	currentLevelData.lastLevelTime = frame->Level->TimeSeconds;
 	for (std::unique_ptr<RTXAnchor>& anchor : currentLevelData.anchors) {
-		if (!anchor->isPausable() || frame->Level->GetLevelInfo()->Pauser == TEXT("")) {
+		if (!anchor->isPausable() || FString(frame->Level->GetLevelInfo()->Pauser) == TEXT("")) {
 			anchor->Tick(deltaTime);
 		}
 		d3d9Dev->renderRTXAnchor(*anchor, viewport->Actor->Level->DefaultTexture);
@@ -378,7 +406,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 
 	d3d9Dev->endWorldDraw(frame);
 
-#if !UNREAL_GOLD_OLDUNREAL
+#if !UTGLR_NO_TEXTURE_UNLOCK
 	for (std::pair<UTexture* const, FTextureInfo>& entry : lockedTextures) {
 		entry.first->Unlock(entry.second);
 	}
@@ -387,13 +415,22 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	// Render view model actor and extra HUD stuff
 	if (!GIsEditor && playerActor && (viewport->Actor->ShowFlags & SHOW_Actors)) {
 		GUglyHackFlags |= 1;
+#if KLINGON_HONOR_GUARD
+		APawn* playerActorPawn = Cast<APawn>(playerActor);
+		if (playerActorPawn && playerActorPawn->Weapon) {
+			playerActorPawn->Weapon->eventInvCalcView();
+			playerActorPawn->Weapon->bHidden = 0;
+			playerActorPawn->XLevel->SetActorZone(playerActorPawn->Weapon, 1, 0);
+			DrawActor(frame, playerActorPawn->Weapon);
+			playerActorPawn->Weapon->bHidden = 1;
+		}
+#else
 		playerActor->eventRenderOverlays(viewport->Canvas);
+#endif
 		GUglyHackFlags &= ~1;
 	}
 
 	memMark.Pop();
-	//dynMark.Pop();
-	//sceneMark.Pop();
 	vectorMark.Pop();
 	unguard;
 }
@@ -414,7 +451,9 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 		}
 	}
 	for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
+#if !UTGLR_NO_RENDERITERATOR
 		if (sprite->Actor->RenderIteratorClass) continue;
+#endif
 		if (!isSky) {
 			visibleZoneBits[sprite->Actor->Region.ZoneNumber] = true;
 		}
@@ -464,6 +503,8 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 					texInfo = &lockedTextures[texture];
 #if UNREAL_GOLD_OLDUNREAL
 					*texInfo = *texture->GetTexture(-1, d3d9Dev);
+#elif KLINGON_HONOR_GUARD
+					texture->GetInfo(*texInfo, frame->Viewport->CurrentTime);
 #else
 					texture->Lock(*texInfo, frame->Viewport->CurrentTime, -1, d3d9Dev);
 #endif
@@ -860,12 +901,12 @@ void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor, FDynamicSprite* Sp
 void UD3D9Render::DrawActor(FSceneNode* frame, AActor* actor) {
 #endif
 	guard(UD3D9Render::DrawActor);
-	if (!GRenderDevice->IsA(UD3D9RenderDevice::StaticClass())) {
+	UD3D9RenderDevice* d3d9Dev = Cast<UD3D9RenderDevice>(frame->Viewport->RenDev);
+	if (!d3d9Dev) {
 		Super::DrawActor(frame, actor);
 		return;
 	}
 	// dout << "Drawing actor! " << actor->GetName() << std::endl;
-	UD3D9RenderDevice* d3d9Dev = (UD3D9RenderDevice*)GRenderDevice;
 	// TODO: fix this muzzle flash schtuff
 	d3d9Dev->executeBufferedTileDraws();
 	d3d9Dev->startWorldDraw(frame);
