@@ -4,3 +4,4 @@
 *.props	eol=crlf
 *.bat	eol=crlf
 Config/D3D9DrvRTX.int	eol=crlf
+gamename.h	eol=crlf
