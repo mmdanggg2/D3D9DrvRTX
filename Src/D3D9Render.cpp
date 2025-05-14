@@ -226,7 +226,7 @@ void UD3D9Render::onLevelChange(FSceneNode* frame) {
 	RTXConfigVars remixConfigVars;
 
 	loadLevelJson(
-		appToUnicode(*frame->Level->URL.Map),
+		*frame->Level->URL.Map,
 		currentLevelData.anchors,
 		remixConfigVars
 	);

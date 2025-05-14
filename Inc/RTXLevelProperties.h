@@ -114,4 +114,4 @@ typedef std::vector<std::unique_ptr<RTXAnchor>> RTXAnchors;
 typedef std::unordered_map<std::string, std::string> RTXConfigVars;
 
 std::unordered_set<std::wstring> getHashTexBlacklist();
-void loadLevelJson(const UNICHAR* levelName, RTXAnchors& anchors, RTXConfigVars& remixConfigVaraibles);
+void loadLevelJson(const TCHAR* levelName, RTXAnchors& anchors, RTXConfigVars& remixConfigVaraibles);
