@@ -471,7 +471,11 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 	QWORD visibleZoneMask = visibleZoneBits.to_ullong();
 	while (visibleZoneMask) {
 		DWORD zone = std::countr_zero(visibleZoneMask);
+#if KLINGON_HONOR_GUARD
+		visibleZoneBits |= frame->Level->Model->Nodes->Zones[zone].Connectivity;
+#else
 		visibleZoneBits |= frame->Level->Model->Zones[zone].Connectivity;
+#endif
 		visibleZoneMask &= (visibleZoneMask - 1);
 	}
 
