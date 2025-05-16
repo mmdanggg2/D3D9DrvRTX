@@ -5151,7 +5151,9 @@ void UD3D9RenderDevice::ConvertP8_RGBA8888(const FMipmapBase *Mip, const FColor 
 			else {
 				BYTE& pIndex = Base[UOff];
 				DWORD dwColor = GET_COLOR_DWORD(Palette[pIndex]);
+#if !UTGLR_NO_PALETTE_ALPHA_FIX
 				if (pIndex != 0) dwColor |= 0xFF000000; // Set alpha to 1
+#endif
 				pTex[j] = (dwColor & 0xFF00FF00) | ((dwColor >> 16) & 0xFF) | ((dwColor << 16) & 0xFF0000);
 			}
 		} while ((j += ij_inc) < j_stop);
@@ -5185,7 +5187,9 @@ void UD3D9RenderDevice::ConvertP8_RGBA8888_NoStep(const FMipmapBase *Mip, const 
 			else {
 				BYTE& pIndex = Base[UOff];
 				DWORD dwColor = GET_COLOR_DWORD(Palette[pIndex]);
+#if !UTGLR_NO_PALETTE_ALPHA_FIX
 				if (pIndex != 0) dwColor |= 0xFF000000; // Set alpha to 1
+#endif
 				pTex[j] = (dwColor & 0xFF00FF00) | ((dwColor >> 16) & 0xFF) | ((dwColor << 16) & 0xFF0000);
 			}	
 		} while ((j += 1) < j_stop);
