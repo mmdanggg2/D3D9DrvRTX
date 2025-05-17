@@ -737,6 +737,14 @@ UBOOL UD3D9RenderDevice::SetRes(INT NewX, INT NewY, INT NewColorBytes, UBOOL Ful
 
 	debugf(TEXT("Enter D3D9::SetRes(%d, %d, %d, %d)"), NewX, NewY, NewColorBytes, Fullscreen);
 
+#if KLINGON_HONOR_GUARD
+	HWND curtainWin = FindWindow(NULL, TEXT("Curtain"));
+	if (curtainWin != NULL) {
+		SetWindowPos(curtainWin, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		SetWindowPos(curtainWin, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+	}
+#endif
+
 	//Save parameters in case need to reset device
 	m_SetRes_NewX = NewX;
 	m_SetRes_NewY = NewY;
