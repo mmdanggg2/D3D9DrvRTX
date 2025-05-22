@@ -13,6 +13,7 @@ This is a custom render device for the Unreal Engine, optimized for use with NVI
 - Harry Potter Philosopher's Stone
 - Harry Potter Chamber of Secrets
 - Brother Bear
+- Star Trek: The Next Generation - Klingon Honor Guard (v1.1)
 
 ## Requirements
 - One of the supported games
@@ -25,7 +26,7 @@ This is a custom render device for the Unreal Engine, optimized for use with NVI
 3. Extract the files into the `System` folder. (the RTX Remix `d3d9.dll` and `.trex` should be here too)
 4. Configure the game to use the `Direct3D 9 RTX Optimised` render device in the menus.
 	
-	Alternatively, or if there is not menu option, you can update the game's .ini configuration file (eg. `UnrealTournament.ini`) by changing these lines under the `[Engine.Engine]` section:
+	Alternatively, or if there is not a menu option, you can update the game's .ini configuration file (eg. `UnrealTournament.ini`) by changing these lines under the `[Engine.Engine]` section:
 	
 	```ini
 	[Engine.Engine]
@@ -35,8 +36,8 @@ This is a custom render device for the Unreal Engine, optimized for use with NVI
 	```
 
 	For some games, the .ini files are located in other directories
-	- Harry Potter Philosopher's Stone - `%USERPROFILE%\Documents\Harry Potter\HP.ini`
-	- Harry Potter Chamber of Secrets - `%USERPROFILE%\Documents\Harry Potter II\Game.ini`
+	- [Harry Potter Philosopher's Stone](https://www.pcgamingwiki.com/wiki/Harry_Potter_and_the_Philosopher%27s_Stone#Game_data) - `%USERPROFILE%\Documents\Harry Potter\HP.ini`
+	- [Harry Potter Chamber of Secrets](https://www.pcgamingwiki.com/wiki/Harry_Potter_and_the_Chamber_of_Secrets#Game_data) - `%USERPROFILE%\Documents\Harry Potter II\Game.ini`
 	- [Brother Bear](https://www.pcgamingwiki.com/wiki/Brother_Bear#Game_data) - `%ProgramData%\Disney Interactive\Brother Bear\System\Game.ini`
 
 ## Unreal 227k_12 64 bit installation
@@ -49,6 +50,9 @@ After installation, start the game, and it should now be using the RTX Remix opt
 
 # Settings
 Settings for the renderer are stored in `D3D9DrvRTX.ini`, they can be changed in this file and take effect after restarting the game.
+
+ℹ️ For Klingon Honor Guard, the settings are saved and loaded from the game's `khg.ini` file.
+
 You can also change the settings in game by running the `preferences` command in the console and navigating to `Rendering->Direct3D 9 RTX Optimised`
 
 The RTX specific options are listed here:
