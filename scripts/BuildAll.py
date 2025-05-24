@@ -74,6 +74,9 @@ def zip_build(build_name: str, version_path: Path, x64: bool = False):
 	if not x64:
 		files_to_zip.append((VS_PROJECT_PATH / "Config" / "bridge.conf", ".trex/bridge.conf"))
 	
+	if "Klingon_Honor_Guard" in build_name:
+		files_to_zip.remove(VS_PROJECT_PATH / "Config" / "D3D9DrvRTX.ini")
+	
 	# Create the ZIP file
 	zip_file_path = version_path / f"{build_name}.zip"
 	with zipfile.ZipFile(zip_file_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zip_file:
