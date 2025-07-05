@@ -24,4 +24,6 @@ extern ods_stream dout;
 
 std::basic_string<TCHAR> HexString(DWORD data, DWORD numBits = 4);
 
+#if UTGLR_ENABLE_CLASS_EXPORT
 bool exportPackage(const class FString& exportPackageName);
+#endif

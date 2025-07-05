@@ -3503,10 +3503,10 @@ void UD3D9RenderDevice::renderMover(FSceneNode* frame, ABrush* mover) {
 
 		bool append = false;
 		for (FPoly* poly : entry.second) {
-			FSavedPoly* sPoly = (FSavedPoly*)New<BYTE>(URender::VectorMem, sizeof(FSavedPoly) + poly->NumVertices * sizeof(FTransform*));
+			FSavedPoly* sPoly = (FSavedPoly*)New<BYTE>(GMem, sizeof(FSavedPoly) + poly->NumVertices * sizeof(FTransform*));
 			sPoly->NumPts = poly->NumVertices;
 			sPoly->Next = NULL;
-			FTransform* trans = New<FTransform>(URender::VectorMem, sPoly->NumPts);
+			FTransform* trans = New<FTransform>(GMem, sPoly->NumPts);
 			for (int i = 0; i < sPoly->NumPts; i++) {
 				int iDest = invertFaces ? (sPoly->NumPts - 1) - i : i;
 				trans[i].Point = poly->Vertex[i];
@@ -6131,7 +6131,13 @@ void UD3D9RenderDevice::startWorldDraw(FSceneNode* frame) {
 #else
 	float aspect = frame->FX / frame->FY;
 #endif
-	setProjection(aspect, frame->Viewport->Actor->FovAngle);
+	float fov = frame->Viewport->Actor->FovAngle;
+	if (XMScalarNearEqual(fov, 0.0f, 0.00001f * 2.0f)) {
+		// If fov calculation fails, default to 90
+		fov = 90;
+	}
+
+	setProjection(aspect, fov);
 
 	// Set viewport.
 	D3DVIEWPORT9 d3dViewport;

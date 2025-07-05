@@ -1,5 +1,6 @@
 #include "D3D9DebugUtils.h"
 #include "Core.h"
+#include "D3D9Config.h"
 
 ods_buf::~ods_buf() {
 	sync();

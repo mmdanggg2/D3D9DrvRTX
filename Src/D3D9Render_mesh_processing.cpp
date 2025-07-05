@@ -230,9 +230,15 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 #endif  // UTGLR_NO_LODMESH
 	{
 		isLod = false;
+#if UNDYING
+		numVerts = mesh->FrameVerts(actor);
+		samples = New<FVector>(GMem, numVerts);
+		mesh->GetFrame(samples, sizeof(samples[0]), GMath.UnitCoords, actor, frame);
+#else
 		numVerts = mesh->FrameVerts;
 		samples = New<FVector>(GMem, numVerts);
 		mesh->GetFrame(samples, sizeof(samples[0]), GMath.UnitCoords, actor);
+#endif
 		numTris = mesh->Tris.Num();
 	}
 
@@ -268,7 +274,7 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 #endif
 		for (INT i = 0; i < numVerts; i++) {
 			FVector& sample = samples[i];
-#if !KLINGON_HONOR_GUARD
+#if !KLINGON_HONOR_GUARD && !UNDYING
 			if (actor->bRandomFrame) {
 				tex = actor->MultiSkins[appCeil((&sample - samples) / 3.f) % 8];
 				if (tex) {

@@ -116,6 +116,7 @@ games_codes = [
 	"HP2",
 	"Brother_Bear",
 	"Klingon_Honor_Guard",
+	"Clive_Barkers_Undying",
 ]
 
 for game_code in games_codes:

@@ -25,6 +25,10 @@ void UD3D9Render::StaticConstructor() {
 	dout << "Static Constructing UD3D9Render!" << std::endl;
 #if UTGLR_HP_ENGINE
 	currentLevelData.facetsMem.Init(8192, TEXT("CacheLevelFacetMem"));
+#elif UNDYING
+	constexpr uint32_t memSize = 0x800000;
+	void* facetsMem = GMalloc->Malloc(memSize, TEXT("CacheLevelFacetMem"), 0);
+	currentLevelData.facetsMem.Init((BYTE*)facetsMem, memSize);
 #else
 	currentLevelData.facetsMem.Init(8192);
 #endif
@@ -263,7 +267,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 #endif
 
 	FMemMark memMark(GMem);
+#if !UTGLR_NO_VECTOR_MEM
 	FMemMark vectorMark(VectorMem);
+#endif
 
 	//dout << "Starting frame" << std::endl;
 
@@ -431,7 +437,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	}
 
 	memMark.Pop();
+#if !UTGLR_NO_VECTOR_MEM
 	vectorMark.Pop();
+#endif
 	unguard;
 }
 

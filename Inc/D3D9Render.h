@@ -1,7 +1,7 @@
 #pragma once
 
-#include "D3D9DebugUtils.h"
 #include "D3D9RenderDevice.h"
+#include "D3D9DebugUtils.h"
 #include "RTXLevelProperties.h"
 
 #include <Render.h>
@@ -99,5 +99,8 @@ static_assert(sizeof(URender) == HP1_size);
 #elif KLINGON_HONOR_GUARD
 constexpr int KHG_size = 184;
 static_assert(sizeof(URender) == KHG_size);
+#elif UNDYING
+constexpr int Undying_size = 244;
+static_assert(sizeof(URender) == Undying_size);
 #endif
 static_assert(sizeof(UD3D9Render) == sizeof(URender));
