@@ -303,13 +303,13 @@ def main(dll_file: str, class_name: str):
             if d.virtual:
                 decl += "virtual "
             decl += f"{d.ret} "
-            if d.decl:
+            if d.decl and d.decl != "__thiscall":
                 decl += f"{d.decl} "
-            if d.ns:
-                decl += f"{d.ns}::"
-            if d.clazz:
-                decl += f"{d.clazz}::"
-            decl += f"{d.name}({' '.join(d.params)})"
+            # if d.ns:
+            #     decl += f"{d.ns}::"
+            # if d.clazz:
+            #     decl += f"{d.clazz}::"
+            decl += f"{d.name}({', '.join(d.params)})"
             if d.const:
                 decl += f" const"
             print(f"    {decl};")
