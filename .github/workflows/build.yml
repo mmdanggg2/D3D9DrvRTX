@@ -77,6 +77,8 @@ jobs:
     - name: Build Solution
       run: |
         python scripts/BuildAll.py --version-extra ${{env.GITHUB_SHA_SHORT}}
+      env:
+        FORCE_COLOR: "1"
 
     # Upload build artifacts
     - name: Upload Build Artifacts
