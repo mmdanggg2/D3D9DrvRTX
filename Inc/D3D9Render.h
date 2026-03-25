@@ -103,5 +103,8 @@ static_assert(sizeof(URender) == KHG_size);
 #elif UNDYING
 constexpr int Undying_size = 244;
 static_assert(sizeof(URender) == Undying_size);
+#elif DS9_THE_FALLEN
+constexpr int DS9_size = 252;
+static_assert(sizeof(URender) == DS9_size);
 #endif
 static_assert(sizeof(UD3D9Render) == sizeof(URender));
