@@ -250,7 +250,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	guard(UD3D9Render::DrawWorld);
 #if UTGLR_ENABLE_CLASS_EXPORT
 	bool result = exportPackage(TEXT("Engine"));
-	appErrorf(TEXT("EXIT %d"), result);
+	appErrorf(TEXT("Export result = %d"), result);
 #endif
 	const UViewport* viewport = frame->Viewport;
 	UD3D9RenderDevice* d3d9Dev = Cast<UD3D9RenderDevice>(viewport->RenDev);
