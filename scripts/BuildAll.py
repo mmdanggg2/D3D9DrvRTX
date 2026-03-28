@@ -124,6 +124,7 @@ games_codes = [
 	"Brother_Bear",
 	"Klingon_Honor_Guard",
 	"Clive_Barkers_Undying",
+	"DS9_The_Fallen",
 ]
 
 for game_code in games_codes:
