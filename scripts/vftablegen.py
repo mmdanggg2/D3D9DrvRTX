@@ -169,16 +169,18 @@ class VFTableParser:
         
         return target_addr
     
-    def find_vftable(self, class_name: str) -> Address | None:
-        """Find the vftable for the given class name."""
-        vftable_symbol = f"??_7{class_name}@@6B@"
+    def find_all_vftables(self, class_name: str) -> list[Address]:
+        """Find all vftables for the given class name.
+        Returns a list of vftable addresses for classes with multiple base class pointers."""
+        vftables: list[Address] = []
         
-        # Look for exact match first
+        # Look for all vftable patterns matching this class
+        # ??_7ClassName@@6B* can find vftables for classes with multiple bases
         for va, export_name in self.exports.items():
-            if export_name == vftable_symbol:
-                return va
+            if export_name.startswith(f"??_7{class_name}@@6B"):
+                vftables.append(va)
         
-        return None
+        return vftables
     
     def read_vftable_entries(self, vftable_addr: Address, max_entries: int = 100) -> list[Address]:
         """Read function pointers from the vftable."""
@@ -220,11 +222,9 @@ class VFTableParser:
         """Analyze function at VA to determine return type and parameters.
         This is a simplified heuristic-based approach."""
 
-        if thunk_target := self._check_addr_for_thunks(func_addr):
-            func_addr = thunk_target
-        
         # Check if we have export information for this function
-        if func_name := (self.exports | self.imports).get(func_addr):
+        combined = self.exports | self.imports
+        if (func_name := combined.get(func_addr)) or ((thunk_target := self._check_addr_for_thunks(func_addr)) and (func_name := combined.get(thunk_target))):
             if func_name == "_purecall":
                 return FuncDefinition("void", f"Function_{func_addr.va:08X}_purecall")
             demangled = pydemangler.demangle(func_name)
@@ -237,16 +237,8 @@ class VFTableParser:
 
         return FuncDefinition("void", f"Function_{func_addr.va:08X}")
 
-    def generate_definitions(self, class_name: str) -> list[FuncDefinition]:
+    def generate_definitions(self, vftable_addr: Address) -> list[FuncDefinition]:
         """Generate C++ virtual function declarations for the given class."""
-        vftable_addr = self.find_vftable(class_name)
-        
-        if not vftable_addr:
-            print(f"Could not find vftable for class '{class_name}'")
-            return []
-        
-        print(f"Found vftable for {class_name} at: {vftable_addr}")
-        
         # Read vftable entries
         try:
             entries = self.read_vftable_entries(vftable_addr)
@@ -270,10 +262,10 @@ class VFTableParser:
                 param_str = ", ".join(func_def.params)
                 
                 # Generate declaration
-                declaration = f"\t{func_def.ret} {func_def.name}({param_str});"
+                declaration = f"{func_def.ret} {func_def.name}({param_str});"
                 definitions.append(func_def)
                 
-                print(f"  [{i:2d}]: {func_addr} -> {declaration}")
+                print(f"  [{i:2d}]: {func_addr} -> \t{declaration}")
                 
             except Exception as e:
                 print(f"  [{i:2d}]: {func_addr} -> Error: {e}")
@@ -289,9 +281,17 @@ def main(dll_file: str, class_name: str):
     except pefile.PEFormatError as e:
         raise RuntimeError(f"Error: '{dll_file}' is not a valid PE file") from e
     
-    definitions = parser.generate_definitions(class_name)
-    
-    if definitions:
+    vftable_addrs = parser.find_all_vftables(class_name)
+    for vftable_addr in vftable_addrs:
+        print(f"\n{'#'*70}")
+        print(f"# Found vftable for {class_name} at: {vftable_addr}")
+        print(f"{'#'*70}")
+        print("")
+        definitions = parser.generate_definitions(vftable_addr)
+        if not definitions:
+            print("No definitions generated!")
+            continue
+        
         print(f"\nGenerated C++ declarations for {class_name}:")
         print(f"// Virtual function table for {class_name}")
         last_vis = ""
@@ -313,7 +313,8 @@ def main(dll_file: str, class_name: str):
             if d.const:
                 decl += f" const"
             print(f"    {decl};")
-        print("\n")
+        print("")
+        
         print(f"// Virtual function table struct definition for {class_name}")
         print(f"struct {class_name}_vftable {{")
         for d in definitions:
@@ -321,8 +322,6 @@ def main(dll_file: str, class_name: str):
             param_str = ", ".join([this_param] + d.params)
             print(f"    {d.ret} ({d.decl or '__thiscall'} * {d.name})({param_str});")
         print("};")
-    else:
-        print("No definitions generated")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
