@@ -975,6 +975,13 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void UpdateGamma() {};
 	void RestoreGamma() {};
 #endif
+#if DS9_THE_FALLEN
+	virtual void SetFogActive(INT, INT) override {};
+	virtual int SetFogDistance(FLOAT, class FColor) override { return 0; };
+	virtual int SetBlendRatio(FLOAT) override { return 1; };
+	virtual int SetDepthBias(FLOAT) override { return 0; };
+	virtual int SetZBufferTest(enum EZBufferTest) override { return 0; };
+#endif
 
 	// Implementation.
 	void InitFrameRateLimitTimerSafe(void);
