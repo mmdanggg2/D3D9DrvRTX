@@ -303,6 +303,13 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 		if (actor->IsA(ASkyZoneInfo::StaticClass())) {
 			skyZones.push_back((ASkyZoneInfo*)actor);
 		}
+#if DS9_THE_FALLEN
+		if (frame->Level->iFirstDynamicActor < iActor) {
+			if (!actor->bDeleteMe && actor->Mesh && actor->Mesh->c3dMesh) {
+				C3DReinitialiseIfNecessary(actor);
+			}
+		}
+#endif
 		bool isVisible = true;
 		isVisible &= actor != playerActor;
 		isVisible &= GIsEditor ? !actor->bHiddenEd : !actor->bHidden;
@@ -640,6 +647,12 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 		DrawActorSpriteParticles(frame, &sprite);
 	}
 #endif // UNDYING
+#if DS9_THE_FALLEN
+	actor->C3DGetActorAnimState();
+	if (actor->bC3DCallPreRender) {
+		actor->eventC3DPreRender();
+	}
+#endif
 #if UNREAL_GOLD_OLDUNREAL
 	if (actor->RealBasedActors) {
 		if (actor->DrawType == DT_Mesh && actor->Mesh && actor->MeshInstance) {
