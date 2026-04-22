@@ -376,6 +376,53 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	OccludeFrame(frame);
 #endif
 
+#if DS9_THE_FALLEN
+	for (int i = frame->Level->iFirstDynamicActor; i < frame->Level->Actors.Num(); i++) {
+		AActor* dynActor = frame->Level->Actors(i);
+		if (dynActor && !dynActor->bDeleteMe) {
+			if (dynActor->Mesh && dynActor->Mesh->c3dMesh) {
+				UC3DMESHSTATE* meshState = dynActor->C3DOurMeshState;
+				if (meshState->stateTime < frame->Level->timeSeconds2) {
+					const INT stateCount = meshState->childStateCount;
+					if (stateCount) {
+						bool isUpToDate = false;
+						for (int k = 0; ; ++k) {
+							isUpToDate = k == stateCount;
+							if (k >= stateCount)
+								break;
+							C3DMeshStateThing& childStateContainer = meshState->childStateContainerPtr[k];
+							DWORD offsetStatePtr = (DWORD)childStateContainer.state;
+							UC3DMESHSTATE* childState = nullptr;
+							if (offsetStatePtr)
+								childState = (UC3DMESHSTATE*)(offsetStatePtr - 0x28);
+							AActor* childActor = childState->parent;
+							if (childActor) {
+								UC3DMESHSTATE* childActorState = childActor->C3DOurMeshState;
+								if (childActorState) {
+									if (childActorState->stateTime >= frame->Level->timeSeconds2) {
+										isUpToDate = k == stateCount;
+										break;
+									}
+								}
+							}
+						}
+						if (!isUpToDate) {
+							dynActor->C3DGetActorAnimState();
+							dynActor->LastRenderTime = frame->Level->TimeSeconds;
+						}
+					}
+				}
+			}
+			if (dynActor->bC3DCallPreRender) {
+				dynActor->eventC3DPreRender();
+			}
+			DOUBLE cycPerSec = dynActor->ScriptCycles * GSecondsPerCycle * 1000.0f;
+			dynActor->ScriptCycles = cycPerSec;
+			dynActor->AveScriptCycles = (dynActor->AveScriptCycles * 0.98) + (cycPerSec * 0.02);
+		}
+	}
+#endif
+
 	if (currentLevelData.currentLevel != frame->Level || currentLevelData.currentLevelName != frame->Level->URL.Map) {
 		onLevelChange(frame);
 	}
@@ -649,9 +696,7 @@ void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev,
 #endif // UNDYING
 #if DS9_THE_FALLEN
 	actor->C3DGetActorAnimState();
-	if (actor->bC3DCallPreRender) {
-		actor->eventC3DPreRender();
-	}
+	actor->LastRenderTime = frame->Level->TimeSeconds;
 #endif
 #if UNREAL_GOLD_OLDUNREAL
 	if (actor->RealBasedActors) {
