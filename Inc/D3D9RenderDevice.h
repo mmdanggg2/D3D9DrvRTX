@@ -947,6 +947,8 @@ class UD3D9RenderDevice : public RENDERDEVICE_SUPER {
 	void GetStats(TCHAR* Result) override;
 #if UNREAL_GOLD_OLDUNREAL
 	void ReadPixels(FColor* Pixels, UBOOL bGammaCorrectOutput) override;
+#elif DS9_THE_FALLEN
+	void ReadPixels(FColor* Pixels, INT ColorBits) override;
 #else
 	void ReadPixels(FColor* Pixels) override;
 #endif

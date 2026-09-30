@@ -3908,6 +3908,8 @@ void UD3D9RenderDevice::GetStats(TCHAR* Result) {
 
 #if UNREAL_GOLD_OLDUNREAL
 void UD3D9RenderDevice::ReadPixels(FColor* Pixels, UBOOL bGammaCorrectOutput) {
+#elif DS9_THE_FALLEN
+void UD3D9RenderDevice::ReadPixels(FColor* Pixels, INT ColorBits) {
 #else
 void UD3D9RenderDevice::ReadPixels(FColor* Pixels) {
 #endif
