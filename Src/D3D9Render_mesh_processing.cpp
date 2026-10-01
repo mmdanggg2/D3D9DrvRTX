@@ -384,6 +384,22 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 	SurfKeyBucketVector<UTexture*, FRenderVert>& surfaceBuckets = renderData.surfaceBuckets;
 	surfaceBuckets.reserve(numTris);
 
+#if DS9_THE_FALLEN
+	// URender::DrawMesh multiplies the mesh colour by ColorFilter. ScaleGlow only applies to translucent meshes
+	// (fades beams/particles, same as renderSprite); opaque meshes leave brightness to Remix lighting.
+	// Modulated surfaces need white vertex colours, same as renderSpriteGeo.
+	FVector tint = actor->ColorFilter;
+	if (baseFlags & PF_Translucent) {
+		tint *= actor->ScaleGlow;
+	}
+	const DWORD colorFilter = (baseFlags & PF_Modulated) ? 0xFFFFFFFF : D3DCOLOR_COLORVALUE(
+		Clamp(tint.X, 0.0f, 1.0f),
+		Clamp(tint.Y, 0.0f, 1.0f),
+		Clamp(tint.Z, 0.0f, 1.0f),
+		1.0f
+	);
+#endif
+	
 	int vertMaxCount = numTris * 3;
 	// Process all triangles on the mesh
 	for (INT i = 0; i < numTris; i++) {
@@ -445,6 +461,9 @@ void UD3D9RenderDevice::renderMeshActor(FSceneNode* frame, AActor* actor, Render
 			vert.norm = norm;
 			vert.U = triUV[j].U;
 			vert.V = triUV[j].V;
+#if DS9_THE_FALLEN
+			vert.Color = colorFilter;
+#endif
 
 			// Calculate the environment UV mapping
 			if (environMapped) {
