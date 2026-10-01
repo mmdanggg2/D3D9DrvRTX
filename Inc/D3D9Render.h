@@ -75,6 +75,11 @@ private:
 	void drawPawnExtras(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, APawn* pawn, RenderList& renderList, SpecialCoord& specialCoord);
 	void getSurfaceDecals(FSceneNode* frame, const SurfaceData& surfaceData, DecalMap& decals, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures);
 	void drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, ModelFacets& modelFacets, FrameActors& objs, std::unordered_map<UTexture*, FTextureInfo>& lockedTextures, bool isSky = false);
+	static bool isActorInPass(const AActor* actor, RPASS pass);
+	void renderActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor);
+#if DS9_THE_FALLEN
+	void drawMultiMeshActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, RPASS pass);
+#endif
 #if RUNE
 	void drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, RenderList& renderList, const ParentCoord* parentCoord);
 	// These seem to be non exported global variables that are swapped about in the original URender::DrawWorld

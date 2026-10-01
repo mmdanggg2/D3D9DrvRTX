@@ -246,6 +246,19 @@ void UD3D9Render::onLevelChange(FSceneNode* frame) {
 	}
 }
 
+#if DS9_THE_FALLEN
+static void updateVisibleC3DAnimStates(FSceneNode* frame) {
+	for (FSceneNode* child = frame->Child; child; child = child->Sibling) {
+		updateVisibleC3DAnimStates(child);
+	}
+	for (FDynamicSprite* sprite = frame->Sprite; sprite; sprite = sprite->RenderNext) {
+		if (sprite->Actor) {
+			sprite->Actor->C3DGetActorAnimState();
+		}
+	}
+}
+#endif
+
 void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	guard(UD3D9Render::DrawWorld);
 #if UTGLR_ENABLE_CLASS_EXPORT
@@ -377,6 +390,9 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 #endif
 
 #if DS9_THE_FALLEN
+	// The original DrawWorld brings every visible actor's C3D anim state up to date before C3DPreRender events run,
+	// so attach point queries (e.g. weapon FirePoint) see this frame's pose
+	updateVisibleC3DAnimStates(frame);
 	for (int i = frame->Level->iFirstDynamicActor; i < frame->Level->Actors.Num(); i++) {
 		AActor* dynActor = frame->Level->Actors(i);
 		if (dynActor && !dynActor->bDeleteMe) {
@@ -624,20 +640,35 @@ void UD3D9Render::drawFrame(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, Model
 			}
 		}
 		for (AActor* actor : visibleActors) {
-			UBOOL bTranslucent = actor->Style == STY_Translucent;
-#if RUNE || UNDYING
-			bTranslucent |= actor->Style == STY_AlphaBlend;
+#if DS9_THE_FALLEN
+			const UCTVE_MultiMesh* multiMeshHead = actor->MultiMesh;
+			if (multiMeshHead && (multiMeshHead->Next || actor->bMultiMeshRenderInitial)) {
+				drawMultiMeshActor(frame, d3d9Dev, actor, pass);
+				continue;
+			}
 #endif
-			if ((pass == RPASS::NONSOLID && bTranslucent) || (pass == RPASS::SOLID && !bTranslucent)) {
-				RenderList renderList;
-				drawActorSwitch(frame, d3d9Dev, actor, renderList);
-				for (const ActorRenderData& renderData : renderList) {
-					d3d9Dev->renderSurfaceBuckets(renderData, frame->Viewport->CurrentTime);
-				}
+			if (isActorInPass(actor, pass)) {
+				renderActor(frame, d3d9Dev, actor);
 			}
 		}
 	}
 	unguardf((TEXT("(isSky = %i)"), isSky));
+}
+
+bool UD3D9Render::isActorInPass(const AActor* actor, RPASS pass) {
+	bool bTranslucent = actor->Style == STY_Translucent;
+#if RUNE || UNDYING
+	bTranslucent |= actor->Style == STY_AlphaBlend;
+#endif
+	return pass == (bTranslucent ? RPASS::NONSOLID : RPASS::SOLID);
+}
+
+void UD3D9Render::renderActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor) {
+	RenderList renderList;
+	drawActorSwitch(frame, d3d9Dev, actor, renderList);
+	for (const ActorRenderData& renderData : renderList) {
+		d3d9Dev->renderSurfaceBuckets(renderData, frame->Viewport->CurrentTime);
+	}
 }
 
 void UD3D9Render::drawActorSwitch(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, RenderList& renderList, ParentCoord* parentCoord) {
@@ -984,6 +1015,60 @@ void UD3D9Render::drawSkeletalActor(FSceneNode* frame, UD3D9RenderDevice* d3d9De
 // Just the offsets from the closest exported symbols
 float* const UD3D9Render::prevFrameMaxZ = ((float*)&UD3D9Render::Stamp) - 196;
 float* const UD3D9Render::currFrameMaxZ = ((float*)&UD3D9Render::MaxLeafLights) - 1;
+#endif
+
+#if DS9_THE_FALLEN
+// Mirrors URender::DrawFrame + URender::DrawActorSpriteMM: an actor owning a multimesh list (beam sections, particles)
+// is drawn once per live element, with the element's render state temporarily copied onto the actor.
+// The actor itself is only drawn when bMultiMeshRenderInitial is set.
+void UD3D9Render::drawMultiMeshActor(FSceneNode* frame, UD3D9RenderDevice* d3d9Dev, AActor* actor, RPASS pass) {
+	guard(UD3D9Render::drawMultiMeshActor);
+	if (actor->bMultiMeshRenderInitial && isActorInPass(actor, pass)) {
+		renderActor(frame, d3d9Dev, actor);
+	}
+
+	const FLOAT origLifeSpan = actor->LifeSpan;
+	const FVector origLocation = actor->Location;
+	const FRotator origRotation = actor->Rotation;
+	const FLOAT origDrawScale = actor->DrawScale;
+	const FLOAT origScaleGlow = actor->ScaleGlow;
+	UTexture* const origTexture = actor->Texture;
+	const FVector origAxisScale = actor->AxisScale;
+	const FVector origColorFilter = actor->ColorFilter;
+	const BYTE origStyle = actor->Style;
+
+	// actor->MultiMesh is the list head, not an element. Deleted elements stay in the list as a reuse pool.
+	for (UCTVE_DllObject* node = actor->MultiMesh->Next; node; node = node->Next) {
+		if (node->bDeleted) {
+			continue;
+		}
+		const UCTVE_MultiMesh* element = static_cast<UCTVE_MultiMesh*>(node);
+		actor->Style = static_cast<BYTE>(element->Style);
+		if (!isActorInPass(actor, pass)) {
+			continue;
+		}
+		actor->LifeSpan = element->LifeSpan;
+		actor->Location = element->Location;
+		actor->Rotation = element->Rotation;
+		actor->DrawScale = element->DrawScale;
+		actor->ScaleGlow = element->ScaleGlow;
+		actor->Texture = element->Texture;
+		actor->AxisScale = element->AxisScale;
+		actor->ColorFilter = element->ColorFilter;
+		renderActor(frame, d3d9Dev, actor);
+	}
+
+	actor->LifeSpan = origLifeSpan;
+	actor->Location = origLocation;
+	actor->Rotation = origRotation;
+	actor->DrawScale = origDrawScale;
+	actor->ScaleGlow = origScaleGlow;
+	actor->Texture = origTexture;
+	actor->AxisScale = origAxisScale;
+	actor->ColorFilter = origColorFilter;
+	actor->Style = origStyle;
+	unguardf((TEXT("(%ls)"), actor->GetFullName()));
+}
 #endif
 
 #if UNREAL_GOLD_OLDUNREAL
