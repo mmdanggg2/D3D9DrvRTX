@@ -317,7 +317,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 			skyZones.push_back((ASkyZoneInfo*)actor);
 		}
 #if DS9_THE_FALLEN
-		if (frame->Level->iFirstDynamicActor < iActor) {
+		if (frame->Level->iFirstDynamicActor <= iActor) {
 			if (!actor->bDeleteMe && actor->Mesh && actor->Mesh->c3dMesh) {
 				C3DReinitialiseIfNecessary(actor);
 			}
@@ -492,6 +492,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 	}
 #endif
 
+#if !DS9_THE_FALLEN  // DS9 doesn't use eventRenderOverlays
 	// Render view model actor and extra HUD stuff
 	if (!GIsEditor && playerActor && (viewport->Actor->ShowFlags & SHOW_Actors)) {
 		GUglyHackFlags |= 1;
@@ -509,6 +510,7 @@ void UD3D9Render::DrawWorld(FSceneNode* frame) {
 #endif
 		GUglyHackFlags &= ~1;
 	}
+#endif
 
 	memMark.Pop();
 #if !UTGLR_NO_VECTOR_MEM
